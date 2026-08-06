@@ -310,47 +310,6 @@
             border-radius: 3px;
         }
 
-        .photo-gallery-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        .busphoto-thumb {
-            background: var(--bp-input-bg);
-            border: 1px solid var(--bp-border);
-            border-radius: 3px;
-            overflow: hidden;
-            cursor: pointer;
-            transition: transform 0.15s, border-color 0.15s;
-        }
-        .busphoto-thumb:hover {
-            border-color: var(--bp-link);
-            transform: translateY(-2px);
-        }
-        .thumb-img-wrapper {
-            height: 95px;
-            background: #111;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            color: #555;
-            font-size: 10px;
-        }
-        .thumb-caption {
-            padding: 5px;
-            font-size: 10px;
-            text-align: center;
-            color: var(--bp-text);
-            background: var(--bp-card-bg);
-            border-top: 1px solid var(--bp-border);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
         .photo-view-container {
             background: var(--bp-card-bg);
             border: 1px solid var(--bp-border);
@@ -389,15 +348,6 @@
             border-radius: 3px;
         }
         .photo-meta-box p { margin: 4px 0; }
-
-        .specs-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 11px;
-            margin-bottom: 10px;
-        }
-        .specs-table td { padding: 5px 8px; border-bottom: 1px solid var(--bp-border); }
-        .specs-table td.label { font-weight: bold; width: 28%; background: var(--bp-table-header); }
 
         .tab-content { display: none; }
         .tab-content.active { display: block; }
@@ -700,43 +650,6 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="vehicleModal">
-        <div class="modal-card">
-            <span class="modal-close" onclick="closeCard()">&times;</span>
-            <div class="vehicle-title" id="mTitle">Модель ТС</div>
-            <div class="vehicle-subtitle" id="mSubtitle">Минск, Предприятие</div>
-
-            <div style="font-weight:bold; margin-bottom:6px; font-size:11px;" id="m-gallery-title">📷 Фотогалерея ТС (Ракурсы):</div>
-            <div class="photo-gallery-grid" id="vCardGallery">
-                <div class="busphoto-thumb"><div class="thumb-img-wrapper">📷<br><span>(Нет фото)</span></div><div class="thumb-caption">Спереди (3/4)</div></div>
-                <div class="busphoto-thumb"><div class="thumb-img-wrapper">📷<br><span>(Нет фото)</span></div><div class="thumb-caption">Сзади (3/4)</div></div>
-                <div class="busphoto-thumb"><div class="thumb-img-wrapper">📷<br><span>(Нет фото)</span></div><div class="thumb-caption">Правый бок</div></div>
-                <div class="busphoto-thumb"><div class="thumb-img-wrapper">📷<br><span>(Нет фото)</span></div><div class="thumb-caption">Левый бок</div></div>
-                <div class="busphoto-thumb"><div class="thumb-img-wrapper">📷<br><span>(Нет фото)</span></div><div class="thumb-caption">Салон / Кабина</div></div>
-                <div class="busphoto-thumb"><div class="thumb-img-wrapper">📷<br><span>(Нет фото)</span></div><div class="thumb-caption">Табличка</div></div>
-            </div>
-
-            <div style="font-weight:bold; margin-bottom:6px; font-size:11px;" id="m-info-title">📋 Информация о машине:</div>
-            <table class="specs-table">
-                <tr><td class="label" id="lbl-spec-gov">Гос. номер:</td><td id="mGov">—</td></tr>
-                <tr><td class="label" id="lbl-spec-num">Бортовой / Гар. №:</td><td id="mNumber">—</td></tr>
-                <tr><td class="label" id="lbl-spec-purpose">Назначение:</td><td id="mPurpose">—</td></tr>
-                <tr><td class="label" id="lbl-spec-factory">Заводской №:</td><td id="mFactory">—</td></tr>
-                <tr><td class="label" id="lbl-spec-vin">VIN:</td><td id="mVin">—</td></tr>
-                <tr><td class="label" id="lbl-spec-build">Построен:</td><td id="mBuild">—</td></tr>
-                <tr><td class="label" id="lbl-spec-arrive">Поступил:</td><td id="mArrive">—</td></tr>
-                <tr><td class="label" id="lbl-spec-start">Начал работу:</td><td id="mStart">—</td></tr>
-                <tr><td class="label" id="lbl-spec-out">Отставлен:</td><td id="mOut">—</td></tr>
-                <tr><td class="label" id="lbl-spec-decomm">Списан:</td><td id="mDecomm">—</td></tr>
-                <tr><td class="label" id="lbl-spec-util">Утилизирован:</td><td id="mUtil">—</td></tr>
-                <tr><td class="label" id="lbl-spec-status">Текущее состояние:</td><td id="mStatus">—</td></tr>
-                <tr><td class="label" id="lbl-spec-note">Примечание:</td><td id="mNote">—</td></tr>
-            </table>
-
-            <button onclick="deleteCurrentVehicle()" style="background:#c62828; color:#fff; border:none; padding:9px 12px; font-weight:bold; border-radius:3px; cursor:pointer; width:100%; margin-top:10px;">🗑 Удалить ТС из базы</button>
-        </div>
-    </div>
-
     <div class="modal-overlay" id="photoViewModal">
         <div class="photo-view-container" style="max-width:850px; margin:auto; position:relative;">
             <span class="modal-close" onclick="closePhotoView()">&times;</span>
@@ -777,7 +690,6 @@
         ];
 
         let vehicleDB = [];
-        let currentOpenVehicleIndex = null;
 
         function loadDatabase() {
             let saved = localStorage.getItem('busphoto_custom_db');
@@ -894,8 +806,6 @@
                 btnSend: "Отправить на сайт", lblLoadIdx: "Индекс загрузки", lblTotalPhotos: "Всего загружено фотографий",
                 lblQueuePhotos: "Фотографий в очереди", journalDesc: "Здесь отображаются последние правки по госномерам и статусам транспортных средств.",
                 allParks: "Все предприятия", filterPlace: "Фильтр по модели, номеру...",
-                specGov: "Гос. номер:", specNum: "Бортовой / Гар. №:", specPurpose: "Назначение:", specFactory: "Заводской №:", specVin: "VIN:", specBuild: "Построен:", specArrive: "Поступил:", specStart: "Начал работу:", specOut: "Отставлен:", specDecomm: "Списан:", specUtil: "Утилизирован:", specStatus: "Текущее состояние:", specNote: "Примечание:",
-                legTitle: "Статусы:", legAct: "Эксплуатируется", leg1: "Не был в эксплуатации", leg2: "Не эксплуатируется", leg3: "Выведен из эксплуатации", leg4: "Списан", leg5: "Судьба неизвестна", leg6: "КВР/Модернизация", leg7: "Передан в городе", leg8: "Передан в другой город", leg9: "Смена госномера",
                 ang1: "Спереди (3/4)", ang2: "Сзади (3/4)", ang3: "Правый бок", ang4: "Левый бок", ang5: "Вид строго спереди", ang6: "Вид строго сзади", ang7: "Салон / Кабина", ang8: "Табличка", modTitle: "Подмодификации и транспортные средства в базе данных"
             },
             en: {
@@ -906,7 +816,7 @@
                 tabDB: "📋 Database", tabModels: "🚍 Models List", tabSearch: "🔍 Search", tabUpload: "📷 Upload Photo", tabProfile: "👤 My Profile", tabJournal: "📰 Journal & Requests",
                 langTitle: "Interface Language:",
                 thPhoto: "Photo", thPark: "Depot", thModel: "Model", thGov: "License Plate", thNum: "Fleet No.",
-                thPurpose: "Purpose", thFactory: "Factory No.", thVin: "VIN", thBuild: "Built",
+                thPurpose: "Purpose", thFactory: "Factory No.", thVIN: "VIN", thBuild: "Built",
                 thArrive: "Arrived", thStart: "Started", thOut: "Withdrawn", thDecomm: "Decommissioned",
                 thUtil: "Scrapped", thNote: "Note",
                 linear: "Line", service: "Service",
@@ -923,8 +833,6 @@
                 btnSend: "Upload to site", lblLoadIdx: "Upload Index", lblTotalPhotos: "Total uploaded photos",
                 lblQueuePhotos: "Photos in queue", journalDesc: "Latest database edits for vehicles and statuses are shown here.",
                 allParks: "All depots", filterPlace: "Filter by model, number...",
-                specGov: "License Plate:", specNum: "Fleet No.:", specPurpose: "Purpose:", specFactory: "Factory No.:", specVin: "VIN:", specBuild: "Built:", specArrive: "Arrived:", specStart: "Started:", specOut: "Withdrawn:", specDecomm: "Decommissioned:", specUtil: "Scrapped:", specStatus: "Current Status:", specNote: "Note:",
-                legTitle: "Statuses:", legAct: "Operating", leg1: "Never Operated", leg2: "Out of Service", leg3: "Withdrawn", leg4: "Decommissioned", leg5: "Unknown", leg6: "Overhauled", leg7: "Transferred in city", leg8: "Transferred to another city", leg9: "Plate change",
                 ang1: "Front-Right (3/4)", ang2: "Rear-Right (3/4)", ang3: "Right Side", ang4: "Left Side", ang5: "Front View", ang6: "Rear View", ang7: "Interior", ang8: "VIN Plate", modTitle: "Submodifications and vehicles in database"
             },
             be: {
@@ -935,7 +843,7 @@
                 tabDB: "📋 База даных", tabModels: "🚍 Спіс мадэляў", tabSearch: "🔍 Пошук", tabUpload: "📷 Загрузіць фота", tabProfile: "👤 Мой профіль", tabJournal: "📰 Часопіс і заяўкі",
                 langTitle: "Выбар мовы інтэрфейсу:",
                 thPhoto: "Фота", thPark: "Парк", thModel: "Мадэль", thGov: "Дзярж. нумар", thNum: "Борт. / Гар. №",
-                thPurpose: "Прызначэнне", thFactory: "Заводскі №", thVin: "VIN", thBuild: "Пабудаваны",
+                thPurpose: "Прызначэнне", thFactory: "Заводскі №", thVIN: "VIN", thBuild: "Пабудаваны",
                 thArrive: "Паступіў", thStart: "Пачаў працу", thOut: "Адстаўлены", thDecomm: "Спісаны",
                 thUtil: "Утылізаваны", thNote: "Заўвага",
                 linear: "Лінейны", service: "Службовы",
@@ -952,8 +860,6 @@
                 btnSend: "Адправіць на сайт", lblLoadIdx: "Індэкс загрузкі", lblTotalPhotos: "Усяго фатаграфій",
                 lblQueuePhotos: "Фатаграфій у чарзе", journalDesc: "Тут адлюстроўваюцца апошнія праўкі БД.",
                 allParks: "Усе прадпрыемствы", filterPlace: "Фільтр па мадэлі, нумары...",
-                specGov: "Дзярж. нумар:", specNum: "Бартавы / Гар. №:", specPurpose: "Прызначэнне:", specFactory: "Заводскі №:", specVin: "VIN:", specBuild: "Пабудаваны:", specArrive: "Паступіў:", specStart: "Пачаў працу:", specOut: "Адстаўлены:", specDecomm: "Спісаны:", specUtil: "Утылізаваны:", specStatus: "Бягучы стан:", specNote: "Заўвага:",
-                legTitle: "Статусы:", legAct: "Эксплуатуецца", leg1: "Не быў у эксплуатацыі", leg2: "Не эксплуатуецца", leg3: "Выведзены з эксплуатацыі", leg4: "Спісаны", leg5: "Лёс невядомы", leg6: "КВР/Мадэрнізацыя", leg7: "Перададзены ў горадзе", leg8: "Перададзены ў іншы горад", leg9: "Змена дзяржнумара",
                 ang1: "Спераду (3/4)", ang2: "Ззаду (3/4)", ang3: "Правы бок", ang4: "Левы бок", ang5: "Від спераду", ang6: "Від ззаду", ang7: "Салон / Кабіна", ang8: "Таблічка", modTitle: "Падмадыфікацыі і машыны ў базе даных"
             },
             uk: {
@@ -964,7 +870,7 @@
                 tabDB: "📋 База даних", tabModels: "🚍 Список моделей", tabSearch: "🔍 Пошук", tabUpload: "📷 Завантажити фото", tabProfile: "👤 Мій профіль", tabJournal: "📰 Журнал та заявки",
                 langTitle: "Вибір мови інтерфейсу:",
                 thPhoto: "Фото", thPark: "Парк", thModel: "Модель", thGov: "Держ. номер", thNum: "Борт. / Гар. №",
-                thPurpose: "Призначення", thFactory: "Заводський №", thVin: "VIN", thBuild: "Побудований",
+                thPurpose: "Призначення", thFactory: "Заводський №", thVIN: "VIN", thBuild: "Побудований",
                 thArrive: "Надійшов", thStart: "Почав роботу", thOut: "Відставлений", thDecomm: "Списаний",
                 thUtil: "Утилізований", thNote: "Примітка",
                 linear: "Лінійний", service: "Службовий",
@@ -981,8 +887,6 @@
                 btnSend: "Відправити на сайт", lblLoadIdx: "Індекс завантаження", lblTotalPhotos: "Всього фотографій",
                 lblQueuePhotos: "Фотографій в черзі", journalDesc: "Тут відображаються останні правки БД.",
                 allParks: "Всі підприємства", filterPlace: "Фільтр за моделлю, номером...",
-                specGov: "Держ. номер:", specNum: "Бортовий / Гар. №:", specPurpose: "Призначення:", specFactory: "Заводський №:", specVin: "VIN:", specBuild: "Побудований:", specArrive: "Надійшов:", specStart: "Почав роботу:", specOut: "Відставлений:", specDecomm: "Списаний:", specUtil: "Утилізований:", specStatus: "Поточний стан:", specNote: "Примітка:",
-                legTitle: "Статуси:", legAct: "Експлуатується", leg1: "Не був в експлуатації", leg2: "Не експлуатується", leg3: "Виведений з експлуатації", leg4: "Списаний", leg5: "Доля невідома", leg6: "КВР/Модернізація", leg7: "Переданий в місті", leg8: "Переданий в інше місто", leg9: "Зміна держномера",
                 ang1: "Спереду (3/4)", ang2: "Ззаду (3/4)", ang3: "Правий бік", ang4: "Лівий бік", ang5: "Вид спереду", ang6: "Вид ззаду", ang7: "Салон / Кабіна", ang8: "Табличка", modTitle: "Підмодифікації та машини у базі даних"
             },
             de: {
@@ -993,7 +897,7 @@
                 tabDB: "📋 Datenbank", tabModels: "🚍 Modelliste", tabSearch: "🔍 Suchen", tabUpload: "📷 Foto hochladen", tabProfile: "👤 Mein Profil", tabJournal: "📰 Journal & Anfragen",
                 langTitle: "Sprachauswahl:",
                 thPhoto: "Foto", thPark: "Depot", thModel: "Modell", thGov: "Kennzeichen", thNum: "Betriebsnummer",
-                thPurpose: "Einsatz", thFactory: "Fabriknummer", thVin: "VIN", thBuild: "Gebaut",
+                thPurpose: "Einsatz", thFactory: "Fabriknummer", thVIN: "VIN", thBuild: "Gebaut",
                 thArrive: "Eingetroffen", thStart: "In Betrieb", thOut: "Abgestellt", thDecomm: "Ausgemustert",
                 thUtil: "Verschrottet", thNote: "Hinweis",
                 linear: "Linie", service: "Dienst",
@@ -1010,8 +914,6 @@
                 btnSend: "Hochladen", lblLoadIdx: "Upload-Index", lblTotalPhotos: "Hochgeladene Fotos",
                 lblQueuePhotos: "Fotos in Warteschlange", journalDesc: "Hier werden die neuesten Änderungen angezeigt.",
                 allParks: "Alle Depots", filterPlace: "Nach Modell, Nummer filtern...",
-                specGov: "Kennzeichen:", specNum: "Betriebsnummer:", specPurpose: "Einsatz:", specFactory: "Fabriknummer:", specVin: "VIN:", specBuild: "Gebaut:", specArrive: "Eingetroffen:", specStart: "In Betrieb:", specOut: "Abgestellt:", specDecomm: "Ausgemustert:", specUtil: "Verschrottet:", specStatus: "Aktueller Status:", specNote: "Hinweis:",
-                legTitle: "Status:", legAct: "In Betrieb", leg1: "Nicht in Betrieb", leg2: "Außer Betrieb", leg3: "Abgestellt", leg4: "Ausgemustert", leg5: "Unbekannt", leg6: "Modernisierung", leg7: "Stadtintern übertragen", leg8: "In andere Stadt übertragen", leg9: "Kennzeichenwechsel",
                 ang1: "Vorne rechts (3/4)", ang2: "Hinten rechts (3/4)", ang3: "Rechte Seite", ang4: "Linke Seite", ang5: "Frontansicht", ang6: "Rückansicht", ang7: "Innenraum", ang8: "Schild", modTitle: "Untermodelle und Fahrzeuge in der DB"
             },
             zh: {
@@ -1022,7 +924,7 @@
                 tabDB: "📋 数据库", tabModels: "🚍 车型列表", tabSearch: "🔍 搜索", tabUpload: "📷 上传照片", tabProfile: "👤 我的资料", tabJournal: "📰 日志与申请",
                 langTitle: "界面语言：",
                 thPhoto: "照片", thPark: "车队", thModel: "车型", thGov: "车牌号", thNum: "自编号",
-                thPurpose: "用途", thFactory: "出厂编号", thVin: "VIN", thBuild: "制造",
+                thPurpose: "用途", thFactory: "出厂编号", thVIN: "VIN", thBuild: "制造",
                 thArrive: "抵达", thStart: "投入运营", thOut: "封存", thDecomm: "报废",
                 thUtil: "拆解", thNote: "备注",
                 linear: "常规路线", service: "内部勤务",
@@ -1039,8 +941,6 @@
                 btnSend: "上传到网站", lblLoadIdx: "上传指数", lblTotalPhotos: "总上传照片",
                 lblQueuePhotos: "排队审核的照片", journalDesc: "这里显示最新的车辆和状态修改记录。",
                 allParks: "所有车队", filterPlace: "按车型、编号过滤...",
-                specGov: "车牌号:", specNum: "自编号:", specPurpose: "用途:", specFactory: "出厂编号:", specVin: "VIN:", specBuild: "制造:", specArrive: "抵达:", specStart: "投入运营:", specOut: "封存:", specDecomm: "报废:", specUtil: "拆解:", specStatus: "当前状态:", specNote: "备注:",
-                legTitle: "状态：", legAct: "运营中", leg1: "未投入运营", leg2: "停运", leg3: "封存", leg4: "已报废", leg5: "下落不明", leg6: "大修/现代化", leg7: "市内调拨", leg8: "调往其他城市", leg9: "变更车牌",
                 ang1: "右前 (3/4)", ang2: "右后 (3/4)", ang3: "右侧", ang4: "左侧", ang5: "正前", ang6: "正后", ang7: "车厢内部", ang8: "铭牌", modTitle: "数据库中的子型号和车辆"
             }
         };
@@ -1074,7 +974,7 @@
                 
                 tr.onclick = (e) => {
                     if (e.ctrlKey || e.button === 1) {
-                        window.open('#vehicle-' + index, '_blank');
+                        window.open('Vehicle.html?id=' + index, '_blank');
                     } else {
                         openCardFromObj(index);
                     }
@@ -1085,7 +985,7 @@
                 tr.innerHTML = `
                     <td><div class="table-thumb" onclick="event.stopPropagation(); openPhotoView('${t.ang1}', '${v.model}', '${v.gov}', '${v.build !== '—' ? v.build : '—'}', 'Минск')">📷</div></td>
                     <td><b>${v.park}</b></td>
-                    <td><a href="#" onclick="event.stopPropagation(); openCardFromObj(${index}); return false;"><b>${v.model}</b></a></td>
+                    <td><a href="Vehicle.html?id=${index}" onclick="event.stopPropagation();"><b>${v.model}</b></a></td>
                     <td>${v.gov}</td>
                     <td>${v.num}</td>
                     <td>${purposeLabel}</td>
@@ -1149,7 +1049,7 @@
                 'th-num': 'thNum',
                 'th-purpose': 'thPurpose',
                 'th-factory': 'thFactory',
-                'th-vin': 'thVin',
+                'th-vin': 'thVIN',
                 'th-build': 'thBuild',
                 'th-arrive': 'thArrive',
                 'th-start': 'thStart',
@@ -1168,19 +1068,6 @@
                 'leg-7': 'leg7',
                 'leg-8': 'leg8',
                 'leg-9': 'leg9',
-                'lbl-spec-gov': 'specGov',
-                'lbl-spec-num': 'specNum',
-                'lbl-spec-purpose': 'specPurpose',
-                'lbl-spec-factory': 'specFactory',
-                'lbl-spec-vin': 'specVin',
-                'lbl-spec-build': 'specBuild',
-                'lbl-spec-arrive': 'specArrive',
-                'lbl-spec-start': 'specStart',
-                'lbl-spec-out': 'specOut',
-                'lbl-spec-decomm': 'specDecomm',
-                'lbl-spec-util': 'specUtil',
-                'lbl-spec-status': 'specStatus',
-                'lbl-spec-note': 'specNote',
                 'cat-bus': 'catBus',
                 'cat-troll': 'catTroll',
                 'cat-electro': 'catElectro',
@@ -1227,7 +1114,6 @@
         window.addEventListener('DOMContentLoaded', () => {
             loadDatabase();
             
-            // Восстановление сохраненной темы
             let savedTheme = localStorage.getItem('busphoto_theme');
             if (savedTheme === 'dark') {
                 document.body.classList.remove('light-theme');
@@ -1297,55 +1183,12 @@
             alert('Новое транспортное средство успешно добавлено в базу!');
         }
 
+        // ПЕРЕХОД НА ОТДЕЛЬНУЮ СТРАНИЦУ Vehicle.html ВМЕСТО МОДАЛЬНОГО ОКНА
         function openCardFromObj(index) {
-            currentOpenVehicleIndex = index;
-            let v = vehicleDB[index];
-            let t = translations[currentLang];
-            
-            let dispGov = v.gov !== '—' && v.gov !== '????' ? v.gov : '№ ' + v.num;
-            document.getElementById('mTitle').innerText = v.model + " — " + dispGov;
-            document.getElementById('mSubtitle').innerText = "Минск, " + t.tabDB;
-            
-            document.getElementById('mGov').innerText = v.gov;
-            document.getElementById('mNumber').innerText = v.num;
-            document.getElementById('mPurpose').innerText = t[v.purposeKey] || v.purposeKey;
-            document.getElementById('mFactory').innerText = v.factory;
-            document.getElementById('mVin').innerText = v._generatedVin || "—";
-            document.getElementById('mBuild').innerText = v.build;
-            document.getElementById('mArrive').innerText = v.arrive;
-            document.getElementById('mStart').innerText = v.start;
-            document.getElementById('mOut').innerText = v.out;
-            document.getElementById('mDecomm').innerText = v.decomm;
-            document.getElementById('mUtil').innerText = v.util;
-            document.getElementById('mStatus').innerText = t[v.statusKey] || v.statusKey;
-            document.getElementById('mNote').innerText = v.note || "—";
-
-            let thumbs = document.querySelectorAll('#vCardGallery .busphoto-thumb');
-            let angles = [t.ang1, t.ang2, t.ang3, t.ang4, t.ang7, t.ang8];
-            thumbs.forEach((th, i) => {
-                th.querySelector('.thumb-caption').innerText = angles[i];
-                th.querySelector('span').innerText = `(${t.modNoPhoto})`;
-                th.onclick = () => openPhotoView(angles[i], v.model, dispGov, v.build !== '—' ? v.build : '—', 'Минск');
-            });
-
-            document.getElementById('vehicleModal').style.display = 'flex';
-        }
-
-        function deleteCurrentVehicle() {
-            if (currentOpenVehicleIndex === null || currentOpenVehicleIndex >= vehicleDB.length) return;
-            let v = vehicleDB[currentOpenVehicleIndex];
-            let nameDesc = `${v.model} (${v.gov !== '—' && v.gov !== '????' ? v.gov : 'Борт. ' + v.num})`;
-            
-            if (confirm(`Вы действительно хотите удалить транспортное средство: ${nameDesc}?`)) {
-                vehicleDB.splice(currentOpenVehicleIndex, 1);
-                localStorage.setItem('busphoto_custom_db', JSON.stringify(vehicleDB));
-                closeCard();
-                renderTable();
-                alert('Транспортное средство успешно удалено из базы данных!');
+            if (typeof index === 'number' && index >= 0) {
+                window.location.href = `Vehicle.html?id=${index}`;
             }
         }
-
-        function closeCard() { document.getElementById('vehicleModal').style.display = 'none'; }
 
         function executeGlobalSearch() {
             let modelQ = document.getElementById('searchModelQuery').value.toUpperCase().trim();
@@ -1450,11 +1293,9 @@
         }
 
         window.onclick = function(event) {
-            let modal = document.getElementById('vehicleModal');
             let photoModal = document.getElementById('photoViewModal');
             let modelModal = document.getElementById('modelDetailsModal');
             let addModal = document.getElementById('addVehicleModal');
-            if (event.target === modal) modal.style.display = "none";
             if (event.target === photoModal) photoModal.style.display = "none";
             if (event.target === modelModal) modelModal.style.display = "none";
             if (event.target === addModal) addModal.style.display = "none";
@@ -1462,3 +1303,4 @@
     </script>
 </body>
 </html>
+ 
