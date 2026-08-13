@@ -567,6 +567,15 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="vehicleModal">
+        <div class="modal-card" style="max-width: 650px;">
+            <span class="modal-close" onclick="closeVehicleModal()">&times;</span>
+            <div class="vehicle-title" id="vmTitle">Карточка ТС</div>
+            <div class="vehicle-subtitle" id="vmSubtitle">Подробная информация о транспортном средстве</div>
+            <div id="vmContent" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;"></div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="addVehicleModal">
         <div class="modal-card" style="max-width: 550px;">
             <span class="modal-close" onclick="closeAddModal()">&times;</span>
@@ -789,7 +798,7 @@
                 tabDB: "📋 База данных", tabModels: "🚍 Список моделей", tabSearch: "🔍 Поиск", tabUpload: "📷 Загрузить фото", tabProfile: "👤 Мой профиль", tabJournal: "📰 Журнал и заявки",
                 langTitle: "Выбор языка интерфейса:",
                 thPhoto: "Фото", thPark: "Парк", thModel: "Модель", thGov: "Гос. номер", thNum: "Борт. / Гар. №",
-                thPurpose: "Назначение", thFactory: "Заводской №", thVin: "VIN", thBuild: "Построен",
+                thPurpose: "Назначение", thFactory: "Заводской №", thVIN: "VIN", thBuild: "Построен",
                 thArrive: "Поступил", thStart: "Начал работу", thOut: "Отставлен", thDecomm: "Списан",
                 thUtil: "Утилизирован", thNote: "Примечание",
                 linear: "Линейный", service: "Служебный",
@@ -973,11 +982,7 @@
                 v._generatedVin = vin; 
                 
                 tr.onclick = (e) => {
-                    if (e.ctrlKey || e.button === 1) {
-                        window.open('Vehicle.html?id=' + index, '_blank');
-                    } else {
-                        openCardFromObj(index);
-                    }
+                    openVehicleModal(index);
                 };
                 
                 let purposeLabel = t[v.purposeKey] ? t[v.purposeKey] : (v.purposeKey === '—' ? '—' : v.purposeKey);
@@ -985,7 +990,7 @@
                 tr.innerHTML = `
                     <td><div class="table-thumb" onclick="event.stopPropagation(); openPhotoView('${t.ang1}', '${v.model}', '${v.gov}', '${v.build !== '—' ? v.build : '—'}', 'Минск')">📷</div></td>
                     <td><b>${v.park}</b></td>
-                    <td><a href="Vehicle.html?id=${index}" onclick="event.stopPropagation();"><b>${v.model}</b></a></td>
+                    <td><a href="#" onclick="event.preventDefault(); event.stopPropagation(); openVehicleModal(${index});"><b>${v.model}</b></a></td>
                     <td>${v.gov}</td>
                     <td>${v.num}</td>
                     <td>${purposeLabel}</td>
@@ -1138,6 +1143,39 @@
             document.getElementById('addVehicleModal').style.display = 'none';
         }
 
+        // Модальное окно просмотра деталей транспортного средства
+        function openVehicleModal(index) {
+            let v = vehicleDB[index];
+            if (!v) return;
+            let t = translations[currentLang];
+            document.getElementById('vmTitle').innerText = `${v.model} (${v.park})`;
+            document.getElementById('vmSubtitle').innerText = `${t.thGov}: ${v.gov} | ${t.thNum}: ${v.num}`;
+            
+            let content = document.getElementById('vmContent');
+            content.innerHTML = `
+                <div class="photo-meta-box"><p><b>${t.thPark}:</b> ${v.park}</p></div>
+                <div class="photo-meta-box"><p><b>${t.thModel}:</b> ${v.model}</p></div>
+                <div class="photo-meta-box"><p><b>${t.thGov}:</b> ${v.gov}</p></div>
+                <div class="photo-meta-box"><p><b>${t.thNum}:</b> ${v.num}</p></div>
+                <div class="photo-meta-box"><p><b>${t.thPurpose}:</b> ${t[v.purposeKey] || v.purposeKey}</p></div>
+                <div class="photo-meta-box"><p><b>${t.thFactory}:</b> ${v.factory}</p></div>
+                <div class="photo-meta-box"><p><b>VIN:</b> ${v._generatedVin || '—'}</p></div>
+                <div class="photo-meta-box"><p><b>${t.thBuild}:</b> ${v.build}</p></div>
+                <div class="photo-meta-box"><p><b>${t.thArrive}:</b> ${v.arrive}</p></div>
+                <div class="photo-meta-box"><p><b>${t.thStart}:</b> ${v.start}</p></div>
+                <div class="photo-meta-box"><p><b>${t.thOut}:</b> ${v.out}</p></div>
+                <div class="photo-meta-box"><p><b>${t.thDecomm}:</b> ${v.decomm}</p></div>
+                <div class="photo-meta-box"><p><b>${t.thUtil}:</b> ${v.util}</p></div>
+                <div class="photo-meta-box"><p><b>${t.thNote}:</b> ${v.note}</p></div>
+                <div class="photo-meta-box" style="grid-column: span 2;"><p><b>Статус:</b> ${t[v.statusKey] || v.statusKey}</p></div>
+            `;
+            document.getElementById('vehicleModal').style.display = 'flex';
+        }
+
+        function closeVehicleModal() {
+            document.getElementById('vehicleModal').style.display = 'none';
+        }
+
         function saveNewVehicle(event) {
             event.preventDefault();
             
@@ -1183,13 +1221,6 @@
             alert('Новое транспортное средство успешно добавлено в базу!');
         }
 
-        // ПЕРЕХОД НА ОТДЕЛЬНУЮ СТРАНИЦУ Vehicle.html ВМЕСТО МОДАЛЬНОГО ОКНА
-        function openCardFromObj(index) {
-            if (typeof index === 'number' && index >= 0) {
-                window.location.href = `Vehicle.html?id=${index}`;
-            }
-        }
-
         function executeGlobalSearch() {
             let modelQ = document.getElementById('searchModelQuery').value.toUpperCase().trim();
             let numQ = document.getElementById('searchNumQuery').value.toUpperCase().trim();
@@ -1197,7 +1228,11 @@
             switchTab('database', document.getElementById('btn-db'));
             
             let mainInput = document.getElementById('searchInput');
-            mainInput.value = modelQ || numQ;
+            if (modelQ && numQ) {
+                mainInput.value = modelQ + " " + numQ;
+            } else {
+                mainInput.value = modelQ || numQ;
+            }
             
             filterDB();
             
@@ -1238,7 +1273,7 @@
                     div.style.cursor = 'pointer';
                     
                     let globalIdx = vehicleDB.indexOf(v);
-                    div.onclick = () => { closeModelModal(); openCardFromObj(globalIdx); };
+                    div.onclick = () => { closeModelModal(); openVehicleModal(globalIdx); };
                     
                     let dispName = v.gov !== '—' && v.gov !== '????' ? v.gov : `Борт. ${v.num}`;
                     let icon = typeKey === 'bus' ? '🚌' : (typeKey === 'trolleybus' ? '🚎' : '⚡');
@@ -1293,9 +1328,11 @@
         }
 
         window.onclick = function(event) {
+            let vehicleModal = document.getElementById('vehicleModal');
             let photoModal = document.getElementById('photoViewModal');
             let modelModal = document.getElementById('modelDetailsModal');
             let addModal = document.getElementById('addVehicleModal');
+            if (event.target === vehicleModal) vehicleModal.style.display = "none";
             if (event.target === photoModal) photoModal.style.display = "none";
             if (event.target === modelModal) modelModal.style.display = "none";
             if (event.target === addModal) addModal.style.display = "none";
@@ -1303,4 +1340,4 @@
     </script>
 </body>
 </html>
- 
+
