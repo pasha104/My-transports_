@@ -225,22 +225,6 @@
         table.bp-table tbody tr { cursor: pointer; }
         table.bp-table tbody tr:hover { outline: 1px solid var(--bp-link); }
 
-        .table-thumb {
-            width: 45px;
-            height: 30px;
-            background: #111;
-            border: 1px solid var(--bp-border);
-            border-radius: 2px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 10px;
-            color: #777;
-            overflow: hidden;
-            cursor: pointer;
-        }
-        .table-thumb:hover { border-color: var(--bp-link); }
-
         .legend-bar {
             display: flex;
             gap: 10px;
@@ -309,45 +293,6 @@
             border: 1px solid var(--bp-border);
             border-radius: 3px;
         }
-
-        .photo-view-container {
-            background: var(--bp-card-bg);
-            border: 1px solid var(--bp-border);
-            width: 100%;
-            max-width: 850px;
-            border-radius: 4px;
-            padding: 20px;
-            position: relative;
-            display: grid;
-            grid-template-columns: 1fr 300px;
-            gap: 15px;
-        }
-        @media(max-width: 768px) {
-            .photo-view-container { grid-template-columns: 1fr; }
-        }
-        .photo-main-frame {
-            background: #000;
-            min-height: 350px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 3px;
-            overflow: hidden;
-            position: relative;
-        }
-        .photo-sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            font-size: 11px;
-        }
-        .photo-meta-box {
-            background: var(--bp-input-bg);
-            padding: 10px;
-            border: 1px solid var(--bp-border);
-            border-radius: 3px;
-        }
-        .photo-meta-box p { margin: 4px 0; }
 
         .tab-content { display: none; }
         .tab-content.active { display: block; }
@@ -423,9 +368,7 @@
         <button class="nav-btn active" id="btn-db" onclick="switchTab('database', this)">📋 База данных</button>
         <button class="nav-btn" id="btn-models" onclick="switchTab('models', this)">🚍 Список моделей</button>
         <button class="nav-btn" id="btn-search" onclick="switchTab('search-tab', this)">🔍 Поиск</button>
-        <button class="nav-btn" id="btn-upload" onclick="switchTab('upload', this)">📷 Загрузить фото</button>
         <button class="nav-btn" id="btn-profile" onclick="switchTab('profile', this)">👤 Мой профиль</button>
-        <button class="nav-btn" id="btn-journal" onclick="switchTab('journal', this)">📰 Журнал и заявки</button>
     </nav>
 
     <div class="main-wrapper">
@@ -433,6 +376,7 @@
             <div class="page-header">
                 <span id="page-title-db">Минск — Подвижной состав</span>
                 <div class="action-buttons">
+                    <button class="btn-secondary" style="background:#8b0000; border-color:#8b0000;" onclick="openDeleteModal()">🗑 Удалить ТС</button>
                     <button class="btn-secondary" onclick="exportDatabase()">💾 Экспорт БД</button>
                     <button class="btn-secondary" onclick="document.getElementById('importFile').click()">📂 Импорт БД</button>
                     <input type="file" id="importFile" style="display:none" accept=".json" onchange="importDatabase(event)">
@@ -454,7 +398,6 @@
                 <table class="bp-table" id="dbTable">
                     <thead>
                         <tr>
-                            <th style="width: 40px;" id="th-photo">Фото</th>
                             <th id="th-park">Парк</th>
                             <th id="th-model">Модель</th>
                             <th id="th-gov">Гос. номер</th>
@@ -520,31 +463,10 @@
             </div>
         </div>
 
-        <div id="upload" class="tab-content">
-            <div class="page-header" id="page-title-upload">📷 Загрузка фотографии ТС</div>
-            <div style="background:var(--bp-card-bg); padding:15px; border:1px solid var(--bp-border); max-width:600px;">
-                <p><label id="lbl-select-ts">Выберите ТС из базы:</label><br><input type="text" style="width:100%; padding:6px; background:var(--bp-input-bg); color:var(--bp-text); border:1px solid var(--bp-border);"></p>
-                <p><label id="lbl-angle">Ракурс съёмки:</label><br>
-                    <select style="width:100%; padding:6px; background:var(--bp-input-bg); color:var(--bp-text); border:1px solid var(--bp-border);">
-                        <option>Спереди справа (3/4)</option>
-                        <option>Сзади справа (3/4)</option>
-                        <option>Правый бок</option>
-                        <option>Левый бок</option>
-                        <option>Вид строго спереди</option>
-                        <option>Салон / кабина</option>
-                    </select>
-                </p>
-                <p><label id="lbl-file">Файл фото:</label><br><input type="file" multiple></p>
-                <p><button id="btn-send-site" onclick="alert('Фото добавлено в очередь на модерацию!')" style="background:#28a745; color:#fff; border:none; padding:8px 15px; cursor:pointer; font-weight:bold;">Отправить на сайт</button></p>
-            </div>
-        </div>
-
         <div id="profile" class="tab-content">
             <div class="page-header" id="page-title-profile">👤 Мой профиль и настройки</div>
             <div style="background:var(--bp-card-bg); padding:15px; border:1px solid var(--bp-border); max-width:600px;">
                 <p><b><span id="lbl-load-idx">Индекс загрузки</span>:</b> 100%</p>
-                <p><b><span id="lbl-total-photos">Всего загружено фотографий</span>:</b> 0</p>
-                <p><b><span id="lbl-queue-photos">Фотографий в очереди на модерацию</span>:</b> 0</p>
                 <hr style="border-color:var(--bp-border);">
                 <p><label id="lbl-lang-title">Выбор языка интерфейса:</label><br>
                     <select id="langSelect" onchange="changeLanguage(this.value)" style="width:100%; padding:6px; background:var(--bp-input-bg); color:var(--bp-text); border:1px solid var(--bp-border);">
@@ -558,13 +480,6 @@
                 </p>
             </div>
         </div>
-
-        <div id="journal" class="tab-content">
-            <div class="page-header" id="page-title-journal">📰 Журнал заявок и изменений БД</div>
-            <div style="background:var(--bp-card-bg); padding:15px; border:1px solid var(--bp-border);">
-                <p id="txt-journal-desc">Здесь отображаются последние правки по госномерам и статусам транспортных средств.</p>
-            </div>
-        </div>
     </div>
 
     <div class="modal-overlay" id="vehicleModal">
@@ -573,6 +488,20 @@
             <div class="vehicle-title" id="vmTitle">Карточка ТС</div>
             <div class="vehicle-subtitle" id="vmSubtitle">Подробная информация о транспортном средстве</div>
             <div id="vmContent" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;"></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal-card" style="max-width: 600px;">
+            <span class="modal-close" onclick="closeDeleteModal()">&times;</span>
+            <div class="vehicle-title" style="color: #e02424;">🗑 Удаление транспортного средства</div>
+            <div class="vehicle-subtitle">Найдите нужное ТС через поиск и нажмите кнопку удаления</div>
+            
+            <div style="margin-bottom: 10px;">
+                <input type="text" id="deleteSearchInput" onkeyup="filterDeleteList()" placeholder="Поиск по модели, гос. или бортовому номеру..." style="width: 100%; padding: 7px; background: var(--bp-input-bg); color: var(--bp-text); border: 1px solid var(--bp-border); border-radius: 3px; font-size: 11px; box-sizing: border-box;">
+            </div>
+            
+            <div class="submodel-list-box" id="deleteListContainer" style="max-height: 400px;"></div>
         </div>
     </div>
 
@@ -659,31 +588,6 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="photoViewModal">
-        <div class="photo-view-container" style="max-width:850px; margin:auto; position:relative;">
-            <span class="modal-close" onclick="closePhotoView()">&times;</span>
-            <div class="photo-main-frame">
-                <div style="color: #777; text-align: center;">
-                    📷<br><span id="pvPhotoTitle">Фото отсутствует в базе</span>
-                </div>
-            </div>
-            <div class="photo-sidebar">
-                <div style="font-size: 14px; font-weight: bold; color: var(--bp-link);" id="pvHeaderModel">Модель ТС</div>
-                <div class="photo-meta-box">
-                    <p><b id="pvLblGov">Гос. / Борт:</b> <span id="pvGovNum">—</span></p>
-                    <p><b id="pvLblAngle">Ракурс:</b> <span id="pvAngle">—</span></p>
-                    <p><b id="pvLblDate">Дата съёмки:</b> <span id="pvDate">—</span></p>
-                    <p><b id="pvLblPlace">Место:</b> <span id="pvLocation">—</span></p>
-                    <p><b id="pvLblAuthor">Автор:</b> <a href="#">User_BusPhoto</a></p>
-                </div>
-                <div style="font-weight: bold; margin-top: 5px;" id="pvCommentsText">Комментарии (0):</div>
-                <div class="photo-meta-box" style="color: #888; font-style: italic;" id="pvNoComments">
-                    Нет комментариев к этому фото.
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script>
         const defaultVehicleDB = [
             { park: "ТП 2", modelPrefix: "МАЗ-216", model: "МАЗ 216.047", gov: "????", num: "????", purposeKey: "service", factory: "125", build: "03.12.2025", arrive: "15.12.2025", start: "—", out: "—", decomm: "—", util: "—", statusCls: "st-unknown", statusKey: "txtUnk", note: "Новогодний 2026" },
@@ -766,8 +670,7 @@
                 "МАЗ-256": ["256.000", "256.070", "256.100", "256.170", "256.200", "256.270"],
                 "МАЗ-257": ["257.030", "257.S30", "257.A30"],
                 "МАЗ-281": ["281.040"],
-                "МАЗ-303": ["303.047", "303.065", "303.066", "303.266", "303.147"],
-                "МАЗ-305": ["305.040", "305.060"]
+                "МАЗ-303": ["303.047", "303.065", "303.066", "303.266", "303.147"]
             },
             trolleybus: {
                 "МАЗ-103Т": ["103Т"],
@@ -783,6 +686,7 @@
                 "АКСМ-433": ["433"]
             },
             electrobus: {
+                "МАЗ-305Е": [],
                 "МАЗ-303Э": ["303Э10", "303Э20", "303Э22"],
                 "АКСМ-Е321": ["Е321"],
                 "АКСМ-Е433": ["Е433"]
@@ -793,11 +697,10 @@
             ru: {
                 sub: "База данных ПС — Беларусь (Минск)", inBase: "ТС в базе",
                 dbTitle: "Минск — Подвижной состав", modelsTitle: "🚍 Список моделей подвижного состава",
-                searchTitle: "🔍 Расширенный поиск по базе", uploadTitle: "📷 Загрузка фотографии ТС",
-                profileTitle: "👤 Мой профиль и настройки", journalTitle: "📰 Журнал заявок и изменений БД",
-                tabDB: "📋 База данных", tabModels: "🚍 Список моделей", tabSearch: "🔍 Поиск", tabUpload: "📷 Загрузить фото", tabProfile: "👤 Мой профиль", tabJournal: "📰 Журнал и заявки",
+                searchTitle: "🔍 Расширенный поиск по базе", profileTitle: "👤 Мой профиль и настройки",
+                tabDB: "📋 База данных", tabModels: "🚍 Список моделей", tabSearch: "🔍 Поиск", tabProfile: "👤 Мой профиль",
                 langTitle: "Выбор языка интерфейса:",
-                thPhoto: "Фото", thPark: "Парк", thModel: "Модель", thGov: "Гос. номер", thNum: "Борт. / Гар. №",
+                thPark: "Парк", thModel: "Модель", thGov: "Гос. номер", thNum: "Борт. / Гар. №",
                 thPurpose: "Назначение", thFactory: "Заводской №", thVIN: "VIN", thBuild: "Построен",
                 thArrive: "Поступил", thStart: "Начал работу", thOut: "Отставлен", thDecomm: "Списан",
                 thUtil: "Утилизирован", thNote: "Примечание",
@@ -807,24 +710,18 @@
                 txtOut: "Выведен из эксплуатации", txtTransCity: "Передан в городе", txtTransOther: "Передан в другой город", txtPlateChange: "Смена госномера",
                 catBus: "🚌 Автобусы", catTroll: "🚎 Троллейбусы", catElectro: "⚡ Электробусы",
                 clickModel: "(Нажмите на модель для открытия списка подмоделей в отдельном окне)",
-                modSub: "📌 Список подмоделей:", modNoPhoto: "Фото отсутствует в базе",
-                modAngle: "Ракурс:", modDate: "Дата съёмки:", modPlace: "Место:", modAuthor: "Автор:",
-                modComments: "Комментарии (0):", modNoComments: "Нет комментариев к этому фото.",
+                modSub: "📌 Список подмоделей:",
                 lblCountry: "Страна", lblCity: "Город", lblModel: "Модель", lblNum: "Гос. или бортовой номер",
-                btnFind: "Найти в базе", lblSelectTs: "Выберите ТС из базы:", lblAngle: "Ракурс съёмки:", lblFile: "Файл фото:",
-                btnSend: "Отправить на сайт", lblLoadIdx: "Индекс загрузки", lblTotalPhotos: "Всего загружено фотографий",
-                lblQueuePhotos: "Фотографий в очереди", journalDesc: "Здесь отображаются последние правки по госномерам и статусам транспортных средств.",
-                allParks: "Все предприятия", filterPlace: "Фильтр по модели, номеру...",
-                ang1: "Спереди (3/4)", ang2: "Сзади (3/4)", ang3: "Правый бок", ang4: "Левый бок", ang5: "Вид строго спереди", ang6: "Вид строго сзади", ang7: "Салон / Кабина", ang8: "Табличка", modTitle: "Подмодификации и транспортные средства в базе данных"
+                btnFind: "Найти в базе", lblLoadIdx: "Индекс загрузки", allParks: "Все предприятия", filterPlace: "Фильтр по модели, номеру...",
+                modTitle: "Подмодификации и транспортные средства в базе данных"
             },
             en: {
                 sub: "Rolling Stock Database — Belarus (Minsk)", inBase: "Vehicles in db",
                 dbTitle: "Minsk — Rolling Stock", modelsTitle: "🚍 List of rolling stock models",
-                searchTitle: "🔍 Advanced Database Search", uploadTitle: "📷 Upload Vehicle Photo",
-                profileTitle: "👤 My Profile & Settings", journalTitle: "📰 Journal of Requests & DB Changes",
-                tabDB: "📋 Database", tabModels: "🚍 Models List", tabSearch: "🔍 Search", tabUpload: "📷 Upload Photo", tabProfile: "👤 My Profile", tabJournal: "📰 Journal & Requests",
+                searchTitle: "🔍 Advanced Database Search", profileTitle: "👤 My Profile & Settings",
+                tabDB: "📋 Database", tabModels: "🚍 Models List", tabSearch: "🔍 Search", tabProfile: "👤 My Profile",
                 langTitle: "Interface Language:",
-                thPhoto: "Photo", thPark: "Depot", thModel: "Model", thGov: "License Plate", thNum: "Fleet No.",
+                thPark: "Depot", thModel: "Model", thGov: "License Plate", thNum: "Fleet No.",
                 thPurpose: "Purpose", thFactory: "Factory No.", thVIN: "VIN", thBuild: "Built",
                 thArrive: "Arrived", thStart: "Started", thOut: "Withdrawn", thDecomm: "Decommissioned",
                 thUtil: "Scrapped", thNote: "Note",
@@ -834,24 +731,18 @@
                 txtOut: "Withdrawn from service", txtTransCity: "Transferred in city", txtTransOther: "Transferred to another city", txtPlateChange: "Plate change",
                 catBus: "🚌 Buses", catTroll: "🚎 Trolleybuses", catElectro: "⚡ Electric Buses",
                 clickModel: "(Click on a model to open submodels in a new window)",
-                modSub: "📌 Submodels List:", modNoPhoto: "No photo in database",
-                modAngle: "Angle:", modDate: "Date:", modPlace: "Location:", modAuthor: "Author:",
-                modComments: "Comments (0):", modNoComments: "No comments on this photo.",
+                modSub: "📌 Submodels List:",
                 lblCountry: "Country", lblCity: "City", lblModel: "Model", lblNum: "License / Fleet No.",
-                btnFind: "Search Database", lblSelectTs: "Select vehicle:", lblAngle: "Photo angle:", lblFile: "Photo file:",
-                btnSend: "Upload to site", lblLoadIdx: "Upload Index", lblTotalPhotos: "Total uploaded photos",
-                lblQueuePhotos: "Photos in queue", journalDesc: "Latest database edits for vehicles and statuses are shown here.",
-                allParks: "All depots", filterPlace: "Filter by model, number...",
-                ang1: "Front-Right (3/4)", ang2: "Rear-Right (3/4)", ang3: "Right Side", ang4: "Left Side", ang5: "Front View", ang6: "Rear View", ang7: "Interior", ang8: "VIN Plate", modTitle: "Submodifications and vehicles in database"
+                btnFind: "Search Database", lblLoadIdx: "Upload Index", allParks: "All depots", filterPlace: "Filter by model, number...",
+                modTitle: "Submodifications and vehicles in database"
             },
             be: {
                 sub: "База даных РС — Беларусь (Мінск)", inBase: "ТС у базе",
                 dbTitle: "Мінск — Рухомы склад", modelsTitle: "🚍 Спіс мадэляў рухомага складу",
-                searchTitle: "🔍 Пашыраны пошук па базе", uploadTitle: "📷 Загрузка фатаграфіі ТС",
-                profileTitle: "👤 Мой профіль і налады", journalTitle: "📰 Часопіс заявак і зменаў БД",
-                tabDB: "📋 База даных", tabModels: "🚍 Спіс мадэляў", tabSearch: "🔍 Пошук", tabUpload: "📷 Загрузіць фота", tabProfile: "👤 Мой профіль", tabJournal: "📰 Часопіс і заяўкі",
+                searchTitle: "🔍 Пашыраны пошук па базе", profileTitle: "👤 Мой профіль і налады",
+                tabDB: "📋 База даных", tabModels: "🚍 Спіс мадэляў", tabSearch: "🔍 Пошук", tabProfile: "👤 Мой профіль",
                 langTitle: "Выбар мовы інтэрфейсу:",
-                thPhoto: "Фота", thPark: "Парк", thModel: "Мадэль", thGov: "Дзярж. нумар", thNum: "Борт. / Гар. №",
+                thPark: "Парк", thModel: "Мадэль", thGov: "Дзярж. нумар", thNum: "Борт. / Гар. №",
                 thPurpose: "Прызначэнне", thFactory: "Заводскі №", thVIN: "VIN", thBuild: "Пабудаваны",
                 thArrive: "Паступіў", thStart: "Пачаў працу", thOut: "Адстаўлены", thDecomm: "Спісаны",
                 thUtil: "Утылізаваны", thNote: "Заўвага",
@@ -861,24 +752,18 @@
                 txtOut: "Выведзены з эксплуатацыі", txtTransCity: "Перададзены ў горадзе", txtTransOther: "Перададзены ў іншы горад", txtPlateChange: "Змена дзяржнумара",
                 catBus: "🚌 Аўтобусы", catTroll: "🚎 Тралейбусы", catElectro: "⚡ Электробусы",
                 clickModel: "(Націсніце на мадэль для адкрыцця спісу падмадэляў у асобным акне)",
-                modSub: "📌 Спіс падмадэляў:", modNoPhoto: "Фота адсутнічае ў базе",
-                modAngle: "Ракурс:", modDate: "Дата здымкі:", modPlace: "Месца:", modAuthor: "Аўтар:",
-                modComments: "Каментары (0):", modNoComments: "Няма каментароў да гэтага фота.",
+                modSub: "📌 Спіс падмадэляў:",
                 lblCountry: "Краіна", lblCity: "Горад", lblModel: "Мадэль", lblNum: "Дзярж. ці бартавы нумар",
-                btnFind: "Знайсці ў базе", lblSelectTs: "Выберыце ТС з базы:", lblAngle: "Ракурс здымкі:", lblFile: "Файл фота:",
-                btnSend: "Адправіць на сайт", lblLoadIdx: "Індэкс загрузкі", lblTotalPhotos: "Усяго фатаграфій",
-                lblQueuePhotos: "Фатаграфій у чарзе", journalDesc: "Тут адлюстроўваюцца апошнія праўкі БД.",
-                allParks: "Усе прадпрыемствы", filterPlace: "Фільтр па мадэлі, нумары...",
-                ang1: "Спераду (3/4)", ang2: "Ззаду (3/4)", ang3: "Правы бок", ang4: "Левы бок", ang5: "Від спераду", ang6: "Від ззаду", ang7: "Салон / Кабіна", ang8: "Таблічка", modTitle: "Падмадыфікацыі і машыны ў базе даных"
+                btnFind: "Знайсці ў базе", lblLoadIdx: "Індэкс загрузкі", allParks: "Усе прадпрыемствы", filterPlace: "Фільтр па мадэлі, нумары...",
+                modTitle: "Падмадыфікацыі і машыны ў базе даных"
             },
             uk: {
                 sub: "База даних ПС — Білорусь (Мінськ)", inBase: "ТЗ в базі",
                 dbTitle: "Мінськ — Рухомий склад", modelsTitle: "🚍 Список моделей рухомого складу",
-                searchTitle: "🔍 Розширений пошук по базі", uploadTitle: "📷 Завантаження фотографії ТЗ",
-                profileTitle: "👤 Мій профіль та налаштування", journalTitle: "📰 Журнал заявок та змін БД",
-                tabDB: "📋 База даних", tabModels: "🚍 Список моделей", tabSearch: "🔍 Пошук", tabUpload: "📷 Завантажити фото", tabProfile: "👤 Мій профіль", tabJournal: "📰 Журнал та заявки",
+                searchTitle: "🔍 Розширений пошук по базі", profileTitle: "👤 Мій профіль та налаштування",
+                tabDB: "📋 База даних", tabModels: "🚍 Список моделей", tabSearch: "🔍 Пошук", tabProfile: "👤 Мій профіль",
                 langTitle: "Вибір мови інтерфейсу:",
-                thPhoto: "Фото", thPark: "Парк", thModel: "Модель", thGov: "Держ. номер", thNum: "Борт. / Гар. №",
+                thPark: "Парк", thModel: "Модель", thGov: "Держ. номер", thNum: "Борт. / Гар. №",
                 thPurpose: "Призначення", thFactory: "Заводський №", thVIN: "VIN", thBuild: "Побудований",
                 thArrive: "Надійшов", thStart: "Почав роботу", thOut: "Відставлений", thDecomm: "Списаний",
                 thUtil: "Утилізований", thNote: "Примітка",
@@ -888,24 +773,18 @@
                 txtOut: "Виведений з експлуатації", txtTransCity: "Переданий в місті", txtTransOther: "Переданий в інше місто", txtPlateChange: "Зміна держномера",
                 catBus: "🚌 Автобуси", catTroll: "🚎 Тролейбуси", catElectro: "⚡ Електробуси",
                 clickModel: "(Натисніть на модель для відкриття списку підмоделей в окремому вікні)",
-                modSub: "📌 Список підмоделей:", modNoPhoto: "Фото відсутнє в базі",
-                modAngle: "Ракурс:", modDate: "Дата зйомки:", modPlace: "Місце:", modAuthor: "Автор:",
-                modComments: "Коментарі (0):", modNoComments: "Немає коментарів до цього фото.",
+                modSub: "📌 Список підмоделей:",
                 lblCountry: "Країна", lblCity: "Місто", lblModel: "Модель", lblNum: "Держ. чи бортовий номер",
-                btnFind: "Знайти в базі", lblSelectTs: "Оберіть ТЗ з бази:", lblAngle: "Ракурс зйомки:", lblFile: "Файл фото:",
-                btnSend: "Відправити на сайт", lblLoadIdx: "Індекс завантаження", lblTotalPhotos: "Всього фотографій",
-                lblQueuePhotos: "Фотографій в черзі", journalDesc: "Тут відображаються останні правки БД.",
-                allParks: "Всі підприємства", filterPlace: "Фільтр за моделлю, номером...",
-                ang1: "Спереду (3/4)", ang2: "Ззаду (3/4)", ang3: "Правий бік", ang4: "Лівий бік", ang5: "Вид спереду", ang6: "Вид ззаду", ang7: "Салон / Кабіна", ang8: "Табличка", modTitle: "Підмодифікації та машини у базі даних"
+                btnFind: "Знайти в базі", lblLoadIdx: "Індекс завантаження", allParks: "Всі підприємства", filterPlace: "Фільтр за моделлю, номером...",
+                modTitle: "Підмодифікації та машини у базі даних"
             },
             de: {
                 sub: "Fahrzeugdatenbank — Belarus (Minsk)", inBase: "Fahrzeuge im DB",
                 dbTitle: "Minsk — Fahrzeugpark", modelsTitle: "🚍 Liste der Fahrzeugmodelle",
-                searchTitle: "🔍 Erweiterte Datenbanksuche", uploadTitle: "📷 Fahrzeugfoto hochladen",
-                profileTitle: "👤 Mein Profil & Einstellungen", journalTitle: "📰 Journal & Datenbankänderungen",
-                tabDB: "📋 Datenbank", tabModels: "🚍 Modelliste", tabSearch: "🔍 Suchen", tabUpload: "📷 Foto hochladen", tabProfile: "👤 Mein Profil", tabJournal: "📰 Journal & Anfragen",
+                searchTitle: "🔍 Erweiterte Datenbanksuche", profileTitle: "👤 Mein Profil & Einstellungen",
+                tabDB: "📋 Datenbank", tabModels: "🚍 Modelliste", tabSearch: "🔍 Suchen", tabProfile: "👤 Mein Profil",
                 langTitle: "Sprachauswahl:",
-                thPhoto: "Foto", thPark: "Depot", thModel: "Modell", thGov: "Kennzeichen", thNum: "Betriebsnummer",
+                thPark: "Depot", thModel: "Modell", thGov: "Kennzeichen", thNum: "Betriebsnummer",
                 thPurpose: "Einsatz", thFactory: "Fabriknummer", thVIN: "VIN", thBuild: "Gebaut",
                 thArrive: "Eingetroffen", thStart: "In Betrieb", thOut: "Abgestellt", thDecomm: "Ausgemustert",
                 thUtil: "Verschrottet", thNote: "Hinweis",
@@ -915,24 +794,18 @@
                 txtOut: "Abgestellt", txtTransCity: "Stadtintern übertragen", txtTransOther: "In andere Stadt übertragen", txtPlateChange: "Kennzeichenwechsel",
                 catBus: "🚌 Busse", catTroll: "🚎 Oberleitungsbusse", catElectro: "⚡ Elektrobusse",
                 clickModel: "(Klicken Sie auf ein Modell, um Untermodelle in einem neuen Fenster zu öffnen)",
-                modSub: "📌 Untermodelle:", modNoPhoto: "Kein Foto in der Datenbank",
-                modAngle: "Winkel:", modDate: "Aufnahmedatum:", modPlace: "Ort:", modAuthor: "Autor:",
-                modComments: "Kommentare (0):", modNoComments: "Keine Kommentare.",
+                modSub: "📌 Untermodelle:",
                 lblCountry: "Land", lblCity: "Stadt", lblModel: "Modell", lblNum: "Kennzeichen / Nummer",
-                btnFind: "In DB suchen", lblSelectTs: "Fahrzeug wählen:", lblAngle: "Blickwinkel:", lblFile: "Fotodatei:",
-                btnSend: "Hochladen", lblLoadIdx: "Upload-Index", lblTotalPhotos: "Hochgeladene Fotos",
-                lblQueuePhotos: "Fotos in Warteschlange", journalDesc: "Hier werden die neuesten Änderungen angezeigt.",
-                allParks: "Alle Depots", filterPlace: "Nach Modell, Nummer filtern...",
-                ang1: "Vorne rechts (3/4)", ang2: "Hinten rechts (3/4)", ang3: "Rechte Seite", ang4: "Linke Seite", ang5: "Frontansicht", ang6: "Rückansicht", ang7: "Innenraum", ang8: "Schild", modTitle: "Untermodelle und Fahrzeuge in der DB"
+                btnFind: "In DB suchen", lblLoadIdx: "Upload-Index", allParks: "Alle Depots", filterPlace: "Nach Modell, Nummer filtern...",
+                modTitle: "Untermodelle und Fahrzeuge in der DB"
             },
             zh: {
                 sub: "车辆数据库 — 白俄罗斯 (明斯克)", inBase: "库内车辆",
                 dbTitle: "明斯克 — 车辆保有量", modelsTitle: "🚍 车辆型号列表",
-                searchTitle: "🔍 高级数据库搜索", uploadTitle: "📷 上传车辆照片",
-                profileTitle: "👤 我的资料与设置", journalTitle: "📰 申请与数据库变更日志",
-                tabDB: "📋 数据库", tabModels: "🚍 车型列表", tabSearch: "🔍 搜索", tabUpload: "📷 上传照片", tabProfile: "👤 我的资料", tabJournal: "📰 日志与申请",
+                searchTitle: "🔍 高级数据库搜索", profileTitle: "👤 我的资料与设置",
+                tabDB: "📋 数据库", tabModels: "🚍 车型列表", tabSearch: "🔍 搜索", tabProfile: "👤 我的资料",
                 langTitle: "界面语言：",
-                thPhoto: "照片", thPark: "车队", thModel: "车型", thGov: "车牌号", thNum: "自编号",
+                thPark: "车队", thModel: "车型", thGov: "车牌号", thNum: "自编号",
                 thPurpose: "用途", thFactory: "出厂编号", thVIN: "VIN", thBuild: "制造",
                 thArrive: "抵达", thStart: "投入运营", thOut: "封存", thDecomm: "报废",
                 thUtil: "拆解", thNote: "备注",
@@ -942,15 +815,10 @@
                 txtOut: "停运/封存", txtTransCity: "市内调拨", txtTransOther: "调往其他城市", txtPlateChange: "变更车牌",
                 catBus: "🚌 公交车", catTroll: "🚎 无轨电车", catElectro: "⚡ 纯电动车",
                 clickModel: "(点击车型可在单独的新窗口中打开子型号列表)",
-                modSub: "📌 子型号列表:", modNoPhoto: "数据库中无照片",
-                modAngle: "拍摄角度:", modDate: "拍摄日期:", modPlace: "地点:", modAuthor: "作者:",
-                modComments: "评论 (0):", modNoComments: "此照片暂无评论。",
+                modSub: "📌 子型号列表:",
                 lblCountry: "国家", lblCity: "城市", lblModel: "车型", lblNum: "车牌号或自编号",
-                btnFind: "搜索", lblSelectTs: "选择车辆:", lblAngle: "拍摄角度:", lblFile: "照片文件:",
-                btnSend: "上传到网站", lblLoadIdx: "上传指数", lblTotalPhotos: "总上传照片",
-                lblQueuePhotos: "排队审核的照片", journalDesc: "这里显示最新的车辆和状态修改记录。",
-                allParks: "所有车队", filterPlace: "按车型、编号过滤...",
-                ang1: "右前 (3/4)", ang2: "右后 (3/4)", ang3: "右侧", ang4: "左侧", ang5: "正前", ang6: "正后", ang7: "车厢内部", ang8: "铭牌", modTitle: "数据库中的子型号和车辆"
+                btnFind: "搜索", lblLoadIdx: "上传指数", allParks: "所有车队", filterPlace: "按车型、编号过滤...",
+                modTitle: "数据库中的子型号和车辆"
             }
         };
 
@@ -981,16 +849,15 @@
                 let vin = generateVIN(v.model, v.factory);
                 v._generatedVin = vin; 
                 
-                tr.onclick = (e) => {
+                tr.onclick = () => {
                     openVehicleModal(index);
                 };
                 
                 let purposeLabel = t[v.purposeKey] ? t[v.purposeKey] : (v.purposeKey === '—' ? '—' : v.purposeKey);
                 
                 tr.innerHTML = `
-                    <td><div class="table-thumb" onclick="event.stopPropagation(); openPhotoView('${t.ang1}', '${v.model}', '${v.gov}', '${v.build !== '—' ? v.build : '—'}', 'Минск')">📷</div></td>
                     <td><b>${v.park}</b></td>
-                    <td><a href="#" onclick="event.preventDefault(); event.stopPropagation(); openVehicleModal(${index});"><b>${v.model}</b></a></td>
+                    <td><b>${v.model}</b></td>
                     <td>${v.gov}</td>
                     <td>${v.num}</td>
                     <td>${purposeLabel}</td>
@@ -1006,6 +873,66 @@
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        // Функции нового модального окна удаления ТС
+        function openDeleteModal() {
+            document.getElementById('deleteSearchInput').value = '';
+            renderDeleteList();
+            document.getElementById('deleteModal').style.display = 'flex';
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').style.display = 'none';
+        }
+
+        function renderDeleteList(filterQuery = '') {
+            let container = document.getElementById('deleteListContainer');
+            container.innerHTML = '';
+
+            let query = filterQuery.toUpperCase().trim();
+            let filtered = vehicleDB.map((v, index) => ({v, index})).filter(item => {
+                if (!query) return true;
+                let text = `${item.v.model} ${item.v.gov} ${item.v.num} ${item.v.park}`.toUpperCase();
+                return text.indexOf(query) > -1;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div style="padding: 10px; text-align: center; color: #888;">Ничего не найдено</div>`;
+                return;
+            }
+
+            filtered.forEach(item => {
+                let v = item.v;
+                let index = item.index;
+                let row = document.createElement('div');
+                row.className = 'submodel-row';
+                
+                let dispGov = v.gov !== '—' && v.gov !== '????' ? v.gov : `Борт. ${v.num}`;
+                row.innerHTML = `
+                    <span><b>${v.park}</b> | ${v.model} — ${dispGov}</span>
+                    <button class="btn-primary" style="background: #8b0000; padding: 4px 8px; font-size: 10px;" onclick="confirmDeleteVehicle(${index})">Удалить</button>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function filterDeleteList() {
+            let query = document.getElementById('deleteSearchInput').value;
+            renderDeleteList(query);
+        }
+
+        function confirmDeleteVehicle(index) {
+            let v = vehicleDB[index];
+            if (!v) return;
+            let dispGov = v.gov !== '—' && v.gov !== '????' ? v.gov : `Борт. ${v.num}`;
+            if (confirm(`Удалить транспортное средство ${v.model} (${dispGov}) из базы?`)) {
+                vehicleDB.splice(index, 1);
+                localStorage.setItem('busphoto_custom_db', JSON.stringify(vehicleDB));
+                renderTable();
+                renderDeleteList(document.getElementById('deleteSearchInput').value);
+                alert('Транспортное средство успешно удалено!');
+            }
         }
 
         function renderModels() {
@@ -1038,16 +965,11 @@
                 'txt-in-base': 'inBase',
                 'page-title-db': 'dbTitle',
                 'page-title-search': 'searchTitle',
-                'page-title-upload': 'uploadTitle',
                 'page-title-profile': 'profileTitle',
-                'page-title-journal': 'journalTitle',
                 'btn-db': 'tabDB',
                 'btn-models': 'tabModels',
                 'btn-search': 'tabSearch',
-                'btn-upload': 'tabUpload',
                 'btn-profile': 'tabProfile',
-                'btn-journal': 'tabJournal',
-                'th-photo': 'thPhoto',
                 'th-park': 'thPark',
                 'th-model': 'thModel',
                 'th-gov': 'thGov',
@@ -1081,18 +1003,10 @@
                 'lbl-model': 'lblModel',
                 'lbl-num': 'lblNum',
                 'btn-find': 'btnFind',
-                'lbl-select-ts': 'lblSelectTs',
-                'lbl-angle': 'lblAngle',
-                'lbl-file': 'lblFile',
-                'btn-send-site': 'btnSend',
                 'lbl-load-idx': 'lblLoadIdx',
-                'lbl-total-photos': 'lblTotalPhotos',
-                'lbl-queue-photos': 'lblQueuePhotos',
-                'txt-journal-desc': 'journalDesc',
                 'opt-all-parks': 'allParks',
                 'lbl-lang-title': 'langTitle',
-                'mdSubTitleText': 'modSub',
-                'pvCommentsText': 'modComments'
+                'mdSubTitleText': 'modSub'
             };
             
             for (let id in elementMap) {
@@ -1102,13 +1016,6 @@
                     el.innerText = t[dictKey];
                 }
             }
-            
-            document.getElementById('pvLblGov').innerText = (t.thGov || "Гос. номер") + " / " + (t.thNum || "Борт. №") + ":";
-            document.getElementById('pvLblAngle').innerText = t.modAngle;
-            document.getElementById('pvLblDate').innerText = t.modDate;
-            document.getElementById('pvLblPlace').innerText = t.modPlace;
-            document.getElementById('pvLblAuthor').innerText = t.modAuthor;
-            document.getElementById('pvNoComments').innerText = t.modNoComments;
             
             document.getElementById('searchInput').placeholder = t.filterPlace;
 
@@ -1143,7 +1050,6 @@
             document.getElementById('addVehicleModal').style.display = 'none';
         }
 
-        // Модальное окно просмотра деталей транспортного средства
         function openVehicleModal(index) {
             let v = vehicleDB[index];
             if (!v) return;
@@ -1153,21 +1059,21 @@
             
             let content = document.getElementById('vmContent');
             content.innerHTML = `
-                <div class="photo-meta-box"><p><b>${t.thPark}:</b> ${v.park}</p></div>
-                <div class="photo-meta-box"><p><b>${t.thModel}:</b> ${v.model}</p></div>
-                <div class="photo-meta-box"><p><b>${t.thGov}:</b> ${v.gov}</p></div>
-                <div class="photo-meta-box"><p><b>${t.thNum}:</b> ${v.num}</p></div>
-                <div class="photo-meta-box"><p><b>${t.thPurpose}:</b> ${t[v.purposeKey] || v.purposeKey}</p></div>
-                <div class="photo-meta-box"><p><b>${t.thFactory}:</b> ${v.factory}</p></div>
-                <div class="photo-meta-box"><p><b>VIN:</b> ${v._generatedVin || '—'}</p></div>
-                <div class="photo-meta-box"><p><b>${t.thBuild}:</b> ${v.build}</p></div>
-                <div class="photo-meta-box"><p><b>${t.thArrive}:</b> ${v.arrive}</p></div>
-                <div class="photo-meta-box"><p><b>${t.thStart}:</b> ${v.start}</p></div>
-                <div class="photo-meta-box"><p><b>${t.thOut}:</b> ${v.out}</p></div>
-                <div class="photo-meta-box"><p><b>${t.thDecomm}:</b> ${v.decomm}</p></div>
-                <div class="photo-meta-box"><p><b>${t.thUtil}:</b> ${v.util}</p></div>
-                <div class="photo-meta-box"><p><b>${t.thNote}:</b> ${v.note}</p></div>
-                <div class="photo-meta-box" style="grid-column: span 2;"><p><b>Статус:</b> ${t[v.statusKey] || v.statusKey}</p></div>
+                <div class="model-item"><p><b>${t.thPark}:</b> ${v.park}</p></div>
+                <div class="model-item"><p><b>${t.thModel}:</b> ${v.model}</p></div>
+                <div class="model-item"><p><b>${t.thGov}:</b> ${v.gov}</p></div>
+                <div class="model-item"><p><b>${t.thNum}:</b> ${v.num}</p></div>
+                <div class="model-item"><p><b>${t.thPurpose}:</b> ${t[v.purposeKey] || v.purposeKey}</p></div>
+                <div class="model-item"><p><b>${t.thFactory}:</b> ${v.factory}</p></div>
+                <div class="model-item"><p><b>VIN:</b> ${v._generatedVin || '—'}</p></div>
+                <div class="model-item"><p><b>${t.thBuild}:</b> ${v.build}</p></div>
+                <div class="model-item"><p><b>${t.thArrive}:</b> ${v.arrive}</p></div>
+                <div class="model-item"><p><b>${t.thStart}:</b> ${v.start}</p></div>
+                <div class="model-item"><p><b>${t.thOut}:</b> ${v.out}</p></div>
+                <div class="model-item"><p><b>${t.thDecomm}:</b> ${v.decomm}</p></div>
+                <div class="model-item"><p><b>${t.thUtil}:</b> ${v.util}</p></div>
+                <div class="model-item"><p><b>${t.thNote}:</b> ${v.note}</p></div>
+                <div class="model-item" style="grid-column: span 2;"><p><b>Статус:</b> ${t[v.statusKey] || v.statusKey}</p></div>
             `;
             document.getElementById('vehicleModal').style.display = 'flex';
         }
@@ -1249,13 +1155,18 @@
             listContainer.innerHTML = '';
             
             let subs = modelsData[typeKey][modelName];
-            if (subs) {
+            if (subs && subs.length > 0) {
                 subs.forEach(sub => {
                     let div = document.createElement('div');
                     div.className = 'submodel-row';
                     div.innerHTML = `<span>🔹 ${sub}</span>`;
                     listContainer.appendChild(div);
                 });
+            } else {
+                let div = document.createElement('div');
+                div.className = 'submodel-row';
+                div.innerHTML = `<span>(Нет подмодификаций)</span>`;
+                listContainer.appendChild(div);
             }
 
             let dbMatches = vehicleDB.filter(v => v.modelPrefix === modelName || v.model.startsWith(modelName));
@@ -1287,19 +1198,6 @@
 
         function closeModelModal() { document.getElementById('modelDetailsModal').style.display = 'none'; }
 
-        function openPhotoView(angleName, modelName, govNum, dateStr, locationStr) {
-            let t = translations[currentLang];
-            document.getElementById('pvHeaderModel').innerText = modelName;
-            document.getElementById('pvGovNum').innerText = govNum;
-            document.getElementById('pvAngle').innerText = angleName;
-            document.getElementById('pvDate').innerText = dateStr;
-            document.getElementById('pvLocation').innerText = locationStr;
-            document.getElementById('pvPhotoTitle').innerText = t.modNoPhoto;
-            document.getElementById('photoViewModal').style.display = 'flex';
-        }
-
-        function closePhotoView() { document.getElementById('photoViewModal').style.display = 'none'; }
-
         function switchTab(tabId, btnElement) {
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('nav button').forEach(btn => btn.classList.remove('active'));
@@ -1329,15 +1227,14 @@
 
         window.onclick = function(event) {
             let vehicleModal = document.getElementById('vehicleModal');
-            let photoModal = document.getElementById('photoViewModal');
+            let deleteModal = document.getElementById('deleteModal');
             let modelModal = document.getElementById('modelDetailsModal');
             let addModal = document.getElementById('addVehicleModal');
             if (event.target === vehicleModal) vehicleModal.style.display = "none";
-            if (event.target === photoModal) photoModal.style.display = "none";
+            if (event.target === deleteModal) deleteModal.style.display = "none";
             if (event.target === modelModal) modelModal.style.display = "none";
             if (event.target === addModal) addModal.style.display = "none";
         }
     </script>
 </body>
 </html>
-
