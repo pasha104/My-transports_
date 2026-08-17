@@ -84,7 +84,7 @@
         .header-controls {
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 10px;
         }
 
         .theme-toggle-btn {
@@ -359,6 +359,14 @@
             <span id="header-subtitle" style="font-size:15px; font-weight:bold; margin-left:8px;">База данных ПС</span>
         </div>
         <div class="header-controls">
+            <select id="headerLangSelect" class="theme-toggle-btn" onchange="changeLanguage(this.value)">
+                <option value="ru">RU</option>
+                <option value="be">BE</option>
+                <option value="uk">UK</option>
+                <option value="en">EN</option>
+                <option value="de">DE</option>
+                <option value="zh">ZH</option>
+            </select>
             <button class="theme-toggle-btn" onclick="toggleTheme()">🌓 Сменить тему</button>
             <div style="font-size:11px; color:#c8e6c9;"><span id="txt-in-base">ТС в базе</span>: <b id="dbCount">0</b></div>
         </div>
@@ -368,7 +376,6 @@
         <button class="nav-btn active" id="btn-db" onclick="switchTab('database', this)">📋 База данных</button>
         <button class="nav-btn" id="btn-models" onclick="switchTab('models', this)">🚍 Список моделей</button>
         <button class="nav-btn" id="btn-search" onclick="switchTab('search-tab', this)">🔍 Поиск</button>
-        <button class="nav-btn" id="btn-profile" onclick="switchTab('profile', this)">👤 Мой профиль</button>
     </nav>
 
     <div class="main-wrapper">
@@ -466,30 +473,6 @@
                 <label><span id="lbl-model">Модель</span>: <input type="text" id="searchModelQuery" placeholder="например, МАЗ-203" style="width:100%; padding:5px; background:var(--bp-input-bg); color:var(--bp-text); border:1px solid var(--bp-border);"></label>
                 <label><span id="lbl-num">Гос. или бортовой номер</span>: <input type="text" id="searchNumQuery" placeholder="например, 23145" style="width:100%; padding:5px; background:var(--bp-input-bg); color:var(--bp-text); border:1px solid var(--bp-border);"></label>
                 <button id="btn-find" onclick="executeGlobalSearch()" style="background:#28a745; color:#fff; border:none; padding:8px; cursor:pointer; font-weight:bold;">Найти в базе</button>
-            </div>
-        </div>
-
-        <div id="profile" class="tab-content">
-            <div class="page-header" id="page-title-profile">👤 Мой профиль и настройки</div>
-            <div style="background:var(--bp-card-bg); padding:15px; border:1px solid var(--bp-border); max-width:600px; display: flex; flex-direction: column; gap: 10px;">
-                <p><b><span id="lbl-load-idx">Индекс загрузки</span>:</b> 100%</p>
-                <hr style="border-color:var(--bp-border);">
-                <div>
-                    <p style="margin: 0 0 5px 0;"><b>💰 Бюджет компании на покупку транспорта:</b> <span id="userMoneyDisplay" style="color: #28a745; font-size: 14px; font-weight: bold;">0</span> руб.</p>
-                    <p style="font-size: 10px; color: #888; margin: 0 0 8px 0;">Каждый игровой месяц на ваш счёт поступает субсидия в размере 50,000 руб.</p>
-                    <button class="btn-primary" onclick="simulateNextMonth()">⏭ Пройти месяц (получить бюджет)</button>
-                </div>
-                <hr style="border-color:var(--bp-border);">
-                <p><label id="lbl-lang-title">Выбор языка интерфейса:</label><br>
-                    <select id="langSelect" onchange="changeLanguage(this.value)" style="width:100%; padding:6px; background:var(--bp-input-bg); color:var(--bp-text); border:1px solid var(--bp-border); margin-top: 5px;">
-                        <option value="ru">Русский</option>
-                        <option value="be">Беларуская</option>
-                        <option value="uk">Українська</option>
-                        <option value="en">English</option>
-                        <option value="de">Deutsch</option>
-                        <option value="zh">中文 (Chinese)</option>
-                    </select>
-                </p>
             </div>
         </div>
     </div>
@@ -742,7 +725,6 @@
 
         let vehicleDB = [];
         let currentViewingIndex = null;
-        let userMoney = 50000;
 
         function loadDatabase() {
             let saved = localStorage.getItem('busphoto_custom_db');
@@ -755,26 +737,6 @@
             } else {
                 vehicleDB = [...defaultVehicleDB];
             }
-
-            let savedMoney = localStorage.getItem('busphoto_user_money');
-            if (savedMoney !== null) {
-                userMoney = parseInt(savedMoney);
-            }
-            updateMoneyDisplay();
-        }
-
-        function updateMoneyDisplay() {
-            let el = document.getElementById('userMoneyDisplay');
-            if (el) {
-                el.innerText = userMoney.toLocaleString();
-            }
-            localStorage.setItem('busphoto_user_money', userMoney);
-        }
-
-        function simulateNextMonth() {
-            userMoney += 50000;
-            updateMoneyDisplay();
-            alert('Прошел один месяц! На ваш баланс зачислено +50,000 руб. субсидии на покупку нового транспорта.');
         }
 
         function exportDatabase() {
@@ -865,9 +827,8 @@
             ru: {
                 sub: "База данных ПС — Беларусь (Минск)", inBase: "ТС в базе",
                 dbTitle: "Минск — Подвижной состав", modelsTitle: "🚍 Список моделей подвижного состава",
-                searchTitle: "🔍 Расширенный поиск по базе", profileTitle: "👤 Мой профиль и настройки",
-                tabDB: "📋 База данных", tabModels: "🚍 Список моделей", tabSearch: "🔍 Поиск", tabProfile: "👤 Мой профиль",
-                langTitle: "Выбор языка интерфейса:",
+                searchTitle: "🔍 Расширенный поиск по базе",
+                tabDB: "📋 База данных", tabModels: "🚍 Список моделей", tabSearch: "🔍 Поиск",
                 thPark: "Парк", thModel: "Модель", thGov: "Гос. номер", thNum: "Борт. / Гар. №",
                 thPurpose: "Назначение", thFactory: "Заводской №", thVIN: "VIN", thBuild: "Построен",
                 thArrive: "Поступил", thStart: "Начал работу", thOut: "Отставлен", thDecomm: "Списан",
@@ -880,15 +841,14 @@
                 clickModel: "(Нажмите на модель для открытия списка подмоделей в отдельном окне)",
                 modSub: "📌 Список подмоделей:",
                 lblCountry: "Страна", lblCity: "Город", lblModel: "Модель", lblNum: "Гос. или бортовой номер",
-                btnFind: "Найти в базе", lblLoadIdx: "Индекс загрузки", allParks: "Все предприятия", filterPlace: "Фильтр по модели, номеру...",
+                btnFind: "Найти в базе", allParks: "Все предприятия", filterPlace: "Фильтр по модели, номеру...",
                 modTitle: "Подмодификации и транспортные средства в базе данных"
             },
             en: {
                 sub: "Rolling Stock Database — Belarus (Minsk)", inBase: "Vehicles in db",
                 dbTitle: "Minsk — Rolling Stock", modelsTitle: "🚍 List of rolling stock models",
-                searchTitle: "🔍 Advanced Database Search", profileTitle: "👤 My Profile & Settings",
-                tabDB: "📋 Database", tabModels: "🚍 Models List", tabSearch: "🔍 Search", tabProfile: "👤 My Profile",
-                langTitle: "Interface Language:",
+                searchTitle: "🔍 Advanced Database Search",
+                tabDB: "📋 Database", tabModels: "🚍 Models List", tabSearch: "🔍 Search",
                 thPark: "Depot", thModel: "Model", thGov: "License Plate", thNum: "Fleet No.",
                 thPurpose: "Purpose", thFactory: "Factory No.", thVIN: "VIN", thBuild: "Built",
                 thArrive: "Arrived", thStart: "Started", thOut: "Withdrawn", thDecomm: "Decommissioned",
@@ -901,15 +861,14 @@
                 clickModel: "(Click on a model to open submodels in a new window)",
                 modSub: "📌 Submodels List:",
                 lblCountry: "Land", lblCity: "City", lblModel: "Model", lblNum: "License / Fleet No.",
-                btnFind: "Search Database", lblLoadIdx: "Upload Index", allParks: "All depots", filterPlace: "Filter by model, number...",
+                btnFind: "Search Database", allParks: "All depots", filterPlace: "Filter by model, number...",
                 modTitle: "Submodifications and vehicles in database"
             },
             be: {
                 sub: "База даных РС — Беларусь (Мінск)", inBase: "ТС у базе",
                 dbTitle: "Мінск — Рухомы склад", modelsTitle: "🚍 Спіс мадэляў рухомага складу",
-                searchTitle: "🔍 Пашыраны пошук па базе", profileTitle: "👤 Мой профіль і налады",
-                tabDB: "📋 База даных", tabModels: "🚍 Спіс мадэляў", tabSearch: "🔍 Пошук", tabProfile: "👤 Мой профіль",
-                langTitle: "Выбар мовы інтэрфейсу:",
+                searchTitle: "🔍 Пашыраны пошук па базе",
+                tabDB: "📋 База даных", tabModels: "🚍 Спіс мадэляў", tabSearch: "🔍 Пошук",
                 thPark: "Парк", thModel: "Мадэль", thGov: "Дзярж. нумар", thNum: "Борт. / Гар. №",
                 thPurpose: "Прызначэнне", thFactory: "Заводскі №", thVIN: "VIN", thBuild: "Пабудаваны",
                 thArrive: "Паступіў", thStart: "Пачаў працу", thOut: "Адстаўлены", thDecomm: "Спісаны",
@@ -922,15 +881,14 @@
                 clickModel: "(Націсніце на мадэль для адкрыцця спісу падмадэляў у асобным акне)",
                 modSub: "📌 Спіс падмадэляў:",
                 lblCountry: "Краіна", lblCity: "Горад", lblModel: "Мадэль", lblNum: "Дзярж. ці бартавы нумар",
-                btnFind: "Знайсці ў базе", lblLoadIdx: "Індэкс загрузкі", allParks: "Усе прадпрыемствы", filterPlace: "Фільтр па мадэлі, нумары...",
+                btnFind: "Знайсці ў базе", allParks: "Усе прадпрыемствы", filterPlace: "Фільтр па мадэлі, нумары...",
                 modTitle: "Падмадыфікацыі і машыны ў базе даных"
             },
             uk: {
                 sub: "База даних ПС — Білорусь (Мінськ)", inBase: "ТЗ в базі",
                 dbTitle: "Мінськ — Рухомий склад", modelsTitle: "🚍 Список моделей рухомого складу",
-                searchTitle: "🔍 Розширений пошук по базі", profileTitle: "👤 Мій профіль та налаштування",
-                tabDB: "📋 База даних", tabModels: "🚍 Список моделей", tabSearch: "🔍 Пошук", tabProfile: "👤 Мій профіль",
-                langTitle: "Вибір мови інтерфейсу:",
+                searchTitle: "🔍 Розширений пошук по базі",
+                tabDB: "📋 База даних", tabModels: "🚍 Список моделей", tabSearch: "🔍 Пошук",
                 thPark: "Парк", thModel: "Модель", thGov: "Держ. номер", thNum: "Борт. / Гар. №",
                 thPurpose: "Призначення", thFactory: "Заводський №", thVIN: "VIN", thBuild: "Побудований",
                 thArrive: "Надійшов", thStart: "Почав роботу", thOut: "Відставлений", thDecomm: "Списаний",
@@ -943,15 +901,14 @@
                 clickModel: "(Натисніть на модель для відкриття списку підмоделей в окремому вікні)",
                 modSub: "📌 Список підмоделей:",
                 lblCountry: "Країна", lblCity: "Місто", lblModel: "Модель", lblNum: "Держ. чи бортовий номер",
-                btnFind: "Знайти в базі", lblLoadIdx: "Індекс завантаження", allParks: "Всі підприємства", filterPlace: "Фільтр за моделлю, номером...",
+                btnFind: "Знайти в базі", allParks: "Всі підприємства", filterPlace: "Фільтр за моделлю, номером...",
                 modTitle: "Підмодифікації та машини у базі даних"
             },
             de: {
                 sub: "Fahrzeugdatenbank — Belarus (Minsk)", inBase: "Fahrzeuge im DB",
                 dbTitle: "Minsk — Fahrzeugpark", modelsTitle: "🚍 Liste der Fahrzeugmodelle",
-                searchTitle: "🔍 Erweiterte Datenbanksuche", profileTitle: "👤 Mein Profil & Einstellungen",
-                tabDB: "📋 Datenbank", tabModels: "🚍 Modelliste", tabSearch: "🔍 Suchen", tabProfile: "👤 Mein Profil",
-                langTitle: "Sprachauswahl:",
+                searchTitle: "🔍 Erweiterte Datenbanksuche",
+                tabDB: "📋 Datenbank", tabModels: "🚍 Modelliste", tabSearch: "🔍 Suchen",
                 thPark: "Depot", thModel: "Modell", thGov: "Kennzeichen", thNum: "Betriebsnummer",
                 thPurpose: "Einsatz", thFactory: "Fabriknummer", thVIN: "VIN", thBuild: "Gebaut",
                 thArrive: "Eingetroffen", thStart: "In Betrieb", thOut: "Abgestellt", thDecomm: "Ausgemustert",
@@ -964,15 +921,14 @@
                 clickModel: "(Klicken Sie auf ein Modell, um Untermodelle in einem neuen Fenster zu öffnen)",
                 modSub: "📌 Untermodelle:",
                 lblCountry: "Land", lblCity: "Stadt", lblModel: "Modell", lblNum: "Kennzeichen / Nummer",
-                btnFind: "In DB suchen", lblLoadIdx: "Upload-Index", allParks: "Alle Depots", filterPlace: "Nach Modell, Nummer filtern...",
+                btnFind: "In DB suchen", allParks: "Alle Depots", filterPlace: "Nach Modell, Nummer filtern...",
                 modTitle: "Untermodelle und Fahrzeuge in der DB"
             },
             zh: {
                 sub: "车辆数据库 — 白俄罗斯 (明斯克)", inBase: "库内车辆",
                 dbTitle: "明斯克 — 车辆保有量", modelsTitle: "🚍 车辆型号列表",
-                searchTitle: "🔍 高级数据库搜索", profileTitle: "👤 我的资料与设置",
-                tabDB: "📋 数据库", tabModels: "🚍 车型列表", tabSearch: "🔍 搜索", tabProfile: "👤 我的资料",
-                langTitle: "界面语言：",
+                searchTitle: "🔍 高级数据库搜索",
+                tabDB: "📋 数据库", tabModels: "🚍 车型列表", tabSearch: "🔍 搜索",
                 thPark: "车队", thModel: "车型", thGov: "车牌号", thNum: "自编号",
                 thPurpose: "用途", thFactory: "出厂编号", thVIN: "VIN", thBuild: "制造",
                 thArrive: "抵达", thStart: "投入运营", thOut: "封存", thDecomm: "报废",
@@ -984,7 +940,7 @@
                 clickModel: "(点击车型可在单独的新窗口中打开子型号列表)",
                 modSub: "📌 子型号列表:",
                 lblCountry: "国家", lblCity: "城市", lblModel: "车型", lblNum: "车牌号或自编号",
-                btnFind: "搜索", lblLoadIdx: "上传指数", allParks: "所有车队", filterPlace: "按车型、编号过滤...",
+                btnFind: "搜索", allParks: "所有车队", filterPlace: "按车型、编号过滤...",
                 modTitle: "数据库中的子型号和车辆"
             }
         };
@@ -1243,11 +1199,9 @@
                 'txt-in-base': 'inBase',
                 'page-title-db': 'dbTitle',
                 'page-title-search': 'searchTitle',
-                'page-title-profile': 'profileTitle',
                 'btn-db': 'tabDB',
                 'btn-models': 'tabModels',
                 'btn-search': 'tabSearch',
-                'btn-profile': 'tabProfile',
                 'th-park': 'thPark',
                 'th-model': 'thModel',
                 'th-gov': 'thGov',
@@ -1282,9 +1236,7 @@
                 'lbl-model': 'lblModel',
                 'lbl-num': 'lblNum',
                 'btn-find': 'btnFind',
-                'lbl-load-idx': 'lblLoadIdx',
                 'opt-all-parks': 'allParks',
-                'lbl-lang-title': 'langTitle',
                 'mdSubTitleText': 'modSub'
             };
             
@@ -1312,13 +1264,19 @@
                 document.body.classList.add('light-theme');
             }
 
-            let select = document.getElementById('langSelect');
-            if (select) currentLang = select.value;
+            let select = document.getElementById('headerLangSelect');
+            if (select) {
+                currentLang = select.value;
+            }
             renderApp();
         });
 
         function changeLanguage(lang) {
             currentLang = lang;
+            let select = document.getElementById('headerLangSelect');
+            if (select && select.value !== lang) {
+                select.value = lang;
+            }
             renderApp();
         }
 
@@ -1523,4 +1481,5 @@
     </script>
 </body>
 </html>
+
 
