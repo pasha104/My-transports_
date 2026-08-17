@@ -377,7 +377,6 @@
                 <span id="page-title-db">Минск — Подвижной состав</span>
                 <div class="action-buttons">
                     <button class="btn-secondary" style="background:#8b0000; border-color:#8b0000;" onclick="openDeleteModal()">🗑 Удалить ТС</button>
-                    <button class="btn-secondary" style="background:#1e3f66; border-color:#1e3f66;" onclick="openEditListModal()">✏️ Править ТС</button>
                     <button class="btn-secondary" onclick="exportDatabase()">💾 Экспорт БД</button>
                     <button class="btn-secondary" onclick="document.getElementById('importFile').click()">📂 Импорт БД</button>
                     <input type="file" id="importFile" style="display:none" accept=".json" onchange="importDatabase(event)">
@@ -451,6 +450,11 @@
                 <h3 id="cat-electro">⚡ Электробусы</h3>
                 <div class="models-grid" id="models-grid-electro"></div>
             </div>
+
+            <div class="models-section">
+                <h3 id="cat-tram">🚊 Трамваи</h3>
+                <div class="models-grid" id="models-grid-tram"></div>
+            </div>
         </div>
 
         <div id="search-tab" class="tab-content">
@@ -466,11 +470,17 @@
 
         <div id="profile" class="tab-content">
             <div class="page-header" id="page-title-profile">👤 Мой профиль и настройки</div>
-            <div style="background:var(--bp-card-bg); padding:15px; border:1px solid var(--bp-border); max-width:600px;">
+            <div style="background:var(--bp-card-bg); padding:15px; border:1px solid var(--bp-border); max-width:600px; display: flex; flex-direction: column; gap: 10px;">
                 <p><b><span id="lbl-load-idx">Индекс загрузки</span>:</b> 100%</p>
                 <hr style="border-color:var(--bp-border);">
+                <div>
+                    <p style="margin: 0 0 5px 0;"><b>💰 Бюджет компании на покупку транспорта:</b> <span id="userMoneyDisplay" style="color: #28a745; font-size: 14px; font-weight: bold;">0</span> руб.</p>
+                    <p style="font-size: 10px; color: #888; margin: 0 0 8px 0;">Каждый игровой месяц на ваш счёт поступает субсидия в размере 50,000 руб.</p>
+                    <button class="btn-primary" onclick="simulateNextMonth()">⏭ Пройти месяц (получить бюджет)</button>
+                </div>
+                <hr style="border-color:var(--bp-border);">
                 <p><label id="lbl-lang-title">Выбор языка интерфейса:</label><br>
-                    <select id="langSelect" onchange="changeLanguage(this.value)" style="width:100%; padding:6px; background:var(--bp-input-bg); color:var(--bp-text); border:1px solid var(--bp-border);">
+                    <select id="langSelect" onchange="changeLanguage(this.value)" style="width:100%; padding:6px; background:var(--bp-input-bg); color:var(--bp-text); border:1px solid var(--bp-border); margin-top: 5px;">
                         <option value="ru">Русский</option>
                         <option value="be">Беларуская</option>
                         <option value="uk">Українська</option>
@@ -490,21 +500,6 @@
             <div class="vehicle-title" id="vmTitle">Карточка ТС</div>
             <div class="vehicle-subtitle" id="vmSubtitle">Подробная информация о транспортном средстве</div>
             <div id="vmContent" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;"></div>
-        </div>
-    </div>
-
-    <!-- Модальное окно выбора ТС для правки с главного экрана -->
-    <div class="modal-overlay" id="editListModal">
-        <div class="modal-card" style="max-width: 600px;">
-            <span class="modal-close" onclick="closeEditListModal()">&times;</span>
-            <div class="vehicle-title" style="color: var(--bp-link);">✏️ Редактирование транспортного средства</div>
-            <div class="vehicle-subtitle">Найдите нужное ТС через поиск и нажмите кнопку правки</div>
-            
-            <div style="margin-bottom: 10px;">
-                <input type="text" id="editSearchInput" onkeyup="filterEditList()" placeholder="Поиск по модели, гос. или бортовому номеру..." style="width: 100%; padding: 7px; background: var(--bp-input-bg); color: var(--bp-text); border: 1px solid var(--bp-border); border-radius: 3px; font-size: 11px; box-sizing: border-box;">
-            </div>
-            
-            <div class="submodel-list-box" id="editListContainer" style="max-height: 400px;"></div>
         </div>
     </div>
 
@@ -555,12 +550,16 @@
                         <input type="text" id="editArrive">
                     </div>
                     <div class="form-group">
-                        <label>Отставлен (дата):</label>
-                        <input type="text" id="editOut" placeholder="—" value="—">
+                        <label>Отставлен:</label>
+                        <input type="text" id="editOut" value="—">
                     </div>
                     <div class="form-group">
-                        <label>Утилизирован (дата):</label>
-                        <input type="text" id="editUtil" placeholder="—" value="—">
+                        <label>Списан:</label>
+                        <input type="text" id="editDecomm" value="—">
+                    </div>
+                    <div class="form-group">
+                        <label>Утилизирован:</label>
+                        <input type="text" id="editUtil" value="—">
                     </div>
                     <div class="form-group">
                         <label>Статус:</label>
@@ -656,6 +655,18 @@
                         <input type="text" id="newArrive" placeholder="ДД.ММ.ГГГГ" value="—">
                     </div>
                     <div class="form-group">
+                        <label>Отставлен:</label>
+                        <input type="text" id="newOut" placeholder="—" value="—">
+                    </div>
+                    <div class="form-group">
+                        <label>Списан:</label>
+                        <input type="text" id="newDecomm" placeholder="—" value="—">
+                    </div>
+                    <div class="form-group">
+                        <label>Утилизирован:</label>
+                        <input type="text" id="newUtil" placeholder="—" value="—">
+                    </div>
+                    <div class="form-group">
                         <label>Статус:</label>
                         <select id="newStatus">
                             <option value="st-active">Эксплуатируется</option>
@@ -715,6 +726,7 @@
 
         let vehicleDB = [];
         let currentViewingIndex = null;
+        let userMoney = 50000;
 
         function loadDatabase() {
             let saved = localStorage.getItem('busphoto_custom_db');
@@ -727,6 +739,26 @@
             } else {
                 vehicleDB = [...defaultVehicleDB];
             }
+
+            let savedMoney = localStorage.getItem('busphoto_user_money');
+            if (savedMoney !== null) {
+                userMoney = parseInt(savedMoney);
+            }
+            updateMoneyDisplay();
+        }
+
+        function updateMoneyDisplay() {
+            let el = document.getElementById('userMoneyDisplay');
+            if (el) {
+                el.innerText = userMoney.toLocaleString();
+            }
+            localStorage.setItem('busphoto_user_money', userMoney);
+        }
+
+        function simulateNextMonth() {
+            userMoney += 50000;
+            updateMoneyDisplay();
+            alert('Прошел один месяц! На ваш баланс зачислено +50,000 руб. субсидии на покупку нового транспорта.');
         }
 
         function exportDatabase() {
@@ -803,6 +835,13 @@
                 "МАЗ-303Э": ["303Э10", "303Э20", "303Э22"],
                 "АКСМ-Е321": ["Е321"],
                 "АКСМ-Е433": ["Е433"]
+            },
+            tram: {
+                "БКМ 60102": [],
+                "БКМ 62103": [],
+                "БКМ 743": [],
+                "БКМ Т811": ["Т811", "Т811 МиНиН"],
+                "БКМ Т856": ["Т856", "Т856 МиНиН"]
             }
         };
 
@@ -821,7 +860,7 @@
                 txtAct: "Эксплуатируется", txtDecomm: "Списан", txtNotOp: "Не был в эксплуатации",
                 txtNotWrk: "Не эксплуатируется", txtUnk: "Судьба неизвестна", txtMod: "КВР/Модернизация",
                 txtOut: "Выведен из эксплуатации", txtTransCity: "Передан в городе", txtTransOther: "Передан в другой город", txtPlateChange: "Смена госномера",
-                catBus: "🚌 Автобусы", catTroll: "🚎 Троллейбусы", catElectro: "⚡ Электробусы",
+                catBus: "🚌 Автобусы", catTroll: "🚎 Троллейбусы", catElectro: "⚡ Электробусы", catTram: "🚊 Трамваи",
                 clickModel: "(Нажмите на модель для открытия списка подмоделей в отдельном окне)",
                 modSub: "📌 Список подмоделей:",
                 lblCountry: "Страна", lblCity: "Город", lblModel: "Модель", lblNum: "Гос. или бортовой номер",
@@ -842,7 +881,7 @@
                 txtAct: "Operating", txtDecomm: "Decommissioned", txtNotOp: "Never Operated",
                 txtNotWrk: "Out of Service", txtUnk: "Unknown Fate", txtMod: "Overhauled",
                 txtOut: "Withdrawn from service", txtTransCity: "Transferred in city", txtTransOther: "Transferred to another city", txtPlateChange: "Plate change",
-                catBus: "🚌 Buses", catTroll: "🚎 Trolleybuses", catElectro: "⚡ Electric Buses",
+                catBus: "🚌 Buses", catTroll: "🚎 Trolleybuses", catElectro: "⚡ Electric Buses", catTram: "🚊 Trams",
                 clickModel: "(Click on a model to open submodels in a new window)",
                 modSub: "📌 Submodels List:",
                 lblCountry: "Land", lblCity: "City", lblModel: "Model", lblNum: "License / Fleet No.",
@@ -863,7 +902,7 @@
                 txtAct: "Эксплуатуецца", txtDecomm: "Спісаны", txtNotOp: "Не быў у эксплуатацыі",
                 txtNotWrk: "Не эксплуатуецца", txtUnk: "Лёс невядомы", txtMod: "КВР/Мадэрнізацыя",
                 txtOut: "Выведзены з эксплуатацыі", txtTransCity: "Перададзены ў горадзе", txtTransOther: "Перададзены ў іншы горад", txtPlateChange: "Змена дзяржнумара",
-                catBus: "🚌 Аўтобусы", catTroll: "🚎 Тралейбусы", catElectro: "⚡ Электробусы",
+                catBus: "🚌 Аўтобусы", catTroll: "🚎 Тралейбусы", catElectro: "⚡ Электробусы", catTram: "🚊 Трамваі",
                 clickModel: "(Націсніце на мадэль для адкрыцця спісу падмадэляў у асобным акне)",
                 modSub: "📌 Спіс падмадэляў:",
                 lblCountry: "Краіна", lblCity: "Горад", lblModel: "Мадэль", lblNum: "Дзярж. ці бартавы нумар",
@@ -884,7 +923,7 @@
                 txtAct: "Експлуатується", txtDecomm: "Списаний", txtNotOp: "Не був в експлуатації",
                 txtNotWrk: "Не експлуатується", txtUnk: "Доля невідома", txtMod: "КВР/Модернізація",
                 txtOut: "Виведений з експлуатації", txtTransCity: "Переданий в місті", txtTransOther: "Переданий в інше місто", txtPlateChange: "Зміна держномера",
-                catBus: "🚌 Автобуси", catTroll: "🚎 Тролейбуси", catElectro: "⚡ Электробуси",
+                catBus: "🚌 Автобуси", catTroll: "🚎 Тролейбуси", catElectro: "⚡ Електробуси", catTram: "🚊 Трамваї",
                 clickModel: "(Натисніть на модель для відкриття списку підмоделей в окремому вікні)",
                 modSub: "📌 Список підмоделей:",
                 lblCountry: "Країна", lblCity: "Місто", lblModel: "Модель", lblNum: "Держ. чи бортовий номер",
@@ -905,7 +944,7 @@
                 txtAct: "In Betrieb", txtDecomm: "Ausgemustert", txtNotOp: "Nicht in Betrieb",
                 txtNotWrk: "Außer Betrieb", txtUnk: "Unbekannt", txtMod: "Modernisiert",
                 txtOut: "Abgestellt", txtTransCity: "Stadtintern übertragen", txtTransOther: "In andere Stadt übertragen", txtPlateChange: "Kennzeichenwechsel",
-                catBus: "🚌 Busse", catTroll: "🚎 Oberleitungsbusse", catElectro: "⚡ Elektrobusse",
+                catBus: "🚌 Busse", catTroll: "🚎 Oberleitungsbusse", catElectro: "⚡ Elektrobusse", catTram: "🚊 Straßenbahnen",
                 clickModel: "(Klicken Sie auf ein Modell, um Untermodelle in einem neuen Fenster zu öffnen)",
                 modSub: "📌 Untermodelle:",
                 lblCountry: "Land", lblCity: "Stadt", lblModel: "Modell", lblNum: "Kennzeichen / Nummer",
@@ -926,7 +965,7 @@
                 txtAct: "运营中", txtDecomm: "已报废", txtNotOp: "未投入运营",
                 txtNotWrk: "停运", txtUnk: "下落不明", txtMod: "大修/现代化",
                 txtOut: "停运/封存", txtTransCity: "市内调拨", txtTransOther: "调往其他城市", txtPlateChange: "变更车牌",
-                catBus: "🚌 公交车", catTroll: "🚎 无轨电车", catElectro: "⚡ 纯电动车",
+                catBus: "🚌 公交车", catTroll: "🚎 无轨电车", catElectro: "⚡ 纯电动车", catTram: "🚊 有轨电车",
                 clickModel: "(点击车型可在单独的新窗口中打开子型号列表)",
                 modSub: "📌 子型号列表:",
                 lblCountry: "国家", lblCity: "城市", lblModel: "车型", lblNum: "车牌号或自编号",
@@ -966,9 +1005,9 @@
                     <td>${v.build}</td>
                     <td>${v.arrive}</td>
                     <td>${v.start}</td>
-                    <td>${v.out}</td>
-                    <td>${v.decomm}</td>
-                    <td>${v.util}</td>
+                    <td>${v.out || '—'}</td>
+                    <td>${v.decomm || '—'}</td>
+                    <td>${v.util || '—'}</td>
                     <td>${v.note}</td>
                 `;
                 tbody.appendChild(tr);
@@ -1034,53 +1073,6 @@
             }
         }
 
-        // Функции для окна выбора ТС для правки с главного экрана
-        function openEditListModal() {
-            document.getElementById('editSearchInput').value = '';
-            renderEditList();
-            document.getElementById('editListModal').style.display = 'flex';
-        }
-
-        function closeEditListModal() {
-            document.getElementById('editListModal').style.display = 'none';
-        }
-
-        function renderEditList(filterQuery = '') {
-            let container = document.getElementById('editListContainer');
-            container.innerHTML = '';
-
-            let query = filterQuery.toUpperCase().trim();
-            let filtered = vehicleDB.map((v, index) => ({v, index})).filter(item => {
-                if (!query) return true;
-                let text = `${item.v.model} ${item.v.gov} ${item.v.num} ${item.v.park}`.toUpperCase();
-                return text.indexOf(query) > -1;
-            });
-
-            if (filtered.length === 0) {
-                container.innerHTML = `<div style="padding: 10px; text-align: center; color: #888;">Ничего не найдено</div>`;
-                return;
-            }
-
-            filtered.forEach(item => {
-                let v = item.v;
-                let index = item.index;
-                let row = document.createElement('div');
-                row.className = 'submodel-row';
-                
-                let dispGov = v.gov !== '—' && v.gov !== '????' ? v.gov : `Борт. ${v.num}`;
-                row.innerHTML = `
-                    <span><b>${v.park}</b> | ${v.model} — ${dispGov}</span>
-                    <button class="btn-primary" style="background: #1e3f66; padding: 4px 8px; font-size: 10px;" onclick="closeEditListModal(); openEditModal(${index})">Править</button>
-                `;
-                container.appendChild(row);
-            });
-        }
-
-        function filterEditList() {
-            let query = document.getElementById('editSearchInput').value;
-            renderEditList(query);
-        }
-
         function openEditModal(index) {
             currentViewingIndex = index;
             let v = vehicleDB[index];
@@ -1096,6 +1088,7 @@
             document.getElementById('editBuild').value = v.build || '';
             document.getElementById('editArrive').value = v.arrive || '';
             document.getElementById('editOut').value = v.out || '—';
+            document.getElementById('editDecomm').value = v.decomm || '—';
             document.getElementById('editUtil').value = v.util || '—';
             document.getElementById('editStatus').value = v.statusCls || 'st-active';
             document.getElementById('editPurpose').value = v.purposeKey || '—';
@@ -1144,6 +1137,7 @@
                 build: document.getElementById('editBuild').value,
                 arrive: document.getElementById('editArrive').value,
                 out: document.getElementById('editOut').value,
+                decomm: document.getElementById('editDecomm').value,
                 util: document.getElementById('editUtil').value,
                 statusCls: statusVal,
                 statusKey: statusKeyMap[statusVal] || 'txtAct',
@@ -1162,6 +1156,7 @@
             
             let buildGrid = (gridId, typeKey) => {
                 let grid = document.getElementById(gridId);
+                if (!grid) return;
                 grid.innerHTML = '';
                 let data = modelsData[typeKey];
                 for (let mainModel in data) {
@@ -1175,6 +1170,7 @@
             buildGrid('models-grid-bus', 'bus');
             buildGrid('models-grid-troll', 'trolleybus');
             buildGrid('models-grid-electro', 'electrobus');
+            buildGrid('models-grid-tram', 'tram');
         }
 
         function renderApp() {
@@ -1219,6 +1215,7 @@
                 'cat-bus': 'catBus',
                 'cat-troll': 'catTroll',
                 'cat-electro': 'catElectro',
+                'cat-tram': 'catTram',
                 'lbl-country': 'lblCountry',
                 'lbl-city': 'lblCity',
                 'lbl-model': 'lblModel',
@@ -1291,9 +1288,9 @@
                 <div class="model-item"><p><b>${t.thBuild}:</b> ${v.build}</p></div>
                 <div class="model-item"><p><b>${t.thArrive}:</b> ${v.arrive}</p></div>
                 <div class="model-item"><p><b>${t.thStart}:</b> ${v.start}</p></div>
-                <div class="model-item"><p><b>${t.thOut}:</b> ${v.out}</p></div>
-                <div class="model-item"><p><b>${t.thDecomm}:</b> ${v.decomm}</p></div>
-                <div class="model-item"><p><b>${t.thUtil}:</b> ${v.util}</p></div>
+                <div class="model-item"><p><b>${t.thOut}:</b> ${v.out || '—'}</p></div>
+                <div class="model-item"><p><b>${t.thDecomm}:</b> ${v.decomm || '—'}</p></div>
+                <div class="model-item"><p><b>${t.thUtil}:</b> ${v.util || '—'}</p></div>
                 <div class="model-item"><p><b>${t.thNote}:</b> ${v.note}</p></div>
                 <div class="model-item" style="grid-column: span 2;"><p><b>Статус:</b> ${t[v.statusKey] || v.statusKey}</p></div>
                 <div style="grid-column: span 2; text-align: right; margin-top: 5px;">
@@ -1336,9 +1333,9 @@
                 build: document.getElementById('newBuild').value,
                 arrive: document.getElementById('newArrive').value,
                 start: "2026",
-                out: "—",
-                decomm: "—",
-                util: "—",
+                out: document.getElementById('newOut').value,
+                decomm: document.getElementById('newDecomm').value,
+                util: document.getElementById('newUtil').value,
                 statusCls: statusVal,
                 statusKey: statusKeyMap[statusVal] || 'txtAct',
                 note: document.getElementById('newNote').value
@@ -1413,7 +1410,7 @@
                     div.onclick = () => { closeModelModal(); openVehicleModal(globalIdx); };
                     
                     let dispName = v.gov !== '—' && v.gov !== '????' ? v.gov : `Борт. ${v.num}`;
-                    let icon = typeKey === 'bus' ? '🚌' : (typeKey === 'trolleybus' ? '🚎' : '⚡');
+                    let icon = typeKey === 'bus' ? '🚌' : (typeKey === 'trolleybus' ? '🚎' : (typeKey === 'electrobus' ? '⚡' : '🚊'));
                     div.innerHTML = `<span>${icon} ${v.model} — ${dispName}</span> <span>[${t[v.statusKey]}]</span>`;
                     listContainer.appendChild(div);
                 });
@@ -1454,13 +1451,11 @@
         window.onclick = function(event) {
             let vehicleModal = document.getElementById('vehicleModal');
             let deleteModal = document.getElementById('deleteModal');
-            let editListModal = document.getElementById('editListModal');
             let editModal = document.getElementById('editVehicleModal');
             let modelModal = document.getElementById('modelDetailsModal');
             let addModal = document.getElementById('addVehicleModal');
             if (event.target === vehicleModal) vehicleModal.style.display = "none";
             if (event.target === deleteModal) deleteModal.style.display = "none";
-            if (event.target === editListModal) editListModal.style.display = "none";
             if (event.target === editModal) editModal.style.display = "none";
             if (event.target === modelModal) modelModal.style.display = "none";
             if (event.target === addModal) addModal.style.display = "none";
