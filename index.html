@@ -571,6 +571,7 @@
         </div>
     </div>
 
+    <!-- Модальное окно удаления ТС -->
     <div class="modal-overlay" id="deleteModal">
         <div class="modal-card" style="max-width: 600px;">
             <span class="modal-close" onclick="closeDeleteModal()">&times;</span>
@@ -585,6 +586,7 @@
         </div>
     </div>
 
+    <!-- Модальное окно добавления ТС -->
     <div class="modal-overlay" id="addVehicleModal">
         <div class="modal-card" style="max-width: 550px;">
             <span class="modal-close" onclick="closeAddModal()">&times;</span>
@@ -662,6 +664,7 @@
         </div>
     </div>
 
+    <!-- Модальное окно списка моделей -->
     <div class="modal-overlay" id="modelDetailsModal">
         <div class="modal-card">
             <span class="modal-close" onclick="closeModelModal()">&times;</span>
@@ -817,7 +820,7 @@
                 catBus: "🚌 Buses", catTroll: "🚎 Trolleybuses", catElectro: "⚡ Electric Buses",
                 clickModel: "(Click on a model to open submodels in a new window)",
                 modSub: "📌 Submodels List:",
-                lblCountry: "Country", lblCity: "City", lblModel: "Model", lblNum: "License / Fleet No.",
+                lblCountry: "Land", lblCity: "City", lblModel: "Model", lblNum: "License / Fleet No.",
                 btnFind: "Search Database", lblLoadIdx: "Upload Index", allParks: "All depots", filterPlace: "Filter by model, number...",
                 modTitle: "Submodifications and vehicles in database"
             },
@@ -947,7 +950,6 @@
             });
         }
 
-        // Функции модального окна удаления ТС
         function openDeleteModal() {
             document.getElementById('deleteSearchInput').value = '';
             renderDeleteList();
@@ -1007,7 +1009,6 @@
             }
         }
 
-        // Функции модального окна правки (обновления) ТС
         function openEditModal(index) {
             currentViewingIndex = index;
             let v = vehicleDB[index];
@@ -1389,4 +1390,5 @@
     </script>
 </body>
 </html>
+
 
