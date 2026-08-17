@@ -482,12 +482,92 @@
         </div>
     </div>
 
+    <!-- Модальное окно просмотра ТС -->
     <div class="modal-overlay" id="vehicleModal">
         <div class="modal-card" style="max-width: 650px;">
             <span class="modal-close" onclick="closeVehicleModal()">&times;</span>
             <div class="vehicle-title" id="vmTitle">Карточка ТС</div>
             <div class="vehicle-subtitle" id="vmSubtitle">Подробная информация о транспортном средстве</div>
             <div id="vmContent" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;"></div>
+        </div>
+    </div>
+
+    <!-- Модальное окно правки (обновления) ТС -->
+    <div class="modal-overlay" id="editVehicleModal">
+        <div class="modal-card" style="max-width: 550px;">
+            <span class="modal-close" onclick="closeEditModal()">&times;</span>
+            <div class="vehicle-title" style="color: var(--bp-link);">✏️ Правка транспортного средства (БД)</div>
+            <div class="vehicle-subtitle">Измените необходимые данные ТС и сохраните изменения</div>
+            
+            <form id="editVehicleForm" onsubmit="saveEditedVehicle(event)" style="display: flex; flex-direction: column; gap: 10px;">
+                <input type="hidden" id="editIndex">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Предприятие (Парк):</label>
+                        <input type="text" id="editPark" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Полная модель:</label>
+                        <input type="text" id="editModel" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Префикс модели (для списков):</label>
+                        <input type="text" id="editModelPrefix" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Государственный номер:</label>
+                        <input type="text" id="editGov" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Бортовой / Гаражный №:</label>
+                        <input type="text" id="editNum" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Заводской номер:</label>
+                        <input type="text" id="editFactory">
+                    </div>
+                    <div class="form-group">
+                        <label>VIN:</label>
+                        <input type="text" id="editVin" placeholder="—" value="—">
+                    </div>
+                    <div class="form-group">
+                        <label>Дата постройки:</label>
+                        <input type="text" id="editBuild">
+                    </div>
+                    <div class="form-group">
+                        <label>Дата поступления:</label>
+                        <input type="text" id="editArrive">
+                    </div>
+                    <div class="form-group">
+                        <label>Статус:</label>
+                        <select id="editStatus">
+                            <option value="st-active">Эксплуатируется</option>
+                            <option value="st-inactive">Не эксплуатируется</option>
+                            <option value="st-not-operated">Не был в эксплуатации</option>
+                            <option value="st-out">Выведен из эксплуатации</option>
+                            <option value="st-mod">КВР/Модернизация</option>
+                            <option value="st-decomm">Списан</option>
+                            <option value="st-unknown">Судьба неизвестна</option>
+                            <option value="st-trans-city">Передан в городе</option>
+                            <option value="st-trans-other">Передан в другой город</option>
+                            <option value="st-plate-change">Смена госномера</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Назначение:</label>
+                        <select id="editPurpose">
+                            <option value="linear">Линейный</option>
+                            <option value="service">Служебный</option>
+                            <option value="—">—</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Примечание:</label>
+                    <input type="text" id="editNote">
+                </div>
+                <button type="submit" style="background:#28a745; color:#fff; border:none; padding:10px; font-weight:bold; border-radius:3px; cursor:pointer; margin-top:5px;">Сохранить изменения в БД</button>
+            </form>
         </div>
     </div>
 
@@ -536,6 +616,10 @@
                     <div class="form-group">
                         <label>Заводской номер:</label>
                         <input type="text" id="newFactory" placeholder="36" value="—">
+                    </div>
+                    <div class="form-group">
+                        <label>VIN:</label>
+                        <input type="text" id="newVin" placeholder="—" value="—">
                     </div>
                     <div class="form-group">
                         <label>Дата постройки:</label>
@@ -590,19 +674,20 @@
 
     <script>
         const defaultVehicleDB = [
-            { park: "ТП 2", modelPrefix: "МАЗ-216", model: "МАЗ 216.047", gov: "????", num: "????", purposeKey: "service", factory: "125", build: "03.12.2025", arrive: "15.12.2025", start: "—", out: "—", decomm: "—", util: "—", statusCls: "st-unknown", statusKey: "txtUnk", note: "Новогодний 2026" },
-            { park: "ТП 2", modelPrefix: "МАЗ-203", model: "МАЗ 203.047", gov: "АА 0001-7", num: "23145", purposeKey: "linear", factory: "36", build: "02.12.2025", arrive: "15.12.2025", start: "12.2025", out: "—", decomm: "—", util: "—", statusCls: "st-active", statusKey: "txtAct", note: "—" },
-            { park: "ТП 2", modelPrefix: "МАЗ-103Т", model: "МАЗ 103Т", gov: "—", num: "1002", purposeKey: "—", factory: "102", build: "—", arrive: "—", start: "—", out: "—", decomm: "—", util: "—", statusCls: "st-not-operated", statusKey: "txtNotOp", note: "—" },
-            { park: "ТП 2", modelPrefix: "МАЗ-203Т", model: "МАЗ 203Т20", gov: "—", num: "1001", purposeKey: "—", factory: "101", build: "—", arrive: "—", start: "—", out: "—", decomm: "—", util: "—", statusCls: "st-not-operated", statusKey: "txtNotOp", note: "—" },
-            { park: "АП 1", modelPrefix: "МАЗ-203", model: "МАЗ 203.147", gov: "АН 0031-5", num: "20003", purposeKey: "linear", factory: "203", build: "15.12.2025", arrive: "15.12.2025", start: "2026", out: "08.2026", decomm: "04.08.2026", util: "2026", statusCls: "st-decomm", statusKey: "txtDecomm", note: "—" },
-            { park: "АП 1", modelPrefix: "МАЗ-206", model: "МАЗ 206.047", gov: "АН 0351-5", num: "20035", purposeKey: "linear", factory: "917", build: "16.12.2025", arrive: "16.12.2025", start: "2026", out: "—", decomm: "—", util: "—", statusCls: "st-inactive", statusKey: "txtNotWrk", note: "—" },
-            { park: "АП 1", modelPrefix: "МАЗ-103", model: "МАЗ 103С65", gov: "АН 0032-5", num: "20005", purposeKey: "linear", factory: "405", build: "01.12.2025", arrive: "15.12.2025", start: "2026", out: "—", decomm: "—", util: "—", statusCls: "st-active", statusKey: "txtAct", note: "—" },
-            { park: "АП 1", modelPrefix: "МАЗ-107", model: "МАЗ 107.569", gov: "АН 0453-5", num: "20015", purposeKey: "linear", factory: "569", build: "25.01.2026", arrive: "25.01.2026", start: "2026", out: "—", decomm: "—", util: "—", statusCls: "st-inactive", statusKey: "txtNotWrk", note: "—" },
-            { park: "АП 1", modelPrefix: "МАЗ-103", model: "МАЗ 103.065", gov: "АЕ 3592", num: "20145", purposeKey: "linear", factory: "145", build: "12.02.2026", arrive: "14.02.2026", start: "—", out: "08.2026", decomm: "03.08.2026", util: "2026", statusCls: "st-decomm", statusKey: "txtDecomm", note: "—" },
-            { park: "АП 1", modelPrefix: "МАЗ-206", model: "МАЗ 206.047", gov: "АВ 7425-5", num: "20042", purposeKey: "linear", factory: "242", build: "12.04.2026", arrive: "04.2026", start: "2026", out: "—", decomm: "—", util: "—", statusCls: "st-mod", statusKey: "txtMod", note: "КВР/Модернизирован (смена модели)" }
+            { park: "ТП 2", modelPrefix: "МАЗ-216", model: "МАЗ 216.047", gov: "????", num: "????", purposeKey: "service", factory: "125", vin: "—", build: "03.12.2025", arrive: "15.12.2025", start: "—", out: "—", decomm: "—", util: "—", statusCls: "st-unknown", statusKey: "txtUnk", note: "Новогодний 2026" },
+            { park: "ТП 2", modelPrefix: "МАЗ-203", model: "МАЗ 203.047", gov: "АА 0001-7", num: "23145", purposeKey: "linear", factory: "36", vin: "—", build: "02.12.2025", arrive: "15.12.2025", start: "12.2025", out: "—", decomm: "—", util: "—", statusCls: "st-active", statusKey: "txtAct", note: "—" },
+            { park: "ТП 2", modelPrefix: "МАЗ-103Т", model: "МАЗ 103Т", gov: "—", num: "1002", purposeKey: "—", factory: "102", vin: "—", build: "—", arrive: "—", start: "—", out: "—", decomm: "—", util: "—", statusCls: "st-not-operated", statusKey: "txtNotOp", note: "—" },
+            { park: "ТП 2", modelPrefix: "МАЗ-203Т", model: "МАЗ 203Т20", gov: "—", num: "1001", purposeKey: "—", factory: "101", vin: "—", build: "—", arrive: "—", start: "—", out: "—", decomm: "—", util: "—", statusCls: "st-not-operated", statusKey: "txtNotOp", note: "—" },
+            { park: "АП 1", modelPrefix: "МАЗ-203", model: "МАЗ 203.147", gov: "АН 0031-5", num: "20003", purposeKey: "linear", factory: "203", vin: "—", build: "15.12.2025", arrive: "15.12.2025", start: "2026", out: "08.2026", decomm: "04.08.2026", util: "2026", statusCls: "st-decomm", statusKey: "txtDecomm", note: "—" },
+            { park: "АП 1", modelPrefix: "МАЗ-206", model: "МАЗ 206.047", gov: "АН 0351-5", num: "20035", purposeKey: "linear", factory: "917", vin: "—", build: "16.12.2025", arrive: "16.12.2025", start: "2026", out: "—", decomm: "—", util: "—", statusCls: "st-inactive", statusKey: "txtNotWrk", note: "—" },
+            { park: "АП 1", modelPrefix: "МАЗ-103", model: "МАЗ 103С65", gov: "АН 0032-5", num: "20005", purposeKey: "linear", factory: "405", vin: "—", build: "01.12.2025", arrive: "15.12.2025", start: "2026", out: "—", decomm: "—", util: "—", statusCls: "st-active", statusKey: "txtAct", note: "—" },
+            { park: "АП 1", modelPrefix: "МАЗ-107", model: "МАЗ 107.569", gov: "АН 0453-5", num: "20015", purposeKey: "linear", factory: "569", vin: "—", build: "25.01.2026", arrive: "25.01.2026", start: "2026", out: "—", decomm: "—", util: "—", statusCls: "st-inactive", statusKey: "txtNotWrk", note: "—" },
+            { park: "АП 1", modelPrefix: "МАЗ-103", model: "МАЗ 103.065", gov: "АЕ 3592", num: "20145", purposeKey: "linear", factory: "145", vin: "—", build: "12.02.2026", arrive: "14.02.2026", start: "—", out: "08.2026", decomm: "03.08.2026", util: "2026", statusCls: "st-decomm", statusKey: "txtDecomm", note: "—" },
+            { park: "АП 1", modelPrefix: "МАЗ-206", model: "МАЗ 206.047", gov: "АВ 7425-5", num: "20042", purposeKey: "linear", factory: "242", vin: "—", build: "12.04.2026", arrive: "04.2026", start: "2026", out: "—", decomm: "—", util: "—", statusCls: "st-mod", statusKey: "txtMod", note: "КВР/Модернизирован (смена модели)" }
         ];
 
         let vehicleDB = [];
+        let currentViewingIndex = null;
 
         function loadDatabase() {
             let saved = localStorage.getItem('busphoto_custom_db');
@@ -824,16 +909,6 @@
 
         let currentLang = 'ru';
 
-        function generateVIN(model, factoryNum) {
-            if (!factoryNum || factoryNum === '—' || factoryNum === '????') return '—';
-            let modelNoDot = model.split(' ')[1] ? model.split(' ')[1].replace(/\./g, '') : model.replace(/\./g, '');
-            modelNoDot = modelNoDot.replace(/Т/g, 'T').replace(/Э/g, 'E').replace(/С/g, 'S');
-            const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-            const randomLetter = letters[Math.floor(Math.random() * letters.length)];
-            const paddedFactory = String(factoryNum).padStart(5, '0');
-            return "V3N" + modelNoDot + randomLetter + paddedFactory;
-        }
-
         function renderTable() {
             let t = translations[currentLang];
             let tbody = document.getElementById('tableBody');
@@ -845,9 +920,6 @@
                 let tr = document.createElement('tr');
                 tr.className = v.statusCls;
                 tr.setAttribute('data-park', v.park);
-                
-                let vin = generateVIN(v.model, v.factory);
-                v._generatedVin = vin; 
                 
                 tr.onclick = () => {
                     openVehicleModal(index);
@@ -862,7 +934,7 @@
                     <td>${v.num}</td>
                     <td>${purposeLabel}</td>
                     <td class="f-num">${v.factory}</td>
-                    <td class="vin-cell">${vin}</td>
+                    <td class="vin-cell">${v.vin || '—'}</td>
                     <td>${v.build}</td>
                     <td>${v.arrive}</td>
                     <td>${v.start}</td>
@@ -875,7 +947,7 @@
             });
         }
 
-        // Функции нового модального окна удаления ТС
+        // Функции модального окна удаления ТС
         function openDeleteModal() {
             document.getElementById('deleteSearchInput').value = '';
             renderDeleteList();
@@ -933,6 +1005,78 @@
                 renderDeleteList(document.getElementById('deleteSearchInput').value);
                 alert('Транспортное средство успешно удалено!');
             }
+        }
+
+        // Функции модального окна правки (обновления) ТС
+        function openEditModal(index) {
+            currentViewingIndex = index;
+            let v = vehicleDB[index];
+            if (!v) return;
+            document.getElementById('editIndex').value = index;
+            document.getElementById('editPark').value = v.park || '';
+            document.getElementById('editModel').value = v.model || '';
+            document.getElementById('editModelPrefix').value = v.modelPrefix || '';
+            document.getElementById('editGov').value = v.gov || '';
+            document.getElementById('editNum').value = v.num || '';
+            document.getElementById('editFactory').value = v.factory || '';
+            document.getElementById('editVin').value = v.vin || '';
+            document.getElementById('editBuild').value = v.build || '';
+            document.getElementById('editArrive').value = v.arrive || '';
+            document.getElementById('editStatus').value = v.statusCls || 'st-active';
+            document.getElementById('editPurpose').value = v.purposeKey || '—';
+            document.getElementById('editNote').value = v.note || '';
+            document.getElementById('editVehicleModal').style.display = 'flex';
+        }
+
+        function openEditModalFromView() {
+            closeVehicleModal();
+            openEditModal(currentViewingIndex);
+        }
+
+        function closeEditModal() {
+            document.getElementById('editVehicleModal').style.display = 'none';
+        }
+
+        function saveEditedVehicle(event) {
+            event.preventDefault();
+            let index = parseInt(document.getElementById('editIndex').value);
+            if (isNaN(index) || !vehicleDB[index]) return;
+
+            let statusVal = document.getElementById('editStatus').value;
+            let statusKeyMap = {
+                'st-active': 'txtAct',
+                'st-inactive': 'txtNotWrk',
+                'st-not-operated': 'txtNotOp',
+                'st-out': 'txtOut',
+                'st-mod': 'txtMod',
+                'st-decomm': 'txtDecomm',
+                'st-unknown': 'txtUnk',
+                'st-trans-city': 'txtTransCity',
+                'st-trans-other': 'txtTransOther',
+                'st-plate-change': 'txtPlateChange'
+            };
+
+            vehicleDB[index] = {
+                ...vehicleDB[index],
+                park: document.getElementById('editPark').value,
+                modelPrefix: document.getElementById('editModelPrefix').value,
+                model: document.getElementById('editModel').value,
+                gov: document.getElementById('editGov').value,
+                num: document.getElementById('editNum').value,
+                purposeKey: document.getElementById('editPurpose').value,
+                factory: document.getElementById('editFactory').value,
+                vin: document.getElementById('editVin').value,
+                build: document.getElementById('editBuild').value,
+                arrive: document.getElementById('editArrive').value,
+                statusCls: statusVal,
+                statusKey: statusKeyMap[statusVal] || 'txtAct',
+                note: document.getElementById('editNote').value
+            };
+
+            localStorage.setItem('busphoto_custom_db', JSON.stringify(vehicleDB));
+            renderTable();
+            closeEditModal();
+            alert('Транспортное средство успешно обновлено в базе!');
         }
 
         function renderModels() {
@@ -1051,6 +1195,7 @@
         }
 
         function openVehicleModal(index) {
+            currentViewingIndex = index;
             let v = vehicleDB[index];
             if (!v) return;
             let t = translations[currentLang];
@@ -1065,7 +1210,7 @@
                 <div class="model-item"><p><b>${t.thNum}:</b> ${v.num}</p></div>
                 <div class="model-item"><p><b>${t.thPurpose}:</b> ${t[v.purposeKey] || v.purposeKey}</p></div>
                 <div class="model-item"><p><b>${t.thFactory}:</b> ${v.factory}</p></div>
-                <div class="model-item"><p><b>VIN:</b> ${v._generatedVin || '—'}</p></div>
+                <div class="model-item"><p><b>VIN:</b> ${v.vin || '—'}</p></div>
                 <div class="model-item"><p><b>${t.thBuild}:</b> ${v.build}</p></div>
                 <div class="model-item"><p><b>${t.thArrive}:</b> ${v.arrive}</p></div>
                 <div class="model-item"><p><b>${t.thStart}:</b> ${v.start}</p></div>
@@ -1074,6 +1219,9 @@
                 <div class="model-item"><p><b>${t.thUtil}:</b> ${v.util}</p></div>
                 <div class="model-item"><p><b>${t.thNote}:</b> ${v.note}</p></div>
                 <div class="model-item" style="grid-column: span 2;"><p><b>Статус:</b> ${t[v.statusKey] || v.statusKey}</p></div>
+                <div style="grid-column: span 2; text-align: right; margin-top: 5px;">
+                    <button class="btn-primary" style="background:#1e3f66; padding:6px 12px; font-size:11px;" onclick="openEditModalFromView()">✏️ Править ТС</button>
+                </div>
             `;
             document.getElementById('vehicleModal').style.display = 'flex';
         }
@@ -1107,6 +1255,7 @@
                 num: document.getElementById('newNum').value,
                 purposeKey: document.getElementById('newPurpose').value,
                 factory: document.getElementById('newFactory').value,
+                vin: document.getElementById('newVin').value,
                 build: document.getElementById('newBuild').value,
                 arrive: document.getElementById('newArrive').value,
                 start: "2026",
@@ -1228,13 +1377,16 @@
         window.onclick = function(event) {
             let vehicleModal = document.getElementById('vehicleModal');
             let deleteModal = document.getElementById('deleteModal');
+            let editModal = document.getElementById('editVehicleModal');
             let modelModal = document.getElementById('modelDetailsModal');
             let addModal = document.getElementById('addVehicleModal');
             if (event.target === vehicleModal) vehicleModal.style.display = "none";
             if (event.target === deleteModal) deleteModal.style.display = "none";
+            if (event.target === editModal) editModal.style.display = "none";
             if (event.target === modelModal) modelModal.style.display = "none";
             if (event.target === addModal) addModal.style.display = "none";
         }
     </script>
 </body>
 </html>
+
