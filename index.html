@@ -377,6 +377,7 @@
                 <span id="page-title-db">Минск — Подвижной состав</span>
                 <div class="action-buttons">
                     <button class="btn-secondary" style="background:#8b0000; border-color:#8b0000;" onclick="openDeleteModal()">🗑 Удалить ТС</button>
+                    <button class="btn-secondary" style="background:#1e3f66; border-color:#1e3f66;" onclick="openEditListModal()">✏️ Править ТС</button>
                     <button class="btn-secondary" onclick="exportDatabase()">💾 Экспорт БД</button>
                     <button class="btn-secondary" onclick="document.getElementById('importFile').click()">📂 Импорт БД</button>
                     <input type="file" id="importFile" style="display:none" accept=".json" onchange="importDatabase(event)">
@@ -492,6 +493,21 @@
         </div>
     </div>
 
+    <!-- Модальное окно выбора ТС для правки с главного экрана -->
+    <div class="modal-overlay" id="editListModal">
+        <div class="modal-card" style="max-width: 600px;">
+            <span class="modal-close" onclick="closeEditListModal()">&times;</span>
+            <div class="vehicle-title" style="color: var(--bp-link);">✏️ Редактирование транспортного средства</div>
+            <div class="vehicle-subtitle">Найдите нужное ТС через поиск и нажмите кнопку правки</div>
+            
+            <div style="margin-bottom: 10px;">
+                <input type="text" id="editSearchInput" onkeyup="filterEditList()" placeholder="Поиск по модели, гос. или бортовому номеру..." style="width: 100%; padding: 7px; background: var(--bp-input-bg); color: var(--bp-text); border: 1px solid var(--bp-border); border-radius: 3px; font-size: 11px; box-sizing: border-box;">
+            </div>
+            
+            <div class="submodel-list-box" id="editListContainer" style="max-height: 400px;"></div>
+        </div>
+    </div>
+
     <!-- Модальное окно правки (обновления) ТС -->
     <div class="modal-overlay" id="editVehicleModal">
         <div class="modal-card" style="max-width: 550px;">
@@ -537,6 +553,14 @@
                     <div class="form-group">
                         <label>Дата поступления:</label>
                         <input type="text" id="editArrive">
+                    </div>
+                    <div class="form-group">
+                        <label>Отставлен (дата):</label>
+                        <input type="text" id="editOut" placeholder="—" value="—">
+                    </div>
+                    <div class="form-group">
+                        <label>Утилизирован (дата):</label>
+                        <input type="text" id="editUtil" placeholder="—" value="—">
                     </div>
                     <div class="form-group">
                         <label>Статус:</label>
@@ -763,7 +787,7 @@
             trolleybus: {
                 "МАЗ-103Т": ["103Т"],
                 "МАЗ-203Т": ["203Т20", "203Т21", "203Т70"],
-                "МАЗ-206Т": ["206Т", "206Т47"]
+                "МАЗ-206Т": ["206Т", "206Т47"],
                 "МАЗ-303Т": ["303Т20", "303Т21", "303Т22"],
                 "АКСМ-101": ["101"],
                 "АКСМ-201": ["201"],
@@ -780,12 +804,6 @@
                 "АКСМ-Е321": ["Е321"],
                 "АКСМ-Е433": ["Е433"]
             }
-           tramvai: {
-               "БКМ 60102": []
-               "БКМ 62103": []
-               "БКМ 743": []
-               "БКМ Т811": ["Т811", "Т811 МиНиН"]
-               "БКМ Т856": ["Т856", "Т856 МиНиН"]
         };
 
         const translations = {
@@ -866,7 +884,7 @@
                 txtAct: "Експлуатується", txtDecomm: "Списаний", txtNotOp: "Не був в експлуатації",
                 txtNotWrk: "Не експлуатується", txtUnk: "Доля невідома", txtMod: "КВР/Модернізація",
                 txtOut: "Виведений з експлуатації", txtTransCity: "Переданий в місті", txtTransOther: "Переданий в інше місто", txtPlateChange: "Зміна держномера",
-                catBus: "🚌 Автобуси", catTroll: "🚎 Тролейбуси", catElectro: "⚡ Електробуси",
+                catBus: "🚌 Автобуси", catTroll: "🚎 Тролейбуси", catElectro: "⚡ Электробуси",
                 clickModel: "(Натисніть на модель для відкриття списку підмоделей в окремому вікні)",
                 modSub: "📌 Список підмоделей:",
                 lblCountry: "Країна", lblCity: "Місто", lblModel: "Модель", lblNum: "Держ. чи бортовий номер",
@@ -1016,6 +1034,53 @@
             }
         }
 
+        // Функции для окна выбора ТС для правки с главного экрана
+        function openEditListModal() {
+            document.getElementById('editSearchInput').value = '';
+            renderEditList();
+            document.getElementById('editListModal').style.display = 'flex';
+        }
+
+        function closeEditListModal() {
+            document.getElementById('editListModal').style.display = 'none';
+        }
+
+        function renderEditList(filterQuery = '') {
+            let container = document.getElementById('editListContainer');
+            container.innerHTML = '';
+
+            let query = filterQuery.toUpperCase().trim();
+            let filtered = vehicleDB.map((v, index) => ({v, index})).filter(item => {
+                if (!query) return true;
+                let text = `${item.v.model} ${item.v.gov} ${item.v.num} ${item.v.park}`.toUpperCase();
+                return text.indexOf(query) > -1;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div style="padding: 10px; text-align: center; color: #888;">Ничего не найдено</div>`;
+                return;
+            }
+
+            filtered.forEach(item => {
+                let v = item.v;
+                let index = item.index;
+                let row = document.createElement('div');
+                row.className = 'submodel-row';
+                
+                let dispGov = v.gov !== '—' && v.gov !== '????' ? v.gov : `Борт. ${v.num}`;
+                row.innerHTML = `
+                    <span><b>${v.park}</b> | ${v.model} — ${dispGov}</span>
+                    <button class="btn-primary" style="background: #1e3f66; padding: 4px 8px; font-size: 10px;" onclick="closeEditListModal(); openEditModal(${index})">Править</button>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function filterEditList() {
+            let query = document.getElementById('editSearchInput').value;
+            renderEditList(query);
+        }
+
         function openEditModal(index) {
             currentViewingIndex = index;
             let v = vehicleDB[index];
@@ -1030,6 +1095,8 @@
             document.getElementById('editVin').value = v.vin || '';
             document.getElementById('editBuild').value = v.build || '';
             document.getElementById('editArrive').value = v.arrive || '';
+            document.getElementById('editOut').value = v.out || '—';
+            document.getElementById('editUtil').value = v.util || '—';
             document.getElementById('editStatus').value = v.statusCls || 'st-active';
             document.getElementById('editPurpose').value = v.purposeKey || '—';
             document.getElementById('editNote').value = v.note || '';
@@ -1076,6 +1143,8 @@
                 vin: document.getElementById('editVin').value,
                 build: document.getElementById('editBuild').value,
                 arrive: document.getElementById('editArrive').value,
+                out: document.getElementById('editOut').value,
+                util: document.getElementById('editUtil').value,
                 statusCls: statusVal,
                 statusKey: statusKeyMap[statusVal] || 'txtAct',
                 note: document.getElementById('editNote').value
@@ -1385,11 +1454,13 @@
         window.onclick = function(event) {
             let vehicleModal = document.getElementById('vehicleModal');
             let deleteModal = document.getElementById('deleteModal');
+            let editListModal = document.getElementById('editListModal');
             let editModal = document.getElementById('editVehicleModal');
             let modelModal = document.getElementById('modelDetailsModal');
             let addModal = document.getElementById('addVehicleModal');
             if (event.target === vehicleModal) vehicleModal.style.display = "none";
             if (event.target === deleteModal) deleteModal.style.display = "none";
+            if (event.target === editListModal) editListModal.style.display = "none";
             if (event.target === editModal) editModal.style.display = "none";
             if (event.target === modelModal) modelModal.style.display = "none";
             if (event.target === addModal) addModal.style.display = "none";
@@ -1397,5 +1468,4 @@
     </script>
 </body>
 </html>
-
 
