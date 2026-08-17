@@ -376,6 +376,7 @@
             <div class="page-header">
                 <span id="page-title-db">Минск — Подвижной состав</span>
                 <div class="action-buttons">
+                    <button class="btn-secondary" style="background:#1e3f66; border-color:#1e3f66;" onclick="openEditSelectionModal()">✏️ Править ТС</button>
                     <button class="btn-secondary" style="background:#8b0000; border-color:#8b0000;" onclick="openDeleteModal()">🗑 Удалить ТС</button>
                     <button class="btn-secondary" onclick="exportDatabase()">💾 Экспорт БД</button>
                     <button class="btn-secondary" onclick="document.getElementById('importFile').click()">📂 Импорт БД</button>
@@ -503,11 +504,26 @@
         </div>
     </div>
 
+    <!-- Модальное окно выбора ТС для правки -->
+    <div class="modal-overlay" id="editSelectionModal">
+        <div class="modal-card" style="max-width: 600px;">
+            <span class="modal-close" onclick="closeEditSelectionModal()">&times;</span>
+            <div class="vehicle-title" style="color: var(--bp-link);">✏️ Правка транспортного средства</div>
+            <div class="vehicle-subtitle">Найдите нужное ТС через поиск и нажмите кнопку правки</div>
+            
+            <div style="margin-bottom: 10px;">
+                <input type="text" id="editSearchInput" onkeyup="filterEditList()" placeholder="Поиск по модели, гос. или бортовому номеру..." style="width: 100%; padding: 7px; background: var(--bp-input-bg); color: var(--bp-text); border: 1px solid var(--bp-border); border-radius: 3px; font-size: 11px; box-sizing: border-box;">
+            </div>
+            
+            <div class="submodel-list-box" id="editListContainer" style="max-height: 400px;"></div>
+        </div>
+    </div>
+
     <!-- Модальное окно правки (обновления) ТС -->
     <div class="modal-overlay" id="editVehicleModal">
         <div class="modal-card" style="max-width: 550px;">
             <span class="modal-close" onclick="closeEditModal()">&times;</span>
-            <div class="vehicle-title" style="color: var(--bp-link);">✏️ Правка транспортного средства (БД)</div>
+            <div class="vehicle-title" style="color: var(--bp-link);">✏️ Редактирование транспортного средства (БД)</div>
             <div class="vehicle-subtitle">Измените необходимые данные ТС и сохраните изменения</div>
             
             <form id="editVehicleForm" onsubmit="saveEditedVehicle(event)" style="display: flex; flex-direction: column; gap: 10px;">
@@ -965,7 +981,6 @@
                 txtAct: "运营中", txtDecomm: "已报废", txtNotOp: "未投入运营",
                 txtNotWrk: "停运", txtUnk: "下落不明", txtMod: "大修/现代化",
                 txtOut: "停运/封存", txtTransCity: "市内调拨", txtTransOther: "调往其他城市", txtPlateChange: "变更车牌",
-                catBus: "🚌 公交车", catTroll: "🚎 无轨电车", catElectro: "⚡ 纯电动车", catTram: "🚊 有轨电车",
                 clickModel: "(点击车型可在单独的新窗口中打开子型号列表)",
                 modSub: "📌 子型号列表:",
                 lblCountry: "国家", lblCity: "城市", lblModel: "车型", lblNum: "车牌号或自编号",
@@ -1073,6 +1088,57 @@
             }
         }
 
+        function openEditSelectionModal() {
+            document.getElementById('editSearchInput').value = '';
+            renderEditList();
+            document.getElementById('editSelectionModal').style.display = 'flex';
+        }
+
+        function closeEditSelectionModal() {
+            document.getElementById('editSelectionModal').style.display = 'none';
+        }
+
+        function renderEditList(filterQuery = '') {
+            let container = document.getElementById('editListContainer');
+            container.innerHTML = '';
+
+            let query = filterQuery.toUpperCase().trim();
+            let filtered = vehicleDB.map((v, index) => ({v, index})).filter(item => {
+                if (!query) return true;
+                let text = `${item.v.model} ${item.v.gov} ${item.v.num} ${item.v.park}`.toUpperCase();
+                return text.indexOf(query) > -1;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div style="padding: 10px; text-align: center; color: #888;">Ничего не найдено</div>`;
+                return;
+            }
+
+            filtered.forEach(item => {
+                let v = item.v;
+                let index = item.index;
+                let row = document.createElement('div');
+                row.className = 'submodel-row';
+                
+                let dispGov = v.gov !== '—' && v.gov !== '????' ? v.gov : `Борт. ${v.num}`;
+                row.innerHTML = `
+                    <span><b>${v.park}</b> | ${v.model} — ${dispGov}</span>
+                    <button class="btn-primary" style="background: #1e3f66; padding: 4px 8px; font-size: 10px;" onclick="selectVehicleForEdit(${index})">Править</button>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function filterEditList() {
+            let query = document.getElementById('editSearchInput').value;
+            renderEditList(query);
+        }
+
+        function selectVehicleForEdit(index) {
+            closeEditSelectionModal();
+            openEditModal(index);
+        }
+
         function openEditModal(index) {
             currentViewingIndex = index;
             let v = vehicleDB[index];
@@ -1094,11 +1160,6 @@
             document.getElementById('editPurpose').value = v.purposeKey || '—';
             document.getElementById('editNote').value = v.note || '';
             document.getElementById('editVehicleModal').style.display = 'flex';
-        }
-
-        function openEditModalFromView() {
-            closeVehicleModal();
-            openEditModal(currentViewingIndex);
         }
 
         function closeEditModal() {
@@ -1293,9 +1354,6 @@
                 <div class="model-item"><p><b>${t.thUtil}:</b> ${v.util || '—'}</p></div>
                 <div class="model-item"><p><b>${t.thNote}:</b> ${v.note}</p></div>
                 <div class="model-item" style="grid-column: span 2;"><p><b>Статус:</b> ${t[v.statusKey] || v.statusKey}</p></div>
-                <div style="grid-column: span 2; text-align: right; margin-top: 5px;">
-                    <button class="btn-primary" style="background:#1e3f66; padding:6px 12px; font-size:11px;" onclick="openEditModalFromView()">✏️ Править ТС</button>
-                </div>
             `;
             document.getElementById('vehicleModal').style.display = 'flex';
         }
@@ -1451,11 +1509,13 @@
         window.onclick = function(event) {
             let vehicleModal = document.getElementById('vehicleModal');
             let deleteModal = document.getElementById('deleteModal');
+            let editSelectionModal = document.getElementById('editSelectionModal');
             let editModal = document.getElementById('editVehicleModal');
             let modelModal = document.getElementById('modelDetailsModal');
             let addModal = document.getElementById('addVehicleModal');
             if (event.target === vehicleModal) vehicleModal.style.display = "none";
             if (event.target === deleteModal) deleteModal.style.display = "none";
+            if (event.target === editSelectionModal) editSelectionModal.style.display = "none";
             if (event.target === editModal) editModal.style.display = "none";
             if (event.target === modelModal) modelModal.style.display = "none";
             if (event.target === addModal) addModal.style.display = "none";
