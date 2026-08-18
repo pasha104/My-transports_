@@ -575,7 +575,10 @@
         .map-filter-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
         .map-filter-btn{padding:5px 8px;border:1px solid var(--bp-border);background:var(--bp-panel);color:inherit;border-radius:5px;cursor:pointer;font-size:11px}
         .map-filter-btn.active{font-weight:700;box-shadow:inset 0 0 0 1px currentColor}
-        .map-stop-cluster{background:rgba(23,105,170,.9);color:#fff;border:2px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+        .map-stop-cluster{cursor:pointer;touch-action:manipulation;background:rgba(23,105,170,.92);color:#fff;border:2px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.35);font-size:11px}
+        .map-vehicle-mode-active{box-shadow:inset 0 0 0 2px #ff9800!important}
+        .map-vehicle-mode-note{display:none;margin-top:6px;padding:6px 8px;border-radius:4px;background:rgba(255,152,0,.12);border:1px solid rgba(255,152,0,.35);font-size:11px}
+        .map-vehicle-mode-note.active{display:block}
         .depot-marker{font-size:20px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
         .route-type-badge{font-size:9px;padding:2px 5px;border-radius:4px;background:var(--bp-border);margin-left:4px}
 
@@ -744,6 +747,44 @@
             .map-side { max-height: none; }
             #routeMap { height: 520px; }
         }
+        /* Адаптивная версия для телефона и планшета */
+        @media (max-width: 700px) {
+            .interactive-card { padding: 10px; }
+            .game-menu { gap: 5px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+            .game-menu-btn { flex: 0 0 auto; padding: 9px 11px; font-size: 12px; }
+            .map-toolbar { align-items: stretch; }
+            .map-mode { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+            .map-mode button { min-height: 42px; font-size: 12px; padding: 9px 6px; }
+            .map-toolbar > .btn-secondary { width: 100%; min-height: 40px; }
+            .map-toolbar .map-status { width: 100%; margin-left: 0; }
+            .map-filter-row { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 3px; }
+            .map-filter-btn { flex: 0 0 auto; min-height: 38px; padding: 8px 10px; font-size: 12px; }
+            .map-layout { display: flex; flex-direction: column; }
+            #routeMap { height: min(68vh, 560px); min-height: 360px; border-radius: 6px; }
+            .map-side { width: 100%; }
+            .map-panel { padding: 10px; }
+            .map-mini-input, .map-panel button, .map-panel select { min-height: 40px; font-size: 13px; }
+            .map-help { font-size: 11px; }
+            .map-stop-item { min-height: 42px; padding: 8px; font-size: 12px; }
+            .map-route-item { padding: 10px; }
+        }
+        @media (max-width: 430px) {
+            #routeMap { height: 58vh; min-height: 330px; }
+            .map-mode button { font-size: 11px; }
+            .interactive-stats { grid-template-columns: 1fr 1fr; }
+            .interactive-stat { padding: 8px; }
+            .money-big { font-size: 20px; }
+        }
+        @media (min-width: 701px) and (max-width: 1100px) {
+            #routeMap { height: 55vh; min-height: 480px; }
+        }
+        /* Большая зона касания остановки: сама точка остаётся компактной. */
+        .map-stop-hit {
+            stroke-width: 8px !important;
+            stroke-opacity: 0.05 !important;
+        }
+        .map-select-stop-btn { min-height: 34px; padding: 6px 10px; cursor: pointer; }
+        @media (max-width: 700px) { .map-select-stop-btn { min-height: 40px; font-size: 13px; } }
     </style>
 
 </head>
@@ -1129,12 +1170,14 @@
                             <button id="mapModeSelect" class="active" onclick="setMapMode('select')">🖱️ Выбор</button>
                             <button id="mapModeAdd" onclick="setMapMode('add')">📍 Своя остановка</button>
                             <button id="mapModeRoute" onclick="setMapMode('route')">🛣️ Сборка маршрута</button>
+                            <button id="mapModeVehicles" onclick="setMapMode('vehicles')">🚍 Местоположение ТС</button>
                         </div>
                         <button class="btn-secondary" onclick="loadAllMinskStops()">🚏 Загрузить все остановки Минска и района</button>
                         <button class="btn-secondary" onclick="loadOsmTramRoutes()">🚊 Загрузить трамвайные маршруты</button>
                         <button class="btn-secondary" onclick="clearRouteDraft()">Очистить точки</button>
                         <span id="mapStatus" class="map-status">Готово</span>
                     </div>
+                    <div id="mapVehicleModeNote" class="map-vehicle-mode-note">🚍 Режим местоположения ТС: остановки и линии скрыты, на карте остаётся только движущийся транспорт. Нажми на ТС или выбери его справа.</div>
 
                     <div class="map-filter-row">
                         <button class="map-filter-btn active" id="routeFilterAll" onclick="setMapRouteTypeFilter('all')">Все</button>
@@ -1149,8 +1192,9 @@
                             <div class="map-help" style="margin-top:7px;">
                                 <b>Выбор:</b> нажми на остановку, чтобы увидеть её данные.
                                 <b>Своя остановка:</b> кликни по карте и задай название.
-                                <b>Сборка маршрута:</b> кликай по существующим или своим остановкам по порядку,
-                                затем выбери маршрут и нажми «Построить по дорогам».
+                                <b>Сборка маршрута:</b> включи режим 🛣️ и кликай по остановкам по порядку.
+                                Точки увеличены для удобного нажатия на телефоне. При необходимости нажми «➕ Выбрать для маршрута» в карточке остановки.
+                                Затем выбери/создай маршрут и нажми «Построить по дорогам».
                                 Карта использует данные OpenStreetMap; атрибуция показывается непосредственно на карте.
                             </div>
                         </div>
@@ -1176,7 +1220,7 @@
                             </div>
 
                             <div class="map-panel">
-                                <h4>🚌 Автобусы на линии</h4>
+                                <h4>🚍 ТС на линии</h4>
                                 <div id="mapBusList" class="map-route-list"></div>
                                 <div class="map-help" style="margin-top:6px;">Маркеры автобусов двигаются по сохранённой геометрии маршрута. Положение является игровой симуляцией, а не GPS.</div>
                             </div>
@@ -2265,6 +2309,7 @@
             lastBusUpdate: 0,
             routeTypeFilter: 'all',
             stopRenderZoom: 13,
+            vehicleRenderSignature: '',
             depotMarkers: new Map()
         };
 
@@ -2576,8 +2621,12 @@
         function setMapRouteTypeFilter(type) {
             mapState.routeTypeFilter = type;
             ['All','Bus','Trolleybus','Tram'].forEach(x => { const b=document.getElementById('routeFilter'+x); if(b)b.classList.toggle('active', (x==='All'?'all':x.toLowerCase())===type); });
-            renderMapRouteControls(); renderMapRouteLayers(); renderMapRouteList();
+            renderMapRouteControls();
+            renderMapRouteLayers();
+            renderMapRouteList();
+            if (mapState.mode === 'vehicles') updateMapBusMarkers(true);
         }
+
         function createRouteFromMapDraft() {
             const ids = mapState.draftStopIds.slice();
             const stops = getMapStops().filter(s => ids.some(id => String(id)===String(s.id)));
@@ -2786,8 +2835,12 @@
             mapState.map.on('load', () => mapState.map.invalidateSize({pan:false}));
 
             mapState.map.on('click', onMapClick);
-            mapState.map.on('zoomend moveend', () => { clearTimeout(mapState.stopRenderTimer); mapState.stopRenderTimer=setTimeout(renderMapStops,180); });
-            mapState.map.on('moveend zoomend', scheduleMapStopRender);
+            mapState.map.on('moveend zoomend', () => {
+                clearTimeout(mapState.stopRenderTimer);
+                mapState.stopRenderTimer = setTimeout(() => {
+                    if (mapState.mode !== 'vehicles') renderMapStops();
+                }, 180);
+            });
             mapState.initialized = true;
 
             renderMapStops();
@@ -2804,15 +2857,31 @@
             document.querySelectorAll('.map-mode button').forEach(b => b.classList.remove('active'));
             const btn = document.getElementById(
                 mode === 'select' ? 'mapModeSelect' :
-                mode === 'add' ? 'mapModeAdd' : 'mapModeRoute'
+                mode === 'add' ? 'mapModeAdd' :
+                mode === 'route' ? 'mapModeRoute' : 'mapModeVehicles'
             );
             if (btn) btn.classList.add('active');
 
-            mapSetStatus(
-                mode === 'select' ? 'Режим выбора остановок' :
-                mode === 'add' ? 'Кликни по карте, чтобы создать свою остановку' :
-                'Кликай по остановкам в нужном порядке'
-            );
+            const note = document.getElementById('mapVehicleModeNote');
+            if (note) note.classList.toggle('active', mode === 'vehicles');
+
+            if (mode === 'vehicles') {
+                mapState.stopMarkers.forEach(m => m.remove());
+                mapState.stopMarkers.clear();
+                mapState.routeLayers.forEach(l => l.remove());
+                mapState.routeLayers.clear();
+                updateMapBusMarkers(true);
+                mapSetStatus('Режим местоположения ТС');
+            } else {
+                renderMapStops();
+                renderMapRouteLayers();
+                updateMapBusMarkers();
+                mapSetStatus(
+                    mode === 'select' ? 'Режим выбора остановок' :
+                    mode === 'add' ? 'Кликни по карте, чтобы создать свою остановку' :
+                    'Кликай по остановкам в нужном порядке'
+                );
+            }
         }
 
         function getMapStops() {
@@ -2896,17 +2965,66 @@
 
         function renderMapStops() {
             if (!mapState.map) return;
-            mapState.stopMarkers.forEach(m=>m.remove()); mapState.stopMarkers.clear();
-            const stops=getMapStops(); const zoom=mapState.map.getZoom();
-            if (zoom < 13) {
-                const cells=new Map(); const size=0.035/(Math.max(1,zoom-9));
-                for(const s of stops){ const key=`${Math.floor(s.lat/size)}:${Math.floor(s.lon/size)}`; const c=cells.get(key)||{lat:0,lon:0,count:0,ids:[]}; c.lat+=s.lat;c.lon+=s.lon;c.count++; if(c.ids.length<8)c.ids.push(s.id); cells.set(key,c); }
-                for(const [key,c] of cells){ const p=[c.lat/c.count,c.lon/c.count]; const icon=L.divIcon({className:'',html:`<div class="map-stop-cluster" style="width:${Math.min(46,26+Math.log2(c.count)*5)}px;height:${Math.min(46,26+Math.log2(c.count)*5)}px">${c.count}</div>`,iconSize:[42,42],iconAnchor:[21,21]}); const m=L.marker(p,{icon}).addTo(mapState.map); m.bindPopup(`<b>Остановок в группе: ${c.count}</b><br>Приблизь карту, чтобы увидеть отдельные остановки.`); mapState.stopMarkers.set('cluster-'+key,m); }
-            } else {
-                const bounds=mapState.map.getBounds(); const visible=stops.filter(s=>bounds.contains([s.lat,s.lon])); const limit=zoom>=16?1200:700; const draw=visible.slice(0,limit);
-                for(const stop of draw){ const color=stop.source==='custom'?'#8e44ad':'#1769aa'; const marker=L.circleMarker([stop.lat,stop.lon],{radius:4,weight:1,color:'#fff',fillColor:color,fillOpacity:.9}).addTo(mapState.map); marker.bindPopup(`<b>${escapeHtml(stop.name)}</b><br>${stop.tags?.railway==='tram_stop'?'🚊 Трамвайная':stop.tags?.highway==='bus_stop'?'🚏 Автобусная':'🚏 Остановка'}<br><small>${stop.lat.toFixed(6)}, ${stop.lon.toFixed(6)}</small><br><button onclick="mapSelectStop('${String(stop.id).replace(/'/g,"\'")}')">Выбрать для маршрута</button>`); marker.on('click',()=>{if(mapState.mode==='route')mapSelectStop(stop.id);}); mapState.stopMarkers.set(String(stop.id),marker); }
-                if(visible.length>draw.length) mapSetStatus(`Показано ${draw.length} из ${visible.length} видимых остановок — приблизь карту.`);
+            if (mapState.mode === 'vehicles') {
+                mapState.stopMarkers.forEach(m => m.remove());
+                mapState.stopMarkers.clear();
+                return;
             }
+            mapState.stopMarkers.forEach(m => m.remove());
+            mapState.stopMarkers.clear();
+
+            const stops = getMapStops();
+            const zoom = mapState.map.getZoom();
+            const bounds = mapState.map.getBounds().pad(0.12);
+            const visible = stops.filter(s => bounds.contains([Number(s.lat), Number(s.lon)]));
+
+            // Экранная сетка: один круг = одна группа точек в ячейке.
+            // Чем меньше масштаб, тем крупнее ячейка — поэтому кругов на карте значительно меньше.
+            const clusterAtZoom = zoom < 16;
+            if (clusterAtZoom) {
+                const cellPx = zoom <= 11 ? 150 : zoom <= 13 ? 130 : zoom <= 15 ? 105 : 90;
+                const cells = new Map();
+                visible.forEach(stop => {
+                    const p = mapState.map.project([Number(stop.lat), Number(stop.lon)], zoom);
+                    const key = `${Math.floor(p.x / cellPx)}:${Math.floor(p.y / cellPx)}`;
+                    let c = cells.get(key);
+                    if (!c) c = {x:0,y:0,count:0,ids:[],types:new Set()};
+                    c.x += p.x; c.y += p.y; c.count++;
+                    if (c.ids.length < 12) c.ids.push(stop.id);
+                    if (stop.tags?.railway === 'tram_stop') c.types.add('tram');
+                    else if (stop.tags?.highway === 'bus_stop' || stop.tags?.public_transport === 'platform') c.types.add('bus');
+                    cells.set(key,c);
+                });
+                cells.forEach((c,key) => {
+                    const p = mapState.map.unproject([c.x/c.count,c.y/c.count], zoom);
+                    const size = Math.min(50, 28 + Math.log2(Math.max(1,c.count))*5);
+                    const icon = L.divIcon({className:'',html:`<div class="map-stop-cluster" style="width:${size}px;height:${size}px">${c.count}</div>`,iconSize:[size,size],iconAnchor:[size/2,size/2]});
+                    const m = L.marker(p,{icon}).addTo(mapState.map);
+                    m.bindPopup(`<b>🚏 ${c.count} остановок</b><br><small>Приблизь карту, чтобы увидеть отдельные точки.</small>`);
+                    mapState.stopMarkers.set('cluster-'+key,m);
+                });
+                renderMapStopList();
+                return;
+            }
+
+            // На очень большом масштабе показываем реальные точки, но только в видимой области.
+            const limit = zoom >= 17 ? 1800 : 1100;
+            const draw = visible.slice(0, limit);
+            for (const stop of draw) {
+                const isTram = stop.tags?.railway === 'tram_stop';
+                const color = stop.source === 'custom' ? '#8e44ad' : (isTram ? '#8e44ad' : '#1769aa');
+                const marker = L.circleMarker([stop.lat, stop.lon], {radius:6, weight:7, color:'#fff', fillColor:color, fillOpacity:.92, className:'map-stop-hit'}).addTo(mapState.map);
+                marker.bindPopup(`<b>${escapeHtml(stop.name)}</b><br>${isTram?'🚊 Трамвайная':stop.tags?.highway==='bus_stop'?'🚏 Автобусная':'🚏 Остановка'}<br><small>${Number(stop.lat).toFixed(6)}, ${Number(stop.lon).toFixed(6)}</small><br><button class="map-select-stop-btn" onclick="mapSelectStop('${String(stop.id).replace(/'/g,"\'")}')">➕ Выбрать для маршрута</button>`);
+                marker.on('click',()=>{
+                    if(mapState.mode==='route') {
+                        mapSelectStop(stop.id);
+                    } else {
+                        marker.openPopup();
+                    }
+                });
+                mapState.stopMarkers.set(String(stop.id),marker);
+            }
+            if (visible.length > draw.length) mapSetStatus(`Показано ${draw.length} из ${visible.length} видимых остановок — приблизь карту.`);
             renderMapStopList();
         }
 
@@ -2979,15 +3097,67 @@
 
         async function loadAllMinskStops() {
             if (!mapState.map) return;
-            mapSetStatus('Загружаю все остановки Минска и Минского района из OSM…');
-            const query = `[out:json][timeout:90];area["name"="Минск"]["boundary"="administrative"]->.minsk;area["name"="Минский район"]["boundary"="administrative"]->.district;(nwr["public_transport"="platform"](area.minsk);nwr["highway"="bus_stop"](area.minsk);nwr["railway"="tram_stop"](area.minsk);nwr["public_transport"="platform"](area.district);nwr["highway"="bus_stop"](area.district);nwr["railway"="tram_stop"](area.district););out center tags;`;
-            try {
-                const response=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:query});
-                if(!response.ok) throw new Error('HTTP '+response.status);
-                const data=await response.json(); const byId=new Map(getMapStops().map(s=>[String(s.id),s]));
-                for(const e of data.elements||[]){ const tags=e.tags||{}; const lat=Number(e.lat??e.center?.lat),lon=Number(e.lon??e.center?.lon); if(!Number.isFinite(lat)||!Number.isFinite(lon))continue; const name=tags.name||tags['name:ru']||tags['name:be']||'Остановка без названия'; byId.set('osm-'+e.type+'-'+e.id,{id:'osm-'+e.type+'-'+e.id,name,lat,lon,source:'osm',tags}); }
-                saveMapStops(Array.from(byId.values())); mapState.osmStopsLoaded=true; renderMapStops(); mapSetStatus(`Загружено остановок OSM: ${byId.size}`);
-            } catch(err){ console.error(err); mapSetStatus('Не удалось загрузить все остановки OSM.'); alert('Не удалось загрузить все остановки. Overpass API может быть временно перегружен — повтори позже.'); }
+            mapSetStatus('Загружаю остановки Минска и Минского района…');
+
+            const endpoints = [
+                'https://overpass-api.de/api/interpreter',
+                'https://overpass.kumi.systems/api/interpreter'
+            ];
+            const areaQuery = `
+[out:json][timeout:120];
+(
+  area["boundary"="administrative"]["name"="Минск"];
+  area["boundary"="administrative"]["name:ru"="Минск"];
+)->.minskAreas;
+(
+  area["boundary"="administrative"]["name"="Минский район"];
+  area["boundary"="administrative"]["name:ru"="Минский район"];
+)->.districtAreas;
+(
+  nwr["highway"="bus_stop"](area.minskAreas);
+  nwr["public_transport"="platform"](area.minskAreas);
+  nwr["public_transport"="stop_position"](area.minskAreas);
+  nwr["railway"="tram_stop"](area.minskAreas);
+  nwr["highway"="bus_stop"](area.districtAreas);
+  nwr["public_transport"="platform"](area.districtAreas);
+  nwr["public_transport"="stop_position"](area.districtAreas);
+  nwr["railway"="tram_stop"](area.districtAreas);
+);
+out center tags;`;
+
+            let lastError = null;
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch(endpoint, {method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:areaQuery});
+                    if (!response.ok) throw new Error('HTTP '+response.status);
+                    const data = await response.json();
+                    const existing = getMapStops();
+                    const byId = new Map(existing.map(s => [String(s.id), s]));
+                    const seenPhysical = new Set();
+                    for (const e of data.elements || []) {
+                        const tags = e.tags || {};
+                        const lat = Number(e.lat ?? e.center?.lat), lon = Number(e.lon ?? e.center?.lon);
+                        if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+                        const name = tags.name || tags['name:ru'] || tags['name:be'] || 'Остановка без названия';
+                        const kind = tags.railway === 'tram_stop' ? 'tram' : (tags.highway === 'bus_stop' ? 'bus' : 'platform');
+                        const physicalKey = `${name.trim().toLowerCase()}|${lat.toFixed(6)}|${lon.toFixed(6)}|${kind}`;
+                        if (seenPhysical.has(physicalKey)) continue;
+                        seenPhysical.add(physicalKey);
+                        byId.set(`osm-${e.type}-${e.id}`, {id:`osm-${e.type}-${e.id}`,name,lat,lon,source:'osm',tags});
+                    }
+                    saveMapStops(Array.from(byId.values()));
+                    mapState.osmStopsLoaded = true;
+                    renderMapStops();
+                    mapSetStatus(`Готово: найдено ${data.elements?.length || 0} объектов остановок OSM. Всего в базе: ${byId.size}`);
+                    return;
+                } catch (err) {
+                    console.warn('Overpass endpoint failed', endpoint, err);
+                    lastError = err;
+                }
+            }
+            console.error(lastError);
+            mapSetStatus('Не удалось загрузить остановки OSM.');
+            alert('Не удалось загрузить все остановки. Попробуй ещё раз: один из серверов Overpass может быть временно перегружен.');
         }
 
         async function loadOsmTramRoutes() {
@@ -3016,9 +3186,10 @@
             const query = `
 [out:json][timeout:25];
 (
-  node["highway"="bus_stop"](${south},${west},${north},${east});
-  node["public_transport"="platform"]["bus"="yes"](${south},${west},${north},${east});
-  node["public_transport"="platform"]["highway"="bus_stop"](${south},${west},${north},${east});
+  nwr["highway"="bus_stop"](${south},${west},${north},${east});
+  nwr["public_transport"="platform"](${south},${west},${north},${east});
+  nwr["public_transport"="stop_position"](${south},${west},${north},${east});
+  nwr["railway"="tram_stop"](${south},${west},${north},${east});
 );
 out body;
 `;
@@ -3178,12 +3349,17 @@ out body;
             return gameState.owned.filter(v => ids.some(id => String(id) === String(v.id)));
         }
 
-        function createBusIcon(label, routeColorValue) {
-            const safeLabel = escapeHtml(label || '🚌');
+        function vehicleCategoryIcon(category) {
+            return category === 'tram' ? '🚊' : category === 'trolleybus' ? '🚎' : category === 'electrobus' ? '⚡' : '🚌';
+        }
+
+        function createBusIcon(label, routeColorValue, category = 'bus') {
+            const safeLabel = escapeHtml(label || 'ТС');
             const color = routeColorValue || '#e53935';
+            const icon = category === 'tram' ? '🚊' : category === 'trolleybus' ? '🚎' : category === 'electrobus' ? '⚡' : '🚌';
             return L.divIcon({
                 className: 'map-bus-icon',
-                html: `<div class="map-bus-marker" style="background:${color}"><span class="map-bus-label">${safeLabel}</span>🚌</div>`,
+                html: `<div class="map-bus-marker" style="background:${color}"><span class="map-bus-label">${safeLabel}</span>${icon}</div>`,
                 iconSize: [34, 24],
                 iconAnchor: [17, 12],
                 popupAnchor: [0, -15]
@@ -3225,12 +3401,13 @@ out body;
             return DEPOTS[vehicle?.category] || DEPOTS.bus;
         }
         function pathPointFromGeometry(geometry, progress) { return interpolateRoutePoint(geometry, progress); }
-        function updateMapBusMarkers() {
+        function updateMapBusMarkers(forceVehicleMode = false) {
             if (!mapState.map) return;
             const activeKeys = new Set();
             const now = Date.now();
             gameState.routes.forEach(route => {
                 if (!route.geometry) return;
+                if (mapState.mode === 'vehicles' && mapState.routeTypeFilter !== 'all' && route.routeType !== mapState.routeTypeFilter) return;
                 const vehicles = getAssignedVehiclesForRoute(route).filter(v => vehicleCompatibleWithRoute(v, route));
                 vehicles.forEach((vehicle, index) => {
                     const key = `${route.id}:${vehicle.id}`; activeKeys.add(key);
@@ -3244,7 +3421,7 @@ out body;
                     else if (t < 0.47) { p=pathPointFromGeometry(route.geometry, (t-0.12)/0.35); phase='на маршруте →'; }
                     else if (t < 0.82) { p=pathPointFromGeometry(route.geometry, 1-((t-0.47)/0.35)); phase='на маршруте ←'; }
                     else if (t < 0.94 && route.returnGeometry) { p=pathPointFromGeometry(route.returnGeometry, (t-0.82)/0.12); phase='возвращается в парк'; }
-                    const marker = mapState.busMarkers.get(key) || L.marker(p,{icon:createBusIcon(`№${route.number}`,routeColor(route)),zIndexOffset:1000}).addTo(mapState.map);
+                    const marker = mapState.busMarkers.get(key) || L.marker(p,{icon:createBusIcon(`№${route.number}`,routeColor(route),vehicle.category),zIndexOffset:1000}).addTo(mapState.map);
                     marker.setLatLng(p);
                     marker.setPopupContent(`<b>${escapeHtml(depot.icon)} ${escapeHtml(vehicle.model)}</b><br>Бортовой №: ${escapeHtml(vehicle.num || '—')}<br>Маршрут: <b>№${escapeHtml(route.number)}</b><br>Парк: ${escapeHtml(depot.name)}<br><span style="font-weight:bold;">● ${phase}</span>`);
                     mapState.busMarkers.set(key, marker);
@@ -3261,19 +3438,19 @@ out body;
             gameState.routes.forEach(route => {
                 const vehicles = getAssignedVehiclesForRoute(route);
                 vehicles.forEach(vehicle => {
-                    rows.push(`${route.id}|${vehicle.id}|${vehicle.model}|${vehicle.num || ''}|${route.number}|${route.name}`);
+                    rows.push(`${route.id}|${vehicle.id}|${vehicle.model}|${vehicle.num || ''}|${route.number}|${route.name}|${vehicle.category}`);
                 });
             });
             const signature = rows.join('\\n');
             if (signature === mapState.busListSignature) return;
             mapState.busListSignature = signature;
             el.innerHTML = rows.length ? rows.map(row => {
-                const [routeId, vehicleId, model, num, number, name] = row.split('|');
+                const [routeId, vehicleId, model, num, number, name, category] = row.split('|');
                 return `<div class="map-route-item" onclick="focusMapBus('${routeId}','${vehicleId}')">
-                    <div><b>🚌 ${escapeHtml(model)}</b> · борт. ${escapeHtml(num || '—')}</div>
+                    <div><b>${vehicleCategoryIcon(category)} ${escapeHtml(model)}</b> · борт. ${escapeHtml(num || '—')}</div>
                     <div class="map-help">Маршрут №${escapeHtml(number)} — ${escapeHtml(name)} · <span style="color:#28a745">● на линии</span></div>
                 </div>`;
-            }).join('') : '<div class="map-bus-panel-empty">Пока нет автобусов на линии. Назначь автобус на маршрут в разделе «Маршруты».</div>';
+            }).join('') : '<div class="map-bus-panel-empty">Пока нет ТС на линии. Назначь транспорт на маршрут в разделе «Маршруты».</div>';
         }
 
         function focusMapBus(routeId, vehicleId) {
@@ -3294,12 +3471,18 @@ out body;
 
         function renderMapRouteLayers() {
             if (!mapState.map) return;
+            if (mapState.mode === 'vehicles') {
+                mapState.routeLayers.forEach(layer => layer.remove());
+                mapState.routeLayers.clear();
+                return;
+            }
 
             mapState.routeLayers.forEach(layer => layer.remove());
             mapState.routeLayers.clear();
 
             gameState.routes.forEach(route => {
                 if (!route.geometry) return;
+                if (mapState.routeTypeFilter !== 'all' && route.routeType !== mapState.routeTypeFilter) return;
                 const layer = L.geoJSON(route.geometry, {
                     style: {
                         color: routeColor(route),
