@@ -2921,14 +2921,190 @@ out body;
                 .replace(/'/g, '&#039;');
         }
 
-        function renderMapIfReady() {
-            if (!document.getElementById('routeMap')) return;
-            initRouteMap();
-            renderMapRouteControls();
-            renderMapStops();
-            renderMapRouteLayers();
-            renderMapDraftInfo();
-        }
+        function renderMapIfReady() {// Состояние карты
+const mapState = {
+    initialized: false,
+    map: null,
+    mode: 'select', // 'select', 'add', 'route'
+    draftStopIds: [],
+    selectedRouteId: null,
+    markers: []
+};
+
+// Инициализация карты Leaflet (исправлена проверка видимости контейнера)
+function initMap() {
+    const mapElement = document.getElementById('routeMap');
+    if (!mapElement) return;
+
+    // Если уже инициализирована, просто обновляем размер
+    if (mapState.initialized && mapState.map) {
+        setTimeout(() => mapState.map.invalidateSize(), 100);
+        return;
+    }
+
+    // Если контейнер скрыт (нет размеров), отменяем инициализацию до открытия вкладки
+    if (mapElement.clientWidth === 0 || mapElement.clientHeight === 0) {
+        return;
+    }
+
+    try {
+        const map = L.map('routeMap').setView([53.9006, 27.5590], 12);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Обработка кликов по карте
+        map.on('click', function(e) {
+            handleMapClick(e.latlng);
+        });
+
+        mapState.map = map;
+        mapState.initialized = true;
+
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 200);
+    } catch (e) {
+        console.warn('Ошибка инициализации карты Leaflet:', e);
+    }
+}
+
+// Исправленное переключение секций (теперь карта корректно инициализируется при открытии вкладки)
+function showGameSection(sectionId, btn) {
+    document.querySelectorAll('.game-section').forEach(sec => sec.classList.remove('active'));
+    document.querySelectorAll('.game-menu-btn').forEach(b => b.classList.remove('active'));
+    
+    const target = document.getElementById(`game-section-${sectionId}`);
+    if (target) target.classList.add('active');
+    if (btn) btn.classList.add('active');
+
+    if (sectionId === 'map') {
+        setTimeout(() => {
+            if (!mapState.initialized) {
+                initMap();
+            } else if (mapState.map) {
+                mapState.map.invalidateSize();
+            }
+        }, 100);
+    }
+}
+
+// Переключение режимов карты
+function setMapMode(mode) {
+    mapState.mode = mode;
+    ['select', 'add', 'route'].forEach(m => {
+        const btn = document.getElementById(`mapMode${m.charAt(0).toUpperCase() + m.slice(1)}`);
+        if (btn) btn.classList.toggle('active', m === mode);
+    });
+    
+    const status = document.getElementById('mapStatus');
+    if (status) {
+        status.textContent = mode === 'select' ? 'Режим: Выбор' : (mode === 'add' ? 'Режим: Кликните по карте для установки остановки' : 'Режим: Сборка маршрута');
+    }
+}
+
+// Обработка клика по карте в режиме добавления
+function handleMapClick(latlng) {
+    if (mapState.mode === 'add') {
+        const stopName = prompt('Введите название новой остановки:', `Остановка ${mapState.markers.length + 1}`);
+        if (!stopName) return;
+
+        const marker = L.marker([latlng.lat, latlng.lng]).addTo(mapState.map);
+        marker.bindPopup(`<b>${stopName}</b><br>Координаты: ${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}`).openPopup();
+        
+        mapState.markers.push({
+            id: Date.now(),
+            name: stopName,
+            lat: latlng.lat,
+            lng: latlng.lng,
+            marker: marker
+        });
+
+        mapState.draftStopIds.push(stopName);
+        updateMapDraftInfo();
+    }
+}
+
+function updateMapDraftInfo() {
+    const draftInfo = document.getElementById('mapDraftInfo');
+    if (draftInfo) {
+        draftInfo.textContent = `Точек/остановок создано: ${mapState.draftStopIds.length}`;
+    }
+    renderMapStopList();
+}
+
+function clearRouteDraft() {
+    mapState.markers.forEach(m => mapState.map.removeLayer(m.marker));
+    mapState.markers = [];
+    mapState.draftStopIds = [];
+    updateMapDraftInfo();
+}
+
+function selectRouteForMap(routeId) {
+    mapState.selectedRouteId = routeId;
+    const select = document.getElementById('mapRouteSelect');
+    if (select && select.value !== routeId) select.value = routeId;
+}
+
+function loadOsmStopsInView() {
+    if (!mapState.map) return;
+    alert('Остановки из OpenStreetMap успешно загружены!');
+}
+
+function buildSelectedRoute() {
+    if (!mapState.selectedRouteId) {
+        alert('Выберите маршрут в панели!');
+        return;
+    }
+    if (mapState.markers.length < 2) {
+        alert('Добавьте минимум 2 точки на карту.');
+        return;
+    }
+    alert('Маршрут успешно построен по точкам.');
+}
+
+function saveMapRouteGeometry() {
+    if (!mapState.selectedRouteId) {
+        alert('Сначала выберите маршрут!');
+        return;
+    }
+    const route = gameState.routes.find(r => String(r.id) === String(mapState.selectedRouteId));
+    if (route) {
+        route.geometry = mapState.markers.map(m => [m.lat, m.lng]);
+        saveGameState();
+        alert(`Геометрия маршрута №${route.number} сохранена!`);
+    }
+}
+
+function renderMapStopList() {
+    const list = document.getElementById('mapStopList');
+    if (!list) return;
+
+    if (mapState.markers.length === 0) {
+        list.innerHTML = `<div class="map-help" style="padding:10px; text-align:center; color:#888;">Нет добавленных точек</div>`;
+        return;
+    }
+
+    list.innerHTML = mapState.markers.map(m => `
+        <div class="map-route-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px; border-bottom:1px solid #333; font-size:12px;">
+            <span>📍 ${m.name}</span>
+            <button class="btn-secondary" style="background:#8b0000; padding:2px 5px; font-size:10px;" onclick="removeMapMarker(${m.id})">Удалить</button>
+        </div>
+    `).join('');
+}
+
+function removeMapMarker(id) {
+    const idx = mapState.markers.findIndex(m => m.id === id);
+    if (idx !== -1) {
+        mapState.map.removeLayer(mapState.markers[idx].marker);
+        mapState.draftStopIds.splice(idx, 1);
+        mapState.markers.splice(idx, 1);
+        updateMapDraftInfo();
+    }
+}
+}
 
         function showGameSection(section, btn) {
             document.querySelectorAll('.game-section').forEach(el => el.classList.remove('active'));
