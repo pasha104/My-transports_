@@ -98,6 +98,23 @@
         }
         .theme-toggle-btn:hover { background: rgba(0,0,0,0.5); }
 
+
+        .language-select { min-width: 190px; }
+        .stop-clear-btn { background:#b42318 !important; color:#fff !important; font-weight:700; }
+        body.device-pc { --ui-scale: 1; }
+        body.device-mobile { --ui-scale: 1; }
+        body.device-mobile header { flex-wrap: wrap; }
+        body.device-mobile .interactive-dashboard { grid-template-columns: 1fr !important; }
+        body.device-mobile .map-layout { grid-template-columns: 1fr !important; }
+        body.device-mobile .map-side { order: 2; }
+        body.device-mobile .route-form { grid-template-columns: 1fr !important; }
+        body.device-mobile .route-form .full { grid-column: auto !important; }
+        body.device-mobile button, body.device-mobile input, body.device-mobile select, body.device-mobile textarea { min-height: 40px; }
+        body.device-mobile .map-mode { display:grid; grid-template-columns:1fr 1fr; }
+        body.device-mobile .map-mode button { min-height:44px; }
+        body.device-pc #routeMap { height: 650px; }
+        body.device-mobile #routeMap { height: 58vh; min-height: 380px; }
+
         nav {
             background-color: var(--bp-nav-bg);
             display: flex;
@@ -796,14 +813,15 @@
             <span id="header-subtitle" style="font-size:15px; font-weight:bold; margin-left:8px;">База данных ПС</span>
         </div>
         <div class="header-controls">
-            <select id="headerLangSelect" class="theme-toggle-btn" onchange="changeLanguage(this.value)">
-                <option value="ru">RU</option>
-                <option value="be">BE</option>
-                <option value="uk">UK</option>
-                <option value="en">EN</option>
-                <option value="de">DE</option>
-                <option value="zh">ZH</option>
+            <select id="headerLangSelect" class="theme-toggle-btn language-select" onchange="changeLanguage(this.value)" aria-label="Язык">
+                <option value="ru">Русский (Русский)</option>
+                <option value="be">Беларуская (Белорусский)</option>
+                <option value="uk">Українська (Украинский)</option>
+                <option value="en">English (Английский)</option>
+                <option value="de">Deutsch (Немецкий)</option>
+                <option value="zh">中文 (Китайский)</option>
             </select>
+            <button class="theme-toggle-btn" onclick="toggleDeviceMode()" title="Переключить интерфейс между режимом ПК и мобильным">📱/💻 <span id="deviceModeLabel">Авто</span></button>
             <button class="theme-toggle-btn" onclick="toggleTheme()">🌓 Сменить тему</button>
             <div style="font-size:11px; color:#c8e6c9;"><span id="txt-in-base">ТС в базе</span>: <b id="dbCount">0</b></div>
         </div>
@@ -957,7 +975,6 @@
                                 <option value="bus">Автобусы</option>
                                 <option value="trolleybus">Троллейбусы</option>
                                 <option value="electrobus">Электробусы</option>
-                                <option value="tram">Трамваи</option>
                             </select>
                         </label>
                         <label>
@@ -1057,7 +1074,7 @@
                             <div class="guide-step"><div class="guide-num">1</div><div><h3>💰 Начало игры</h3><p>Стартовый баланс — <b>50 000 ₽</b>. Сначала не трать весь бюджет: купи 1–2 машины и создай первый маршрут.</p></div></div>
                         </div>
                         <div class="guide-card">
-                            <div class="guide-step"><div class="guide-num">2</div><div><h3>🏪 Купи транспорт</h3><p>В <b>Магазине</b> выбери категорию и модель. Автобусы и электробусы относятся к автобусным маршрутам, троллейбусы — к троллейбусным, трамваи — к трамвайным.</p></div></div>
+                            <div class="guide-step"><div class="guide-num">2</div><div><h3>🏪 Купи транспорт</h3><p>В <b>Магазине</b> выбери категорию и модель. Автобусы и электробусы относятся к автобусным маршрутам, троллейбусы — к троллейбусным.</p></div></div>
                         </div>
                         <div class="guide-card">
                             <div class="guide-step"><div class="guide-num">3</div><div><h3>🗺️ Загрузить остановки</h3><p>Открой <b>Карту</b> и загрузи остановки Минска и Минского района. На карте точки оптимизированы: при дальнем масштабе они группируются.</p></div></div>
@@ -1069,13 +1086,13 @@
                             <div class="guide-step"><div class="guide-num">5</div><div><h3>📐 Построй линию</h3><p>После выбора остановок используй построение по дорогам. Карта получит геометрию маршрута, по которой потом будет двигаться транспорт.</p></div></div>
                         </div>
                         <div class="guide-card">
-                            <div class="guide-step"><div class="guide-num">6</div><div><h3>📝 Оформи маршрут</h3><p>В разделе <b>Маршруты</b> задай номер, название и тип: 🚌 автобус/электробус, 🚎 троллейбус или 🚊 трамвай.</p></div></div>
+                            <div class="guide-step"><div class="guide-num">6</div><div><h3>📝 Оформи маршрут</h3><p>В разделе <b>Маршруты</b> задай номер, название и тип: 🚌 автобус/электробус или 🚎 троллейбус.</p></div></div>
                         </div>
                         <div class="guide-card">
                             <div class="guide-step"><div class="guide-num">7</div><div><h3>➕ Назначь ТС</h3><p>Открой нужный маршрут и назначь транспорт. Совместимость проверяется по типу маршрута. Снять машину можно без продажи — она останется в гараже.</p></div></div>
                         </div>
                         <div class="guide-card">
-                            <div class="guide-step"><div class="guide-num">8</div><div><h3>🏢 Откуда выезжает транспорт</h3><ul><li>🚌 Автобусы и ⚡ электробусы — Автобусный парк №5</li><li>🚎 Троллейбусы — Транспортный парк №4</li><li>🚊 Трамваи — трамвайный парк</li></ul></div></div>
+                            <div class="guide-step"><div class="guide-num">8</div><div><h3>🏢 Откуда выезжает транспорт</h3><ul><li>🚌 Автобусы и ⚡ электробусы — Автобусный парк №5</li><li>🚎 Троллейбусы — Транспортный парк №4</li></ul></div></div>
                         </div>
                     </div>
                     <div class="guide-card" style="margin-top:12px;">
@@ -1084,7 +1101,7 @@
                         <p>После назначения транспорт должен работать как рейсовая машина: выезд из парка, выход на конечную, движение по линии туда и обратно, затем возвращение в парк.</p>
                     </div>
                     <div class="guide-grid" style="margin-top:12px;">
-                        <div class="guide-card"><h3>🔎 Фильтры маршрутов</h3><ul><li>Все</li><li>🚌 Автобусные / электробусные</li><li>🚎 Троллейбусные</li><li>🚊 Трамвайные</li></ul></div>
+                        <div class="guide-card"><h3>🔎 Фильтры маршрутов</h3><ul><li>Все</li><li>🚌 Автобусные / электробусные</li><li>🚎 Троллейбусные</li></ul></div>
                         <div class="guide-card"><h3>🚍 Несколько машин на линии</h3><p>На один маршрут можно назначить несколько ТС. Они распределяются по линии с разными позициями, чтобы не стоять друг в друге.</p></div>
                         <div class="guide-card"><h3>➖ Снять ТС с маршрута</h3><p>Снятие с линии не продаёт машину. Она возвращается в состояние свободного транспорта и её можно назначить на другой маршрут.</p></div>
                         <div class="guide-card"><h3>🔄 Новая игра</h3><p>Кнопка <b>«Новая игра»</b> сбрасывает сохранение и возвращает стартовые <b>50 000 ₽</b>.</p></div>
@@ -1112,7 +1129,6 @@
                                 <select id="routeType">
                                     <option value="bus">🚌 Автобус / электробус</option>
                                     <option value="trolleybus">🚎 Троллейбус</option>
-                                    <option value="tram">🚊 Трамвай</option>
                                 </select>
                             </label>
                             <label>Начальная остановка
@@ -1155,7 +1171,6 @@
                         <button class="map-filter-btn active" id="gameRouteFilterAll" onclick="setGameRouteTypeFilter('all')">Все</button>
                         <button class="map-filter-btn" id="gameRouteFilterBus" onclick="setGameRouteTypeFilter('bus')">🚌 Автобус/электробус</button>
                         <button class="map-filter-btn" id="gameRouteFilterTrolleybus" onclick="setGameRouteTypeFilter('trolleybus')">🚎 Троллейбус</button>
-                        <button class="map-filter-btn" id="gameRouteFilterTram" onclick="setGameRouteTypeFilter('tram')">🚊 Трамвай</button>
                     </div>
                     <div id="routesList"></div>
                 </div>
@@ -1172,8 +1187,8 @@
                             <button id="mapModeRoute" onclick="setMapMode('route')">🛣️ Сборка маршрута</button>
                             <button id="mapModeVehicles" onclick="setMapMode('vehicles')">🚍 Местоположение ТС</button>
                         </div>
+                        <button class="btn-primary stop-clear-btn" onclick="clearAllMapStops()">🗑️ Удалить все остановки</button>
                         <button class="btn-secondary" onclick="loadAllMinskStops()">🚏 Загрузить все остановки Минска и района</button>
-                        <button class="btn-secondary" onclick="loadOsmTramRoutes()">🚊 Загрузить трамвайные маршруты</button>
                         <button class="btn-secondary" onclick="clearRouteDraft()">Очистить точки</button>
                         <span id="mapStatus" class="map-status">Готово</span>
                     </div>
@@ -1183,7 +1198,6 @@
                         <button class="map-filter-btn active" id="routeFilterAll" onclick="setMapRouteTypeFilter('all')">Все</button>
                         <button class="map-filter-btn" id="routeFilterBus" onclick="setMapRouteTypeFilter('bus')">🚌 Автобус/электробус</button>
                         <button class="map-filter-btn" id="routeFilterTrolleybus" onclick="setMapRouteTypeFilter('trolleybus')">🚎 Троллейбус</button>
-                        <button class="map-filter-btn" id="routeFilterTram" onclick="setMapRouteTypeFilter('tram')">🚊 Трамвай</button>
                     </div>
 
                     <div class="map-layout">
@@ -1208,12 +1222,11 @@
                                 <select id="mapRouteType" class="map-mini-input" style="margin-top:6px;">
                                     <option value="bus">🚌 Автобус / электробус</option>
                                     <option value="trolleybus">🚎 Троллейбус</option>
-                                    <option value="tram">🚊 Трамвай</option>
                                 </select>
                                 <input id="mapNewRouteNumber" class="map-mini-input" style="margin-top:6px;" placeholder="Номер нового маршрута">
                                 <input id="mapNewRouteName" class="map-mini-input" style="margin-top:6px;" placeholder="Название нового маршрута">
                                 <div id="mapDraftInfo" class="map-help">Точек маршрута: 0</div>
-                                <div class="map-help" style="margin-top:5px;">Сначала кликай остановки по порядку, затем создай маршрут прямо из карты.</div>
+                                <div class="map-help" style="margin-top:5px;">Кликай остановки по порядку от первой конечной до второй. После создания маршрут автоматически получает первую и последнюю остановку как конечные, а обратное направление строится по той же линии в обратную сторону.</div>
                                 <button class="btn-primary" style="width:100%; margin-top:6px;" onclick="createRouteFromMapDraft()">➕ Создать маршрут из карты</button>
                                 <button class="btn-primary" style="width:100%; margin-top:6px;" onclick="buildSelectedRoute()">🛣️ Построить по дорогам</button>
                                 <button class="btn-secondary" style="width:100%; margin-top:6px;" onclick="saveMapRouteGeometry()">💾 Сохранить маршрут</button>
@@ -2032,6 +2045,23 @@
             renderModels();
         }
 
+        function applyDeviceMode() {
+            const mode = localStorage.getItem('busphoto_device_mode') || 'auto';
+            document.body.classList.remove('device-pc','device-mobile');
+            let effective = mode;
+            if (mode === 'auto') effective = window.matchMedia('(max-width: 700px)').matches ? 'mobile' : 'pc';
+            document.body.classList.add('device-' + effective);
+            const label = document.getElementById('deviceModeLabel');
+            if (label) label.textContent = mode === 'auto' ? 'Авто' : (mode === 'mobile' ? 'Мобильный' : 'ПК');
+            setTimeout(() => { if (mapState?.map) mapState.map.invalidateSize(); }, 120);
+        }
+        function toggleDeviceMode() {
+            const current = localStorage.getItem('busphoto_device_mode') || 'auto';
+            const next = current === 'auto' ? 'mobile' : current === 'mobile' ? 'pc' : 'auto';
+            localStorage.setItem('busphoto_device_mode', next);
+            applyDeviceMode();
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
             loadDatabase();
             
@@ -2047,6 +2077,7 @@
                 currentLang = select.value;
             }
             renderApp();
+            applyDeviceMode();
         });
 
         function changeLanguage(lang) {
@@ -2342,6 +2373,9 @@
             }
             if (!Array.isArray(gameState.owned)) gameState.owned = [];
             if (!Array.isArray(gameState.routes)) gameState.routes = [];
+            // Интерактив больше не использует трамваи. Старые игровые трамвайные маршруты удаляются.
+            gameState.routes = gameState.routes.filter(r => r.routeType !== 'tram');
+            gameState.owned = gameState.owned.filter(v => v.category !== 'tram');
             gameState.owned.forEach(v => { if (!v.depot) v.depot = DEPOTS[v.category] ? DEPOTS[v.category].id : 'ap5'; });
             gameState.routes.forEach(r => {
                 if (!Array.isArray(r.vehicleIds)) {
@@ -2557,51 +2591,64 @@
             updateMapBusMarkers();
         }
 
-        function createGameRoute(event) {
+        async function createGameRoute(event) {
             event.preventDefault();
-
             const number = document.getElementById('routeNumber').value.trim();
-            const name = document.getElementById('routeName').value.trim();
-            const start = document.getElementById('routeStart').value.trim();
-            const end = document.getElementById('routeEnd').value.trim();
-            const distance = Number(document.getElementById('routeDistance').value);
-            const stopCount = Number(document.getElementById('routeStopCount').value);
-            const stops = document.getElementById('routeStops').value
-                .split(',')
-                .map(s => s.trim())
-                .filter(Boolean);
-            const note = document.getElementById('routeNote').value.trim();
-            const routeType = document.getElementById('routeType')?.value || 'bus';
-
-            if (!number || !start || !end || !Number.isFinite(distance) || !Number.isFinite(stopCount)) {
-                alert('Заполни обязательные поля маршрута.');
-                return;
+            const nameInput = document.getElementById('routeName').value.trim();
+            const startInput = document.getElementById('routeStart').value.trim();
+            const endInput = document.getElementById('routeEnd').value.trim();
+            const type = document.getElementById('routeType')?.value || 'bus';
+            const mapStops = getMapStops();
+            const draft = Array.isArray(mapState.draftStopIds) ? mapState.draftStopIds.slice() : [];
+            const selectedStops = draft.map(id => mapStops.find(s => String(s.id) === String(id))).filter(Boolean);
+            let start = startInput, end = endInput;
+            let stops = [];
+            let stopIds = [];
+            if (selectedStops.length >= 2) {
+                stops = selectedStops;
+                start = selectedStops[0].name;
+                end = selectedStops[selectedStops.length - 1].name;
+                document.getElementById('routeStart').value = start;
+                document.getElementById('routeEnd').value = end;
+                document.getElementById('routeStopCount').value = selectedStops.length;
+                document.getElementById('routeStops').value = selectedStops.map(s=>s.name).join(', ');
+                stopIds = selectedStops.map(s=>s.id);
+            } else {
+                const startStop = mapStops.find(s => normalizeStopName(s.name) === normalizeStopName(startInput));
+                const endStop = mapStops.find(s => normalizeStopName(s.name) === normalizeStopName(endInput));
+                if (startStop && endStop) {
+                    stops = [startStop, endStop];
+                    stopIds = [startStop.id, endStop.id];
+                }
             }
-
-            gameState.routes.push({
-                id: Date.now() + Math.random(),
-                number,
-                name: name || `${start} — ${end}`,
-                start,
-                end,
-                distance,
-                stopCount,
-                stops,
-                stopIds: [],
-                color,
-                note,
-                routeType,
-                vehicleId: null,
-                vehicleIds: [],
-                geometry: null,
-                calculatedDistance: null,
-                calculatedDuration: null,
-                createdAt: localDateKey()
-            });
-
+            let distance = Number(document.getElementById('routeDistance').value);
+            let stopCount = Number(document.getElementById('routeStopCount').value);
+            if (!number || !start || !end) { alert('Укажи номер и две конечные остановки.'); return; }
+            if (!Number.isFinite(distance)) distance = 0;
+            if (!Number.isFinite(stopCount)) stopCount = stops.length || 2;
+            const stopsText = stops.length ? stops.map(s=>s.name) : document.getElementById('routeStops').value.split(',').map(s=>s.trim()).filter(Boolean);
+            const note = document.getElementById('routeNote').value.trim();
+            const route = {
+                id: Date.now()+Math.random(), number,
+                name: nameInput || `${start} — ${end}`,
+                start, end, distance, stopCount,
+                stops: stopsText, stopIds, reverseStopIds: stopIds.slice().reverse(),
+                color: type==='trolleybus'?'#1565c0':'#1e88e5', note,
+                routeType: type === 'trolleybus' ? 'trolleybus' : 'bus',
+                vehicleId:null, vehicleIds:[], geometry:null, outboundGeometry:null, returnGeometry:null,
+                calculatedDistance:null, calculatedDuration:null, createdAt:localDateKey(), source:'manual'
+            };
+            gameState.routes.push(route);
+            mapState.selectedRouteId = route.id;
+            if (stopIds.length >= 2) mapState.draftStopIds = stopIds.slice();
             saveGameState();
+            renderInteractive(); renderMapRouteControls();
+            if (stopIds.length >= 2 && mapState.map) {
+                await buildSelectedRoute();
+            } else {
+                mapSetStatus(`Маршрут №${number} создан. Выбери остановки на карте для построения линии.`);
+            }
             event.target.reset();
-            renderInteractive();
         }
 
         function routeTypeLabel(type) {
@@ -2635,7 +2682,7 @@
             if (!number) return alert('Укажи номер нового маршрута.');
             const type = document.getElementById('mapRouteType')?.value || 'bus';
             const name = document.getElementById('mapNewRouteName')?.value.trim() || `${stops[0].name} — ${stops[stops.length-1].name}`;
-            const route = { id:Date.now()+Math.random(), number, name, start:stops[0].name, end:stops[stops.length-1].name, distance:0, stopCount:stops.length, stops:stops.map(s=>s.name), stopIds:ids, color:type==='tram'?'#8e44ad':type==='trolleybus'?'#1565c0':'#1e88e5', note:'Создано через карту', routeType:type, vehicleId:null, vehicleIds:[], geometry:null, outboundGeometry:null, returnGeometry:null, calculatedDistance:null, calculatedDuration:null, createdAt:localDateKey(), source:'map' };
+            const route = { id:Date.now()+Math.random(), number, name, start:stops[0].name, end:stops[stops.length-1].name, distance:0, stopCount:stops.length, stops:stops.map(s=>s.name), stopIds:ids, color:type==='trolleybus'?'#1565c0':'#1e88e5', note:'Создано через карту', routeType:type, vehicleId:null, vehicleIds:[], geometry:null, outboundGeometry:null, returnGeometry:null, reverseStopIds:ids.slice().reverse(), calculatedDistance:null, calculatedDuration:null, createdAt:localDateKey(), source:'map' };
             gameState.routes.push(route);
             mapState.selectedRouteId = route.id;
             saveGameState();
@@ -2707,6 +2754,18 @@
             updateMapBusMarkers();
         }
 
+        function showRouteVehicles(routeId) {
+            const route = gameState.routes.find(r => String(r.id) === String(routeId));
+            if (!route) return;
+            const vehicles = getAssignedVehiclesForRoute(route).filter(v => vehicleCompatibleWithRoute(v, route));
+            if (!vehicles.length) {
+                alert(`На маршруте №${route.number} сейчас нет назначенного транспорта.`);
+                return;
+            }
+            const text = vehicles.map((v,i) => `${i+1}. ${vehicleCategoryIcon(v.category)} ${v.model} · борт. №${v.num || '—'}`).join('\n');
+            alert(`ТС на маршруте №${route.number}\n${route.start} → ${route.end}\n\n${text}`);
+        }
+
         function renderRoutes() {
             const list = document.getElementById('routesList');
             const summary = document.getElementById('routeAssignmentSummary');
@@ -2743,7 +2802,7 @@
                 return;
             }
 
-            const visibleRoutes = gameState.routes.filter(route => mapState.routeTypeFilter === 'all' || route.routeType === mapState.routeTypeFilter);
+            const visibleRoutes = gameState.routes.filter(route => route.routeType !== 'tram' && (mapState.routeTypeFilter === 'all' || route.routeType === mapState.routeTypeFilter));
             list.innerHTML = visibleRoutes.map(route => {
                 const ids = Array.isArray(route.vehicleIds) ? route.vehicleIds : (route.vehicleId ? [route.vehicleId] : []);
                 const assignedVehicles = gameState.owned.filter(v => ids.some(id => String(id) === String(v.id)));
@@ -2765,14 +2824,15 @@
                         <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px;font-size:10px;">
                             <span>🎨 Цвет:</span>
                             <input type="color" value="${routeColor(route)}" onchange="changeRouteColor('${route.id}', this.value)" style="width:42px;height:24px;padding:1px;">
-                            <button class="btn-secondary" onclick="openRouteOnMap('${route.id}')">🗺️ Открыть на карте</button>
+                            <button class="btn-secondary" onclick="openRouteOnMap('${route.id}')">🗺️ Открыть на карте</button> <button class="btn-secondary" onclick="showRouteVehicles('${route.id}')">🚍 ТС на маршруте</button>
                         </div>
                         <div class="route-stops">
                             <b>Остановки:</b> ${Array.isArray(route.stops) && route.stops.length ? route.stops.map(escapeHtml).join(' → ') : 'не указаны'}
                         </div>
                         ${route.note ? `<div class="interactive-muted" style="margin-bottom:7px;">${escapeHtml(route.note)}</div>` : ''}
                         <div style="border:1px solid var(--bp-border);padding:7px;border-radius:3px;margin-bottom:7px;">
-                            <div style="font-size:10px;font-weight:bold;margin-bottom:5px;">🚌 Транспорт на маршруте — можно выбрать несколько:</div>
+                            <div style="font-size:10px;font-weight:bold;margin-bottom:5px;">🚍 ТС на маршруте — ${assignedVehicles.length ? `назначено: ${assignedVehicles.length}` : 'пока нет'}:</div>
+                            ${assignedVehicles.length ? `<div class="interactive-muted" style="margin-bottom:5px;">${assignedVehicles.map(v=>`${vehicleCategoryIcon(v.category)} ${escapeHtml(v.model)} · борт. №${escapeHtml(v.num || '—')}`).join('<br>')}</div>` : ''}
                             ${gameState.owned.length ? gameState.owned.map(v => {
                                 const other = getVehicleRoute(v.id);
                                 const checked = ids.some(id => String(id) === String(v.id));
@@ -2843,13 +2903,16 @@
             });
             mapState.initialized = true;
 
+            // Автоматически чистим старые дубли, которые могли сохраниться до обновления версии.
+            const storedStops = getMapStops();
+            const normalizedStops = dedupeMapStops(storedStops);
+            if (normalizedStops.length !== storedStops.length) saveMapStops(normalizedStops);
             renderMapStops();
             renderMapRouteLayers();
             renderMapRouteControls();
 
             setTimeout(() => mapState.map.invalidateSize({pan:false}), 100);
             startMapBusAnimation();
-            if (!mapState.tramRoutesLoaded) { mapState.tramRoutesLoaded = true; loadOsmTramRoutes(); }
         }
 
         function setMapMode(mode) {
@@ -3109,47 +3172,45 @@
             return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
         }
 
+        function normalizeStopName(name) {
+            return String(name || '').toLowerCase().replace(/[«»"'`]/g,'').replace(/\s+/g,' ').trim();
+        }
         function dedupeMapStops(stops) {
             const result = [];
-            const byExact = new Map();
-            const buckets = new Map();
+            const exact = new Map();
             for (const raw of (stops || [])) {
                 const s = Object.assign({}, raw);
                 const lat = Number(s.lat), lon = Number(s.lon);
                 if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
                 s.lat = lat; s.lon = lon;
-                const name = String(s.name || 'Остановка без названия').trim();
-                s.name = name;
-                const kind = s.tags?.railway === 'tram_stop' ? 'tram' : (s.tags?.highway === 'bus_stop' ? 'bus' : 'platform');
-                const exact = `${lat.toFixed(6)}|${lon.toFixed(6)}|${kind}`;
-                if (byExact.has(exact)) {
-                    const old = byExact.get(exact);
-                    if ((!old.name || old.name === 'Остановка без названия') && name) old.name = name;
+                s.name = String(s.name || 'Остановка без названия').trim();
+                const kind = s.tags?.railway === 'tram_stop' ? 'tram' : 'ground';
+                const coordKey = `${lat.toFixed(5)}|${lon.toFixed(5)}`;
+                if (exact.has(coordKey)) {
+                    const old = exact.get(coordKey);
                     old.tags = Object.assign({}, old.tags || {}, s.tags || {});
+                    if ((!old.name || old.name === 'Остановка без названия') && s.name) old.name = s.name;
                     continue;
                 }
-                // Дополнительная дедупликация: OSM часто содержит node + platform/way
-                // в нескольких метрах друг от друга. Объединяем только близкие точки
-                // с одинаковым названием/типом, чтобы не склеивать соседние остановки.
-                const bx = Math.round(lat * 10000), by = Math.round(lon * 10000);
+                // OSM often stores the same physical stop as a stop_position, platform and node.
+                // Merge only very close points with the same normalized name (or unnamed points).
+                const nm = normalizeStopName(s.name);
                 let duplicate = null;
-                for (let dx=-1; dx<=1 && !duplicate; dx++) for (let dy=-1; dy<=1 && !duplicate; dy++) {
-                    const arr = buckets.get(`${bx+dx}:${by+dy}`) || [];
-                    for (const old of arr) {
-                        const oldKind = old.tags?.railway === 'tram_stop' ? 'tram' : (old.tags?.highway === 'bus_stop' ? 'bus' : 'platform');
-                        const sameName = name && old.name && name.toLowerCase() === old.name.toLowerCase();
-                        if (oldKind === kind && (sameName || distanceMeters(lat, lon, old.lat, old.lon) <= 8)) { duplicate = old; break; }
+                for (let i=result.length-1; i>=0 && i>=result.length-120; i--) {
+                    const old = result[i];
+                    const oldNm = normalizeStopName(old.name);
+                    const dist = distanceMeters(lat, lon, old.lat, old.lon);
+                    if (dist <= 28 && ((nm && oldNm === nm) || !nm || !oldNm || oldNm === 'остановка без названия')) {
+                        duplicate = old; break;
                     }
                 }
                 if (duplicate) {
                     duplicate.tags = Object.assign({}, duplicate.tags || {}, s.tags || {});
-                    if (duplicate.name === 'Остановка без названия' && name) duplicate.name = name;
+                    if (s.source === 'custom') duplicate.source = 'custom';
+                    if ((!duplicate.name || duplicate.name === 'Остановка без названия') && s.name) duplicate.name = s.name;
                     continue;
                 }
-                byExact.set(exact, s);
-                const key = `${bx}:${by}`;
-                if (!buckets.has(key)) buckets.set(key, []);
-                buckets.get(key).push(s);
+                exact.set(coordKey, s);
                 result.push(s);
             }
             return result;
@@ -3303,7 +3364,7 @@ out body;
             if (!select) return;
 
             const current = mapState.selectedRouteId;
-            const visibleRoutes = gameState.routes.filter(r => mapState.routeTypeFilter === 'all' || r.routeType === mapState.routeTypeFilter);
+            const visibleRoutes = gameState.routes.filter(r => r.routeType !== 'tram' && (mapState.routeTypeFilter === 'all' || r.routeType === mapState.routeTypeFilter));
             if (current && !visibleRoutes.some(r => String(r.id)===String(current))) mapState.selectedRouteId = null;
             select.innerHTML = '<option value="">— Выбери маршрут —</option>' +
                 visibleRoutes.map(r => `<option value="${r.id}" ${String(current) === String(r.id) ? 'selected' : ''}>№${escapeHtml(r.number)} — ${escapeHtml(r.name)}</option>`).join('');
@@ -3358,6 +3419,12 @@ out body;
 
                 const result = data.routes[0];
                 route.geometry = result.geometry;
+                route.outboundGeometry = null;
+                route.returnGeometry = null;
+                route.reverseStopIds = points.map(s => s.id).reverse();
+                route.start = points[0].name;
+                route.end = points[points.length - 1].name;
+                route.stops = points.map(s => s.name);
                 route.calculatedDistance = result.distance;
                 const depot = DEPOTS[route.routeType === 'tram' ? 'tram' : route.routeType === 'trolleybus' ? 'trolleybus' : 'bus'];
                 const first = points[0], last = points[points.length-1];
@@ -3487,10 +3554,12 @@ out body;
                     const cycle = duration * 2.8;
                     const t = ((now + offset) % cycle) / cycle;
                     let p = [depot.lat, depot.lon], phase='стоит в парке';
-                    if (t < 0.12 && route.outboundGeometry) { p=pathPointFromGeometry(route.outboundGeometry, t/0.12); phase='едет из парка на конечную'; }
-                    else if (t < 0.47) { p=pathPointFromGeometry(route.geometry, (t-0.12)/0.35); phase='на маршруте →'; }
-                    else if (t < 0.82) { p=pathPointFromGeometry(route.geometry, 1-((t-0.47)/0.35)); phase='на маршруте ←'; }
-                    else if (t < 0.94 && route.returnGeometry) { p=pathPointFromGeometry(route.returnGeometry, (t-0.82)/0.12); phase='возвращается в парк'; }
+                    // Один ТС всегда проходит полный замкнутый рабочий цикл:
+                    // парк → первая конечная → маршрут туда → маршрут обратно → парк.
+                    if (t < 0.10 && route.outboundGeometry) { p=pathPointFromGeometry(route.outboundGeometry, t/0.10); phase='едет из парка на первую конечную'; }
+                    else if (t < 0.48) { p=pathPointFromGeometry(route.geometry, (t-0.10)/0.38); phase='на маршруте →'; }
+                    else if (t < 0.86) { p=pathPointFromGeometry(route.geometry, 1-((t-0.48)/0.38)); phase='на маршруте ←'; }
+                    else if (t < 0.96 && route.returnGeometry) { p=pathPointFromGeometry(route.returnGeometry, (t-0.86)/0.10); phase='возвращается в парк'; }
                     const marker = mapState.busMarkers.get(key) || L.marker(p,{icon:createBusIcon(`№${route.number}`,routeColor(route),vehicle.category),zIndexOffset:1000}).addTo(mapState.map);
                     marker.setLatLng(p);
                     marker.setPopupContent(`<b>${escapeHtml(depot.icon)} ${escapeHtml(vehicle.model)}</b><br>Бортовой №: ${escapeHtml(vehicle.num || '—')}<br>Маршрут: <b>№${escapeHtml(route.number)}</b><br>Парк: ${escapeHtml(depot.name)}<br><span style="font-weight:bold;">● ${phase}</span>`);
@@ -3572,7 +3641,7 @@ out body;
             const el = document.getElementById('mapRouteList');
             if (!el) return;
 
-            const visibleRoutes = gameState.routes.filter(r => mapState.routeTypeFilter === 'all' || r.routeType === mapState.routeTypeFilter);
+            const visibleRoutes = gameState.routes.filter(r => r.routeType !== 'tram' && (mapState.routeTypeFilter === 'all' || r.routeType === mapState.routeTypeFilter));
             el.innerHTML = visibleRoutes.length ? visibleRoutes.map(route => `
                 <div class="map-route-item" onclick="selectRouteForMap('${route.id}')">
                     <div>
@@ -3746,4 +3815,4 @@ out body;
         initInteractiveGame();
     </script>
 </body>
-</html>
+    </html>
