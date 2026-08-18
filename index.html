@@ -1288,6 +1288,7 @@
                                 <div id="mapDraftInfo" class="map-help">Точек маршрута: 0</div>
                                 <div class="map-help" style="margin-top:5px;">Кликай остановки по порядку от первой конечной до второй. После создания маршрут автоматически получает первую и последнюю остановку как конечные, а обратное направление строится по той же линии в обратную сторону.</div>
                                 <button class="btn-primary" style="width:100%; margin-top:6px;" onclick="createRouteFromMapDraft()">➕ Создать маршрут из карты</button>
+                                <button class="btn-secondary" style="width:100%; margin-top:6px;" onclick="startNewMapRoute()">🆕 Новый маршрут</button>
                                 <button class="btn-primary" style="width:100%; margin-top:6px;" onclick="buildSelectedRoute()">🛣️ Построить по дорогам</button>
                                 <button class="btn-secondary" style="width:100%; margin-top:6px;" onclick="saveMapRouteGeometry()">💾 Сохранить маршрут</button>
                             </div>
@@ -1559,7 +1560,7 @@
         </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 <script>
         const defaultVehicleDB = [
             { park: "ТП 2", modelPrefix: "МАЗ-216", model: "МАЗ 216.047", gov: "????", num: "????", purposeKey: "service", factory: "125", vin: "—", build: "03.12.2025", arrive: "15.12.2025", start: "—", out: "—", decomm: "—", util: "—", statusCls: "st-unknown", statusKey: "txtUnk", note: "Новогодний 2026" },
@@ -2318,10 +2319,25 @@
         function closeModelModal() { document.getElementById('modelDetailsModal').style.display = 'none'; }
 
         function switchTab(tabId, btnElement) {
+            const wasInteractive = document.getElementById('interactive-tab')?.classList.contains('active');
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('nav button').forEach(btn => btn.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            btnElement.classList.add('active');
+            const target = document.getElementById(tabId);
+            if (target) target.classList.add('active');
+            if (btnElement) btnElement.classList.add('active');
+
+            // Критично для производительности: анимация транспорта не должна работать
+            // в фоне, когда пользователь находится в другой вкладке сайта.
+            if (typeof stopMapBusAnimation === 'function' && tabId !== 'interactive-tab') {
+                stopMapBusAnimation();
+            }
+            if (tabId === 'interactive-tab') {
+                if (typeof renderInteractive === 'function') renderInteractive();
+                const activeGameSection = document.querySelector('#interactive-tab .game-section.active');
+                if (activeGameSection?.id === 'game-section-map') {
+                    setTimeout(() => { if (typeof renderMapIfReady === 'function') renderMapIfReady(); }, 60);
+                }
+            }
         }
 
         function toggleTheme() { 
@@ -2400,6 +2416,7 @@
             mode: 'select',
             selectedRouteId: null,
             draftStopIds: [],
+            creatingNewRoute: false,
             stopMarkers: new Map(),
             routeLayers: new Map(),
             busMarkers: new Map(),
@@ -2840,6 +2857,7 @@
             const route = { id:Date.now()+Math.random(), number, name, start:(classicStops[0]||stops[0]).name, end:(classicStops[classicStops.length-1]||stops[stops.length-1]).name, distance:0, stopCount:stops.length, stops:stops.map(s=>s.name), stopIds:ids, terminalStopIds:classicStops.map(s=>s.id), turnbackStopIds:stops.filter(s=>s.stopType==='turnback').map(s=>s.id), turnaroundMinutes:2, color:type==='trolleybus'?'#1565c0':(type==='electrobus'?'#00897b':'#1e88e5'), note:'Создано через карту', routeType:type, vehicleId:null, vehicleIds:[], geometry:null, outboundGeometry:null, returnGeometry:null, reverseStopIds:ids.slice().reverse(), calculatedDistance:null, calculatedDuration:null, createdAt:localDateKey(), source:'map' };
             gameState.routes.push(route);
             mapState.selectedRouteId = route.id;
+            mapState.creatingNewRoute = false;
             saveGameState();
             document.getElementById('mapNewRouteNumber').value=''; document.getElementById('mapNewRouteName').value='';
             renderInteractive(); renderMapRouteControls(); renderMapRouteLayers();
@@ -3522,16 +3540,16 @@
             const stop = getMapStops().find(s => String(s.id) === String(id));
             if (!stop) return;
 
-            if (mapState.mode !== 'route') {
-                mapState.mode = 'route';
-                setMapMode('route');
-            }
+            if (mapState.mode !== 'route') setMapMode('route');
 
-            if (!mapState.draftStopIds.includes(id)) {
-                mapState.draftStopIds.push(id);
+            // ID OSM могут приходить как number или string. Сравниваем их одинаково,
+            // иначе одна и та же остановка могла считаться уже выбранной или наоборот.
+            const sid = String(stop.id);
+            if (!mapState.draftStopIds.some(x => String(x) === sid)) {
+                mapState.draftStopIds.push(stop.id);
             }
             renderMapDraftInfo();
-            mapSetStatus(`Добавлена остановка: ${stop.name}`);
+            mapSetStatus(`Добавлена остановка №${mapState.draftStopIds.length}: ${stop.name}`);
         }
 
         function removeDraftStop(index) {
@@ -3800,6 +3818,7 @@ out body;
 
         function selectRouteForMap(routeId) {
             mapState.selectedRouteId = routeId || null;
+            mapState.creatingNewRoute = false;
             clearRouteDraft();
             if (routeId) {
                 const route = gameState.routes.find(r => String(r.id) === String(routeId));
@@ -3810,6 +3829,27 @@ out body;
             }
             renderMapRouteLayers();
             renderMapRouteList();
+        }
+
+        function startNewMapRoute() {
+            // Полностью отделяем создание нового маршрута от редактирования уже существующего.
+            // Это позволяет сразу после №23 создать, например, обратное направление №23,
+            // не наследуя остановки первого маршрута.
+            mapState.selectedRouteId = null;
+            mapState.creatingNewRoute = true;
+            mapState.draftStopIds = [];
+            const num = document.getElementById('mapNewRouteNumber');
+            const name = document.getElementById('mapNewRouteName');
+            if (num) { num.value = ''; num.focus(); }
+            if (name) name.value = '';
+            const select = document.getElementById('mapRouteSelect');
+            if (select) select.value = '';
+            renderMapDraftInfo();
+            renderMapRouteLayers();
+            renderMapRouteList();
+            if (mapState.mode !== 'route') setMapMode('route');
+            else renderMapStops();
+            mapSetStatus('Новый маршрут: выбери остановки по порядку. Старый маршрут не блокирует выбор.');
         }
 
         async function buildSelectedRoute() {
@@ -3955,34 +3995,40 @@ out body;
             });
         }
 
+        const geometryMetricsCache = new WeakMap();
         function interpolateRoutePoint(geometry, progress) {
             const coords = geometry?.coordinates;
             if (!Array.isArray(coords) || coords.length < 2) return null;
-
-            // GeoJSON coordinates are [lon, lat]. Use rough geographic distances
-            // so the simulated bus moves at a visually even speed along the route.
-            const pts = coords.map(c => [Number(c[1]), Number(c[0])])
-                .filter(c => Number.isFinite(c[0]) && Number.isFinite(c[1]));
-            if (pts.length < 2) return null;
-
-            const distances = [0];
-            let total = 0;
-            for (let i = 1; i < pts.length; i++) {
-                const a = pts[i - 1], b = pts[i];
-                const dx = (b[1] - a[1]) * Math.cos(((a[0] + b[0]) / 2) * Math.PI / 180);
-                const dy = b[0] - a[0];
-                total += Math.sqrt(dx * dx + dy * dy);
-                distances.push(total);
+            let metrics = geometryMetricsCache.get(geometry);
+            if (!metrics) {
+                const pts = coords.map(c => [Number(c[1]), Number(c[0])])
+                    .filter(c => Number.isFinite(c[0]) && Number.isFinite(c[1]));
+                if (pts.length < 2) return null;
+                const distances = [0];
+                let total = 0;
+                for (let i = 1; i < pts.length; i++) {
+                    const a = pts[i - 1], b = pts[i];
+                    const dx = (b[1] - a[1]) * Math.cos(((a[0] + b[0]) / 2) * Math.PI / 180);
+                    const dy = b[0] - a[0];
+                    total += Math.sqrt(dx * dx + dy * dy);
+                    distances.push(total);
+                }
+                metrics = {pts, distances, total};
+                geometryMetricsCache.set(geometry, metrics);
             }
-            if (!total) return pts[0];
-
-            const target = Math.max(0, Math.min(1, progress)) * total;
-            let idx = 1;
-            while (idx < distances.length && distances[idx] < target) idx++;
-            const prev = distances[idx - 1];
-            const span = distances[idx] - prev || 1;
+            if (!metrics.total) return metrics.pts[0];
+            const target = Math.max(0, Math.min(1, progress)) * metrics.total;
+            // Бинарный поиск вместо прохода по всем точкам на каждом кадре.
+            let lo = 1, hi = metrics.distances.length - 1;
+            while (lo < hi) {
+                const mid = (lo + hi) >> 1;
+                if (metrics.distances[mid] < target) lo = mid + 1; else hi = mid;
+            }
+            const idx = lo;
+            const prev = metrics.distances[idx - 1];
+            const span = metrics.distances[idx] - prev || 1;
             const t = (target - prev) / span;
-            const a = pts[idx - 1], b = pts[Math.min(idx, pts.length - 1)];
+            const a = metrics.pts[idx - 1], b = metrics.pts[Math.min(idx, metrics.pts.length - 1)];
             return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
         }
 
@@ -4161,14 +4207,16 @@ out body;
                 const marker = mapState.busMarkers.get(key) || L.marker(position.point,{icon:createBusIcon(`№${route.number}`,routeColor(route),vehicle.category),zIndexOffset:1000}).addTo(mapState.map);
                 marker.setLatLng(position.point);
                 const depot = depotForVehicle(vehicle);
+                // Popup обновляем только при изменении текста, а не создаём заново каждый кадр.
                 const pairText = pair ? `<br>Обратное направление: <b>№${escapeHtml(pair.number)}</b>` : '';
                 const popupHtml = `<b>${escapeHtml(depot.icon)} ${escapeHtml(vehicle.model)}</b><br>Госномер: <b>${escapeHtml(vehicle.plate || vehicle.num || '—')}</b><br>Маршрут: <b>№${escapeHtml(route.number)}</b>${pairText}${cardLabel}<br>Парк: ${escapeHtml(depot.name)}<br><span style="font-weight:bold;">● ${escapeHtml(position.phase)}</span>`;
-                if (marker._popupHtml !== popupHtml) { marker.setPopupContent(popupHtml); marker._popupHtml = popupHtml; }
+                if (forceVehicleMode !== true && marker._popupHtml !== popupHtml) { marker.setPopupContent(popupHtml); marker._popupHtml = popupHtml; }
+                else if (!marker._popupHtml) { marker.setPopupContent(popupHtml); marker._popupHtml = popupHtml; }
                 mapState.busMarkers.set(key, marker);
             });
 
             mapState.busMarkers.forEach((marker,key)=>{if(!activeKeys.has(key)){marker.remove();mapState.busMarkers.delete(key);}});
-            renderMapBusList();
+            if (!forceVehicleMode) renderMapBusList();
         }
 
         function renderMapBusList() {
@@ -4201,15 +4249,20 @@ out body;
         }
 
         function startMapBusAnimation() {
-            if (mapState.busAnimationFrame) cancelAnimationFrame(mapState.busAnimationFrame);
-            const tick = () => {
+            if (mapState.busAnimationFrame) return;
+            const loop = () => {
                 const section = document.getElementById('game-section-map');
-                if (section && section.classList.contains('active')) updateMapBusMarkers();
-                mapState.busAnimationFrame = requestAnimationFrame(tick);
+                if (!section || !section.classList.contains('active') || document.hidden) {
+                    mapState.busAnimationFrame = null;
+                    return;
+                }
+                // На каждом кадре двигаем только существующие маркеры.
+                // Списки, popup и DOM-панели не перерисовываются.
+                updateMapBusMarkers(true);
+                mapState.busAnimationFrame = requestAnimationFrame(loop);
             };
-            tick();
+            mapState.busAnimationFrame = requestAnimationFrame(loop);
         }
-
         function stopMapBusAnimation() {
             if (mapState.busAnimationFrame) cancelAnimationFrame(mapState.busAnimationFrame);
             mapState.busAnimationFrame = null;
@@ -4290,9 +4343,30 @@ out body;
             const target = document.getElementById('game-section-' + section);
             if (target) target.classList.add('active');
             if (btn) btn.classList.add('active');
-            renderInteractive();
+
+            // Не перерисовываем весь интерактив при каждом переключении раздела.
+            // Это было одной из главных причин задержек на телефонах и ПК.
             if (section === 'map') {
-                setTimeout(renderMapIfReady, 80);
+                setTimeout(renderMapIfReady, 60);
+            } else {
+                stopMapBusAnimation();
+                if (section === 'routes') renderRoutes();
+                else if (section === 'cards') renderServiceCards();
+                else renderInteractiveHeaderAndLightViews();
+            }
+        }
+
+        function renderInteractiveHeaderAndLightViews() {
+            const balance = document.getElementById('gameBalance');
+            if (!balance) return;
+            balance.textContent = money(gameState.balance);
+            document.getElementById('gameMonth').textContent = gameState.month;
+            document.getElementById('ownedCount').textContent = gameState.owned.length;
+            const badge = document.getElementById('gameClockBadge');
+            if (badge) {
+                const now = new Date();
+                badge.textContent = now.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) +
+                    (now.getHours() >= 12 ? ' • начисление сегодня выполнено/ожидается' : ' • следующее начисление в 12:00');
             }
         }
 
@@ -4395,15 +4469,25 @@ out body;
             processGamePayout();
             renderInteractive();
             scheduleNoonPayout();
-            renderMapIfReady();
+
+            // Карту и её анимацию инициализируем лениво — только когда пользователь её открыл.
 
             // Если вкладка была открыта всю ночь, обновляем часы/состояние каждую минуту.
-            setInterval(() => {
-                processGamePayout();
-                const badge = document.getElementById('gameClockBadge');
-                if (badge) renderInteractive();
-            }, 60 * 1000);
+            if (!window.gameMinuteTimer) {
+                window.gameMinuteTimer = setInterval(() => {
+                    processGamePayout();
+                    renderInteractiveHeaderAndLightViews();
+                }, 60 * 1000);
+            }
         }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) stopMapBusAnimation();
+            else {
+                const section = document.getElementById('game-section-map');
+                if (section?.classList.contains('active')) startMapBusAnimation();
+            }
+        });
 
         window.onclick = function(event) {
             let vehicleModal = document.getElementById('vehicleModal');
