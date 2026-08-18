@@ -2999,8 +2999,13 @@
                     const p = mapState.map.unproject([c.x/c.count,c.y/c.count], zoom);
                     const size = Math.min(50, 28 + Math.log2(Math.max(1,c.count))*5);
                     const icon = L.divIcon({className:'',html:`<div class="map-stop-cluster" style="width:${size}px;height:${size}px">${c.count}</div>`,iconSize:[size,size],iconAnchor:[size/2,size/2]});
-                    const m = L.marker(p,{icon}).addTo(mapState.map);
+                    const m = L.marker(p,{icon, keyboard:false, zIndexOffset:500}).addTo(mapState.map);
                     m.bindPopup(`<b>🚏 ${c.count} остановок</b><br><small>Приблизь карту, чтобы увидеть отдельные точки.</small>`);
+                    m.on('click', (ev) => {
+                        if (ev && ev.originalEvent) L.DomEvent.stopPropagation(ev.originalEvent);
+                        const nextZoom = Math.min(mapState.map.getMaxZoom ? mapState.map.getMaxZoom() : 19, mapState.map.getZoom() + 2);
+                        mapState.map.setView(p, nextZoom, {animate:true});
+                    });
                     mapState.stopMarkers.set('cluster-'+key,m);
                 });
                 renderMapStopList();
@@ -3013,7 +3018,7 @@
             for (const stop of draw) {
                 const isTram = stop.tags?.railway === 'tram_stop';
                 const color = stop.source === 'custom' ? '#8e44ad' : (isTram ? '#8e44ad' : '#1769aa');
-                const marker = L.circleMarker([stop.lat, stop.lon], {radius:6, weight:7, color:'#fff', fillColor:color, fillOpacity:.92, className:'map-stop-hit'}).addTo(mapState.map);
+                const marker = L.circleMarker([stop.lat, stop.lon], {radius:9, weight:4, color:'#fff', fillColor:color, fillOpacity:.95, bubblingMouseEvents:false, className:'map-stop-hit'}).addTo(mapState.map);
                 marker.bindPopup(`<b>${escapeHtml(stop.name)}</b><br>${isTram?'🚊 Трамвайная':stop.tags?.highway==='bus_stop'?'🚏 Автобусная':'🚏 Остановка'}<br><small>${Number(stop.lat).toFixed(6)}, ${Number(stop.lon).toFixed(6)}</small><br><button class="map-select-stop-btn" onclick="mapSelectStop('${String(stop.id).replace(/'/g,"\'")}')">➕ Выбрать для маршрута</button>`);
                 marker.on('click',()=>{
                     if(mapState.mode==='route') {
@@ -3095,10 +3100,64 @@
             `;
         }
 
+        function distanceMeters(aLat, aLon, bLat, bLon) {
+            const R = 6371000;
+            const p1 = Number(aLat) * Math.PI / 180, p2 = Number(bLat) * Math.PI / 180;
+            const dp = (Number(bLat)-Number(aLat)) * Math.PI / 180;
+            const dl = (Number(bLon)-Number(aLon)) * Math.PI / 180;
+            const x = Math.sin(dp/2)**2 + Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+            return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+        }
+
+        function dedupeMapStops(stops) {
+            const result = [];
+            const byExact = new Map();
+            const buckets = new Map();
+            for (const raw of (stops || [])) {
+                const s = Object.assign({}, raw);
+                const lat = Number(s.lat), lon = Number(s.lon);
+                if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+                s.lat = lat; s.lon = lon;
+                const name = String(s.name || 'Остановка без названия').trim();
+                s.name = name;
+                const kind = s.tags?.railway === 'tram_stop' ? 'tram' : (s.tags?.highway === 'bus_stop' ? 'bus' : 'platform');
+                const exact = `${lat.toFixed(6)}|${lon.toFixed(6)}|${kind}`;
+                if (byExact.has(exact)) {
+                    const old = byExact.get(exact);
+                    if ((!old.name || old.name === 'Остановка без названия') && name) old.name = name;
+                    old.tags = Object.assign({}, old.tags || {}, s.tags || {});
+                    continue;
+                }
+                // Дополнительная дедупликация: OSM часто содержит node + platform/way
+                // в нескольких метрах друг от друга. Объединяем только близкие точки
+                // с одинаковым названием/типом, чтобы не склеивать соседние остановки.
+                const bx = Math.round(lat * 10000), by = Math.round(lon * 10000);
+                let duplicate = null;
+                for (let dx=-1; dx<=1 && !duplicate; dx++) for (let dy=-1; dy<=1 && !duplicate; dy++) {
+                    const arr = buckets.get(`${bx+dx}:${by+dy}`) || [];
+                    for (const old of arr) {
+                        const oldKind = old.tags?.railway === 'tram_stop' ? 'tram' : (old.tags?.highway === 'bus_stop' ? 'bus' : 'platform');
+                        const sameName = name && old.name && name.toLowerCase() === old.name.toLowerCase();
+                        if (oldKind === kind && (sameName || distanceMeters(lat, lon, old.lat, old.lon) <= 8)) { duplicate = old; break; }
+                    }
+                }
+                if (duplicate) {
+                    duplicate.tags = Object.assign({}, duplicate.tags || {}, s.tags || {});
+                    if (duplicate.name === 'Остановка без названия' && name) duplicate.name = name;
+                    continue;
+                }
+                byExact.set(exact, s);
+                const key = `${bx}:${by}`;
+                if (!buckets.has(key)) buckets.set(key, []);
+                buckets.get(key).push(s);
+                result.push(s);
+            }
+            return result;
+        }
+
         async function loadAllMinskStops() {
             if (!mapState.map) return;
             mapSetStatus('Загружаю остановки Минска и Минского района…');
-
             const endpoints = [
                 'https://overpass-api.de/api/interpreter',
                 'https://overpass.kumi.systems/api/interpreter'
@@ -3124,7 +3183,6 @@
   nwr["railway"="tram_stop"](area.districtAreas);
 );
 out center tags;`;
-
             let lastError = null;
             for (const endpoint of endpoints) {
                 try {
@@ -3132,23 +3190,20 @@ out center tags;`;
                     if (!response.ok) throw new Error('HTTP '+response.status);
                     const data = await response.json();
                     const existing = getMapStops();
-                    const byId = new Map(existing.map(s => [String(s.id), s]));
-                    const seenPhysical = new Set();
+                    const incoming = [];
                     for (const e of data.elements || []) {
                         const tags = e.tags || {};
                         const lat = Number(e.lat ?? e.center?.lat), lon = Number(e.lon ?? e.center?.lon);
                         if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-                        const name = tags.name || tags['name:ru'] || tags['name:be'] || 'Остановка без названия';
-                        const kind = tags.railway === 'tram_stop' ? 'tram' : (tags.highway === 'bus_stop' ? 'bus' : 'platform');
-                        const physicalKey = `${name.trim().toLowerCase()}|${lat.toFixed(6)}|${lon.toFixed(6)}|${kind}`;
-                        if (seenPhysical.has(physicalKey)) continue;
-                        seenPhysical.add(physicalKey);
-                        byId.set(`osm-${e.type}-${e.id}`, {id:`osm-${e.type}-${e.id}`,name,lat,lon,source:'osm',tags});
+                        incoming.push({id:`osm-${e.type}-${e.id}`,name:tags.name || tags['name:ru'] || tags['name:be'] || 'Остановка без названия',lat,lon,source:'osm',tags});
                     }
-                    saveMapStops(Array.from(byId.values()));
+                    // Полностью пересобираем OSM-слой, сохраняя пользовательские остановки.
+                    const custom = existing.filter(s => s.source === 'custom');
+                    const cleaned = dedupeMapStops(custom.concat(incoming));
+                    saveMapStops(cleaned);
                     mapState.osmStopsLoaded = true;
                     renderMapStops();
-                    mapSetStatus(`Готово: найдено ${data.elements?.length || 0} объектов остановок OSM. Всего в базе: ${byId.size}`);
+                    mapSetStatus(`Готово: ${incoming.length} объектов OSM → ${cleaned.length} уникальных остановок.`);
                     return;
                 } catch (err) {
                     console.warn('Overpass endpoint failed', endpoint, err);
@@ -3157,7 +3212,22 @@ out center tags;`;
             }
             console.error(lastError);
             mapSetStatus('Не удалось загрузить остановки OSM.');
-            alert('Не удалось загрузить все остановки. Попробуй ещё раз: один из серверов Overpass может быть временно перегружен.');
+            alert('Не удалось загрузить остановки. Попробуй ещё раз: сервер Overpass может быть временно перегружен.');
+        }
+
+        function clearAllMapStops() {
+            const count = getMapStops().length;
+            if (!count) { mapSetStatus('Остановок для удаления нет.'); return; }
+            if (!confirm(`Удалить ВСЕ ${count} остановок с карты?\n\nЭто удалит и остановки OSM, и созданные вручную. Маршруты не удаляются автоматически.`)) return;
+            localStorage.removeItem('minsk_custom_osm_stops_v1');
+            mapState.stopMarkers.forEach(m => m.remove());
+            mapState.stopMarkers.clear();
+            mapState.draftStopIds = [];
+            mapState.osmStopsLoaded = false;
+            renderMapStops();
+            renderMapDraftInfo();
+            renderMapStopList();
+            mapSetStatus('Все остановки удалены. Теперь можно загрузить их заново.');
         }
 
         async function loadOsmTramRoutes() {
@@ -3676,4 +3746,4 @@ out body;
         initInteractiveGame();
     </script>
 </body>
-    </html>
+</html>
