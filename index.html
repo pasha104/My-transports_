@@ -2791,6 +2791,14 @@
                 await buildSelectedRoute();
             } catch (e) {
                 console.warn('Автоматическая постройка маршрута не удалась', e);
+            } finally {
+                // После создания маршрута черновик очищаем.
+                // Иначе при создании второго направления (например, №23 обратно)
+                // уже выбранные остановки первого направления считались бы выбранными
+                // и повторно нажать на них было невозможно.
+                mapState.draftStopIds = [];
+                renderMapDraftInfo();
+                renderMapStops();
             }
         }
 
@@ -3507,40 +3515,65 @@
         function dedupeMapStops(stops) {
             const result = [];
             const exact = new Map();
+            // Пространственный индекс: раньше поиск дубля смотрел только последние 120
+            // элементов, поэтому при большой загрузке Минска одинаковые остановки могли
+            // снова появляться по 2–3 раза.
+            const grid = new Map();
+            const CELL = 0.00012; // ~13 м по широте
+            const cellKey = (lat, lon) => `${Math.floor(lat / CELL)}:${Math.floor(lon / CELL)}`;
+            const mergeInto = (old, s) => {
+                old.tags = Object.assign({}, old.tags || {}, s.tags || {});
+                if (s.source === 'custom') old.source = 'custom';
+                if ((!old.name || normalizeStopName(old.name) === 'остановка без названия') && s.name) old.name = s.name;
+            };
+
             for (const raw of (stops || [])) {
                 const s = Object.assign({}, raw);
                 const lat = Number(s.lat), lon = Number(s.lon);
                 if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
                 s.lat = lat; s.lon = lon;
                 s.name = String(s.name || 'Остановка без названия').trim();
-                const kind = s.tags?.railway === 'tram_stop' ? 'tram' : 'ground';
+
                 const coordKey = `${lat.toFixed(5)}|${lon.toFixed(5)}`;
                 if (exact.has(coordKey)) {
-                    const old = exact.get(coordKey);
-                    old.tags = Object.assign({}, old.tags || {}, s.tags || {});
-                    if ((!old.name || old.name === 'Остановка без названия') && s.name) old.name = s.name;
+                    mergeInto(exact.get(coordKey), s);
                     continue;
                 }
-                // OSM often stores the same physical stop as a stop_position, platform and node.
-                // Merge only very close points with the same normalized name (or unnamed points).
+
                 const nm = normalizeStopName(s.name);
+                const cx = Math.floor(lat / CELL), cy = Math.floor(lon / CELL);
                 let duplicate = null;
-                for (let i=result.length-1; i>=0 && i>=result.length-120; i--) {
-                    const old = result[i];
-                    const oldNm = normalizeStopName(old.name);
-                    const dist = distanceMeters(lat, lon, old.lat, old.lon);
-                    if (dist <= 16 && (s.source === 'osm' || old.source === 'osm') && (nm === oldNm || dist <= 9 || !nm || !oldNm || oldNm === 'остановка без названия')) {
-                        duplicate = old; break;
+
+                // Проверяем соседние ячейки, поэтому порядок ответа Overpass больше не влияет.
+                for (let dx = -1; dx <= 1 && !duplicate; dx++) {
+                    for (let dy = -1; dy <= 1 && !duplicate; dy++) {
+                        const bucket = grid.get(`${cx + dx}:${cy + dy}`) || [];
+                        for (const old of bucket) {
+                            const dist = distanceMeters(lat, lon, old.lat, old.lon);
+                            if (dist > 16) continue;
+                            const oldNm = normalizeStopName(old.name);
+                            const sameName = nm && oldNm && nm === oldNm;
+                            const unnamed = !nm || !oldNm || oldNm === 'остановка без названия' || nm === 'остановка без названия';
+                            // Одинаковая физическая точка или одинаковое имя очень близко — один объект.
+                            if (dist <= 8 || sameName || (dist <= 12 && unnamed)) {
+                                duplicate = old;
+                                break;
+                            }
+                        }
                     }
                 }
+
                 if (duplicate) {
-                    duplicate.tags = Object.assign({}, duplicate.tags || {}, s.tags || {});
-                    if (s.source === 'custom') duplicate.source = 'custom';
-                    if ((!duplicate.name || duplicate.name === 'Остановка без названия') && s.name) duplicate.name = s.name;
+                    mergeInto(duplicate, s);
+                    exact.set(coordKey, duplicate);
                     continue;
                 }
+
                 exact.set(coordKey, s);
                 result.push(s);
+                const key = cellKey(lat, lon);
+                if (!grid.has(key)) grid.set(key, []);
+                grid.get(key).push(s);
             }
             return result;
         }
@@ -4261,4 +4294,4 @@ out body;
         initInteractiveGame();
     </script>
 </body>
-    </html>
+</html>
