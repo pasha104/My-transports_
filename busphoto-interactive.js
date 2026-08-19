@@ -111,6 +111,11 @@
             if (!Array.isArray(gameState.log)) gameState.log = [];
             if (!Array.isArray(gameState.serviceCards)) gameState.serviceCards = [];
             gameState.serviceCards = gameState.serviceCards.filter(card => card && card.vehicleId != null && card.routeId != null);
+            gameState.serviceCards.forEach(card => {
+                if (!card.createdAt) card.createdAt = new Date().toISOString();
+                if (!Number.isFinite(Number(card.lastArrivalCount))) card.lastArrivalCount = 0;
+                card.active = card.active !== false;
+            });
             if (typeof gameState.balance !== 'number' || Number.isNaN(gameState.balance)) {
                 gameState.balance = 50000;
             }
@@ -486,7 +491,13 @@
             }
         }
 
+        function getVehicleServiceCard(vehicleId) {
+            return (gameState.serviceCards || []).find(card => card.active !== false && String(card.vehicleId) === String(vehicleId) && gameState.routes.some(r => String(r.id) === String(card.routeId)));
+        }
+
         function getVehicleRoute(vehicleId) {
+            const card = getVehicleServiceCard(vehicleId);
+            if (card) return gameState.routes.find(r => String(r.id) === String(card.routeId));
             return gameState.routes.find(r => {
                 const ids = Array.isArray(r.vehicleIds) ? r.vehicleIds : (r.vehicleId ? [r.vehicleId] : []);
                 return ids.some(id => String(id) === String(vehicleId));
@@ -591,7 +602,8 @@
             const list = document.getElementById('routesList');
             const summary = document.getElementById('routeAssignmentSummary');
             if (!list || !summary) return;
-            syncAllRouteMetadata();
+            // Не подгружаем список остановок при открытии маршрутов: это тяжёлая операция.
+            // Для списка маршрутов достаточно сохранённых данных «откуда → куда».
 
             const assigned = gameState.routes.reduce((sum, r) => {
                 const ids = Array.isArray(r.vehicleIds) ? r.vehicleIds : (r.vehicleId ? [r.vehicleId] : []);
@@ -632,24 +644,21 @@
                 return `
                     <div class="route-card">
                         <div class="route-card-title">
-                            <span>🛣️ №${route.number} — ${escapeHtml(route.name)} <span class="route-type-badge">${routeTypeLabel(route.routeType)}</span></span>
+                            <span>🛣️ №${route.number} — ${escapeHtml(route.start || "—")} → ${escapeHtml(route.end || "—")} <span class="route-type-badge">${routeTypeLabel(route.routeType)}</span></span>
                             <span class="route-badge ${assignedVehicles.length ? 'route-running' : 'route-idle'}">
                                 ${assignedVehicles.length ? `${assignedVehicles.map(v=>vehicleCategoryIcon(v.category)).join('')} ${assignedVehicles.length} ТС на линии` : '⏸ Без ТС'}
                             </span>
                         </div>
                         <div class="route-meta">
-                            <span>${escapeHtml(route.start)} → ${escapeHtml(route.end)}</span><span>🏢 ${escapeHtml(DEPOTS[route.routeType==='trolleybus'?'trolleybus':'bus'].name)}</span>
-                            <span>📏 ${route.calculatedDistance ? (route.calculatedDistance / 1000).toFixed(2) : route.distance} км</span>
-                            <span>🚏 ${route.stopIds?.length || route.stopCount} остановок</span>
+                            <span>📍 ${escapeHtml(route.start || '—')} → ${escapeHtml(route.end || '—')}</span>
+                            <span>🚍 ${routeTypeLabel(route.routeType)}</span>
+                            ${route.calculatedDistance ? `<span>📏 ${(route.calculatedDistance / 1000).toFixed(2)} км</span>` : ''}
                             ${route.calculatedDuration ? `<span>⏱️ ${formatDuration(route.calculatedDuration)}</span>` : ''}
                         </div>
                         <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px;font-size:10px;">
                             <span>🎨 Цвет:</span>
                             <input type="color" value="${routeColor(route)}" onchange="changeRouteColor('${route.id}', this.value)" style="width:42px;height:24px;padding:1px;">
                             <button class="btn-secondary" onclick="openRouteOnMap('${route.id}')">🗺️ Открыть на карте</button> <button class="btn-secondary" onclick="showRouteVehicles('${route.id}')">🚍 ТС на маршруте</button>
-                        </div>
-                        <div class="route-stops">
-                            <b>Остановочные пункты:</b> ${Array.isArray(route.stops) && route.stops.length ? route.stopIds.map((id,i)=>{ const st=getMapStops().find(x=>String(x.id)===String(id)); return `${escapeHtml(route.stops[i] || '')}${st?.stopType==='turnback'?' 🔄':''}`; }).join(' → ') : 'не указаны'}
                         </div>
                         <div class="route-direction-panel">
                             <div>
@@ -1479,20 +1488,24 @@ out body;
             if (!mapState.map) return;
             const activeKeys = new Set();
             const vehicles = gameState.owned;
+            const nowMs = Date.now();
 
             vehicles.forEach(vehicle => {
-                const route = getVehicleRoute(vehicle.id);
+                const serviceCard = getVehicleServiceCard(vehicle.id);
+                const route = serviceCard
+                    ? gameState.routes.find(r => String(r.id) === String(serviceCard.routeId))
+                    : getVehicleRoute(vehicle.id);
                 if (!route || !route.geometry) return;
+                if (mapState.mode === 'vehicles' && mapState.routeTypeFilter !== 'all' && route.routeType !== mapState.routeTypeFilter) return;
+
                 const pair = route.pairedRouteId
                     ? gameState.routes.find(r => String(r.id) === String(route.pairedRouteId))
                     : null;
-                if (mapState.mode === 'vehicles' && mapState.routeTypeFilter !== 'all' && route.routeType !== mapState.routeTypeFilter) return;
-
-                const now = Date.now();
                 const depot = depotForVehicle(vehicle);
                 const duration = Math.max(60000, Number(route.calculatedDuration || 720) * 1000);
                 const cycleDuration = duration * 2;
-                const t = (now % cycleDuration) / cycleDuration;
+                const elapsed = serviceCard ? Math.max(0, nowMs - new Date(serviceCard.createdAt || nowMs).getTime()) : nowMs;
+                const t = (elapsed % cycleDuration) / cycleDuration;
                 let point = null;
                 let phase = '';
                 let directionLabel = '→';
@@ -1507,12 +1520,26 @@ out body;
                 }
                 if (!point) point = [depot.lat, depot.lon];
 
+                // Карточка выезда является самостоятельным назначением ТС.
+                // На каждой первой конечной после полного оборота начисляем 100 р.
+                if (serviceCard) {
+                    const arrivals = Math.floor(elapsed / cycleDuration + 0.5);
+                    const paid = Number(serviceCard.lastArrivalCount || 0);
+                    if (arrivals > paid) {
+                        gameState.balance += (arrivals - paid) * 100;
+                        serviceCard.lastArrivalCount = arrivals;
+                        saveGameState();
+                        renderInteractiveHeaderAndLightViews();
+                    }
+                }
+
                 const key = `vehicle:${vehicle.id}`;
                 activeKeys.add(key);
                 const marker = mapState.busMarkers.get(key) || L.marker(point,{icon:createBusIcon(`№${route.number}`,routeColor(route),vehicle.category),zIndexOffset:1000}).addTo(mapState.map);
                 marker.setLatLng(point);
                 const pairText = pair ? `<br>Обратное направление: <b>№${escapeHtml(pair.number)}</b>` : '';
-                const popupHtml = `<b>${escapeHtml(depot.icon)} ${escapeHtml(vehicle.model)}</b><br>Госномер: <b>${escapeHtml(vehicle.plate || vehicle.num || '—')}</b><br>Маршрут: <b>№${escapeHtml(route.number)}</b>${pairText}<br>Парк: ${escapeHtml(depot.name)}<br><span style="font-weight:bold;">● ${escapeHtml(phase)}</span>`;
+                const cardText = serviceCard ? `<br>🗓️ Карточка выезда: <b>активна</b><br>💰 +100 р. за прибытие на конечную` : '';
+                const popupHtml = `<b>${escapeHtml(depot.icon)} ${escapeHtml(vehicle.model)}</b><br>Госномер: <b>${escapeHtml(vehicle.plate || vehicle.num || '—')}</b><br>Маршрут: <b>№${escapeHtml(route.number)}</b>${pairText}${cardText}<br><span style="font-weight:bold;">● ${escapeHtml(phase)}</span>`;
                 if (forceVehicleMode !== true && marker._popupHtml !== popupHtml) { marker.setPopupContent(popupHtml); marker._popupHtml = popupHtml; }
                 else if (!marker._popupHtml) { marker.setPopupContent(popupHtml); marker._popupHtml = popupHtml; }
                 mapState.busMarkers.set(key, marker);
@@ -1529,7 +1556,7 @@ out body;
             gameState.routes.forEach(route => {
                 const vehicles = getAssignedVehiclesForRoute(route);
                 vehicles.forEach(vehicle => {
-                    rows.push(`${route.id}|${vehicle.id}|${vehicle.model}|${vehicle.num || ''}|${route.number}|${route.name}|${vehicle.category}`);
+                    rows.push(`${route.id}|${vehicle.id}|${vehicle.model}|${vehicle.num || ''}|${route.number}|${route.start || '—'} → ${route.end || '—'}|${vehicle.category}`);
                 });
             });
             const signature = rows.join('\\n');
@@ -1539,7 +1566,7 @@ out body;
                 const [routeId, vehicleId, model, num, number, name, category] = row.split('|');
                 return `<div class="map-route-item" onclick="focusMapBus('${routeId}','${vehicleId}')">
                     <div><b>${vehicleCategoryIcon(category)} ${escapeHtml(model)}</b> · борт. ${escapeHtml(num || '—')}</div>
-                    <div class="map-help">Маршрут №${escapeHtml(number)} — ${escapeHtml(name)} · <span style="color:#28a745">● на линии</span></div>
+                    <div class="map-help">Маршрут №${escapeHtml(number)} · ${escapeHtml(name)} · <span style="color:#28a745">● на линии</span></div>
                 </div>`;
             }).join('') : '<div class="map-bus-panel-empty">Пока нет ТС на линии. Назначь транспорт на маршрут в разделе «Маршруты».</div>';
         }
@@ -1594,7 +1621,7 @@ out body;
                     }
                 }).addTo(mapState.map);
 
-                layer.bindPopup(`<b>№${escapeHtml(route.number)} — ${escapeHtml(route.name)}</b><br>${route.calculatedDistance ? (route.calculatedDistance / 1000).toFixed(2) + ' км' : 'Расстояние не рассчитано'}`);
+                layer.bindPopup(`<b>№${escapeHtml(route.number)} · ${escapeHtml(route.start || "—")} → ${escapeHtml(route.end || "—")}</b><br>${route.calculatedDistance ? (route.calculatedDistance / 1000).toFixed(2) + ' км' : 'Расстояние не рассчитано'}`);
                 mapState.routeLayers.set(String(route.id), layer);
             });
             updateMapBusMarkers();
@@ -1609,11 +1636,11 @@ out body;
                 <div class="map-route-item" onclick="selectRouteForMap('${route.id}')">
                     <div>
                         <span class="map-route-line" style="background:${routeColor(route)}"></span>
-                        <b>№${escapeHtml(route.number)}</b> — ${escapeHtml(route.name)} <span class="route-type-badge">${routeTypeLabel(route.routeType)}</span>
+                        <b>№${escapeHtml(route.number)}</b> — ${escapeHtml(route.start || "—")} → ${escapeHtml(route.end || "—")} <span class="route-type-badge">${routeTypeLabel(route.routeType)}</span>
                     </div>
                     <div class="map-help">
-                        ${route.calculatedDistance ? (route.calculatedDistance / 1000).toFixed(2) + ' км' : 'нет расчёта'}
-                        · ${route.stopIds?.length || 0} остановок
+                        ${routeTypeLabel(route.routeType)}
+                        · ${escapeHtml(route.start || '—')} → ${escapeHtml(route.end || '—')}
                         · ${(Array.isArray(route.vehicleIds) ? route.vehicleIds.length : (route.vehicleId ? 1 : 0))} ТС
                     </div>
                 </div>
@@ -1685,7 +1712,7 @@ out body;
                 const v = gameState.owned.find(x => String(x.id) === String(card.vehicleId));
                 const r = gameState.routes.find(x => String(x.id) === String(card.routeId));
                 if (!v || !r) return '';
-                return `<div class="departure-card"><div class="departure-card-head"><div><b>🗓️ Выезд · №${escapeHtml(r.number)}</b><div class="interactive-muted">${vehicleCategoryIcon(v.category)} ${escapeHtml(v.model)} · ${escapeHtml(v.plate || v.num || 'без номера')}</div></div><button class="btn-secondary" onclick="deleteDepartureCard('${escapeHtml(card.id)}')">Удалить</button></div><div class="departure-card-grid"><div><div class="interactive-muted">Выезд из парка</div><div class="departure-card-time">${escapeHtml(card.depotTime)}</div></div><div><div class="interactive-muted">Первая конечная</div><div class="departure-card-time">${escapeHtml(card.startTime)}</div><div>${escapeHtml(r.start)}</div></div><div><div class="interactive-muted">Конечная</div><div class="departure-card-time">${escapeHtml(card.endTime)}</div><div>${escapeHtml(r.end)}</div></div><div><div class="interactive-muted">Заезд в парк</div><div class="departure-card-time">${escapeHtml(card.returnTime)}</div></div></div></div>`;
+                return `<div class="departure-card"><div class="departure-card-head"><div><b>🗓️ Выезд · №${escapeHtml(r.number)}</b><div class="interactive-muted">${vehicleCategoryIcon(v.category)} ${escapeHtml(v.model)} · ${escapeHtml(v.plate || v.num || 'без номера')}</div></div><button class="btn-secondary" onclick="toggleDepartureCard('${escapeHtml(card.id)}')">${card.active !== false ? '⏸ Остановить' : '▶ Запустить'}</button><button class="btn-secondary" onclick="deleteDepartureCard('${escapeHtml(card.id)}')">Удалить</button></div><div class="departure-card-grid"><div><div class="interactive-muted">Выезд из парка</div><div class="departure-card-time">${escapeHtml(card.depotTime)}</div></div><div><div class="interactive-muted">Первая конечная</div><div class="departure-card-time">${escapeHtml(card.startTime)}</div><div>${escapeHtml(r.start)}</div></div><div><div class="interactive-muted">Конечная</div><div class="departure-card-time">${escapeHtml(card.endTime)}</div><div>${escapeHtml(r.end)}</div></div><div><div class="interactive-muted">Заезд в парк</div><div class="departure-card-time">${escapeHtml(card.returnTime)}</div></div></div></div>`;
             }).join('') || '<div class="interactive-muted">Карточек выезда пока нет.</div>';
         }
 
@@ -1695,11 +1722,12 @@ out body;
             const route = gameState.routes.find(r => String(r.id) === String(document.getElementById('departureRoute').value));
             if (!vehicle || !route) return alert('Выбери ТС и маршрут.');
             if (!(vehicle.category === route.routeType || (vehicle.category === 'bus' && route.routeType === 'bus'))) return alert('Тип ТС не соответствует типу маршрута.');
-            gameState.serviceCards.unshift({id:'dep-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),vehicleId:vehicle.id,routeId:route.id,depotTime:document.getElementById('departureDepotTime').value,startTime:document.getElementById('departureStartTime').value,endTime:document.getElementById('departureEndTime').value,returnTime:document.getElementById('departureReturnTime').value,createdAt:new Date().toISOString()});
+            gameState.serviceCards.unshift({id:'dep-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),vehicleId:vehicle.id,routeId:route.id,depotTime:document.getElementById('departureDepotTime').value,startTime:document.getElementById('departureStartTime').value,endTime:document.getElementById('departureEndTime').value,returnTime:document.getElementById('departureReturnTime').value,createdAt:new Date().toISOString(),lastArrivalCount:0,active:true});
             saveGameState(); renderDepartureCards(); document.getElementById('departureCardForm').reset(); updateDepartureRouteOptions();
         }
 
-        function deleteDepartureCard(id) { gameState.serviceCards = gameState.serviceCards.filter(card => String(card.id) !== String(id)); saveGameState(); renderDepartureCards(); }
+        function toggleDepartureCard(id) { const card = gameState.serviceCards.find(c => String(c.id) === String(id)); if (!card) return; card.active = card.active === false; if (card.active) card.createdAt = new Date().toISOString(); saveGameState(); renderDepartureCards(); updateMapBusMarkers(true); }
+        function deleteDepartureCard(id) { gameState.serviceCards = gameState.serviceCards.filter(card => String(card.id) !== String(id)); saveGameState(); renderDepartureCards(); updateMapBusMarkers(true); }
         function renderDepartureSection() { updateDepartureRouteOptions(); renderDepartureCards(); }
 
         function renderInteractive() {
