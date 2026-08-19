@@ -2513,17 +2513,17 @@ out body;
                 const turnaround = Math.max(1, Number(route.turnaroundMinutes || 2));
                 if (idx === 0) {
                     if (depot) depot.readOnly = false;
-                    if (start && depot) start.value = addMinutesToTime(depot.value || '05:00', Math.max(1, getDepotTransferMinutes(route,startId)));
+                    if (start && depot && row.dataset.manualStart !== '1') start.value = addMinutesToTime(depot.value || '05:00', Math.max(1, getDepotTransferMinutes(route,startId)));
                 } else {
                     if (depot) { depot.readOnly = true; depot.value = previousEnd ? minutesToTime(previousEnd) : depot.value; }
-                    if (start) start.value = previousEnd ? minutesToTime(previousEnd + Math.max(1,turnaround)) : start.value;
+                    if (start && row.dataset.manualStart !== '1') start.value = previousEnd ? minutesToTime(previousEnd + Math.max(1,turnaround)) : start.value;
                 }
                 const startMin = timeToMinutes(start?.value || '05:30');
                 const endMin = startMin + duration;
-                if (end) end.value = minutesToTime(endMin);
-                if (until) { until.readOnly = true; until.value = minutesToTime(endMin); }
+                if (end && row.dataset.manualEnd !== '1') end.value = minutesToTime(endMin);
+                if (until) { until.readOnly = false; }
                 const returnTransfer = getReturnTransferMinutes(route,row.querySelector('.departure-end-stop')?.value);
-                if (ret) { ret.readOnly = true; ret.value = minutesToTime(endMin + Math.max(1,returnTransfer)); }
+                if (ret && row.dataset.manualReturn !== '1') ret.value = minutesToTime(endMin + Math.max(1,returnTransfer));
                 row.dataset.sequenceOrder = idx;
                 row.dataset.autoSequence = '1';
                 previousEnd = endMin + Math.max(1, returnTransfer);
@@ -2563,22 +2563,28 @@ out body;
                 <select class="departure-start-stop" aria-label="Отправление с конечной"></select>
                 <select class="departure-end-stop" aria-label="Конечная рейса"></select>
                 <label class="departure-time-field"><span>Выезд из парка</span><input class="departure-depot" type="time" value="${escapeHtml(s.depotTime || '05:00')}" required></label>
-                <label class="departure-time-field"><span>Отправление с конечной</span><input class="departure-start" type="time" value="${escapeHtml(s.startTime || '05:30')}" readonly></label>
+                <label class="departure-time-field"><span>Отправление с конечной</span><input class="departure-start" type="time" value="${escapeHtml(s.startTime || '05:30')}"></label>
                 <label class="departure-time-field"><span>Работать до</span><input class="departure-until" type="time" value="${escapeHtml(s.workUntil || s.endTime || '22:00')}" required></label>
-                <label class="departure-time-field"><span>Последнее прибытие</span><input class="departure-end" type="time" value="${escapeHtml(s.lastArrivalTime || s.endTime || '22:00')}" readonly></label>
-                <label class="departure-time-field"><span>Заезд в парк</span><input class="departure-return" type="time" value="${escapeHtml(s.returnTime || '22:20')}" readonly></label>
+                <label class="departure-time-field"><span>Последнее прибытие</span><input class="departure-end" type="time" value="${escapeHtml(s.lastArrivalTime || s.endTime || '22:00')}"></label>
+                <label class="departure-time-field"><span>Заезд в парк</span><input class="departure-return" type="time" value="${escapeHtml(s.returnTime || '22:20')}"></label>
                 <label class="departure-time-field"><span>≈ Рейсов за смену</span><input class="departure-trip-count" type="number" value="0" readonly></label>
                 <label class="departure-time-field"><span>Этап</span><input class="departure-sequence-order" type="number" min="1" value="1" readonly></label>
                 <button type="button" class="btn-secondary departure-remove-row" onclick="this.closest('.departure-schedule-row').remove(); setDepartureRouteMode(isMultiRouteCardMode()?'multi':'single'); recalcMultiRouteSequence(); updateDepartureCardBuilderSummary();" title="Удалить этот выезд">🗑️</button>
                 <div class="departure-auto-preview"></div>`;
             wrap.appendChild(row);
+            row.dataset.manualStart = s.startTime ? '1' : '0';
+            row.dataset.manualEnd = (s.lastArrivalTime || s.endTime) ? '1' : '0';
+            row.dataset.manualReturn = s.returnTime ? '1' : '0';
             row.querySelector('.departure-day').value = String(s.dayGroup || (Array.isArray(s.days) && s.days.length === 7 ? 'all' : 'weekdays'));
             row.querySelector('.departure-day').addEventListener('change', () => updateDepartureCardBuilderSummary());
-            row.querySelector('.departure-route').addEventListener('change', () => { populateDepartureTerminals(row, getRouteTerminalsRoute(row)); autoCalculateDepartureRow(row); recalcMultiRouteSequence(); });
-            row.querySelector('.departure-start-stop').addEventListener('change', () => { row.dataset.startStopId=row.querySelector('.departure-start-stop').value; autoCalculateDepartureRow(row); recalcMultiRouteSequence(); });
-            row.querySelector('.departure-end-stop').addEventListener('change', () => { row.dataset.endStopId=row.querySelector('.departure-end-stop').value; autoCalculateDepartureRow(row); recalcMultiRouteSequence(); });
-            row.querySelector('.departure-depot').addEventListener('change', () => { autoCalculateDepartureRow(row); recalcMultiRouteSequence(); });
-            row.querySelector('.departure-until').addEventListener('change', () => { autoCalculateDepartureRow(row); recalcMultiRouteSequence(); });
+            row.querySelector('.departure-route').addEventListener('change', () => { row.dataset.manualStart='0'; row.dataset.manualEnd='0'; row.dataset.manualReturn='0'; populateDepartureTerminals(row, getRouteTerminalsRoute(row)); autoCalculateDepartureRow(row); recalcMultiRouteSequence(); });
+            row.querySelector('.departure-start-stop').addEventListener('change', () => { row.dataset.startStopId=row.querySelector('.departure-start-stop').value; row.dataset.manualStart='0'; row.dataset.manualEnd='0'; row.dataset.manualReturn='0'; autoCalculateDepartureRow(row); recalcMultiRouteSequence(); });
+            row.querySelector('.departure-end-stop').addEventListener('change', () => { row.dataset.endStopId=row.querySelector('.departure-end-stop').value; row.dataset.manualEnd='0'; row.dataset.manualReturn='0'; autoCalculateDepartureRow(row); recalcMultiRouteSequence(); });
+            row.querySelector('.departure-depot').addEventListener('change', () => { row.dataset.manualStart='0'; row.dataset.manualEnd='0'; row.dataset.manualReturn='0'; autoCalculateDepartureRow(row); recalcMultiRouteSequence(); });
+            row.querySelector('.departure-until').addEventListener('change', () => { row.dataset.manualEnd='0'; row.dataset.manualReturn='0'; autoCalculateDepartureRow(row); recalcMultiRouteSequence(); });
+            row.querySelector('.departure-start').addEventListener('change', () => { row.dataset.manualStart='1'; });
+            row.querySelector('.departure-end').addEventListener('change', () => { row.dataset.manualEnd='1'; });
+            row.querySelector('.departure-return').addEventListener('change', () => { row.dataset.manualReturn='1'; });
             updateDepartureRouteForRows();
             recalcMultiRouteSequence();
             const route = getRouteTerminalsRoute(row);
@@ -2673,7 +2679,7 @@ out body;
             const transferMin = getDepotTransferMinutes(route, startStopId);
             const depotMin = timeToMinutes(depot?.value || '05:00');
             const startMin = depotMin + transferMin;
-            if (start) start.value = minutesToTime(startMin);
+            if (start && row.dataset.manualStart !== '1') start.value = minutesToTime(startMin);
             let untilMin = timeToMinutes(until?.value || '22:00');
             if (untilMin < startMin % 1440) untilMin += 1440;
             if (untilMin < startMin + durationMin) untilMin = startMin + durationMin;
@@ -2682,8 +2688,8 @@ out body;
             let trips = 1;
             for (let dep = startMin; dep + durationMin <= untilMin; dep += durationMin + turnaround) { lastArrival = dep + durationMin; trips++; if (trips > 200) break; }
             const returnTransfer = getReturnTransferMinutes(route, row.querySelector('.departure-end-stop')?.value);
-            if (end) end.value = minutesToTime(lastArrival);
-            if (ret) ret.value = minutesToTime(lastArrival + returnTransfer);
+            if (end && row.dataset.manualEnd !== '1') end.value = minutesToTime(lastArrival);
+            if (ret && row.dataset.manualReturn !== '1') ret.value = minutesToTime(lastArrival + returnTransfer);
             row.dataset.startStopId = startStopId || '';
             row.dataset.endStopId = row.querySelector('.departure-end-stop')?.value || '';
             const preview = row.querySelector('.departure-auto-preview');
