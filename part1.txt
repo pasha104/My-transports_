@@ -1,0 +1,380 @@
+/* ===== Интерактив: транспортный бизнес ===== */
+
+        /* v17: карточка выезда со сменой, автографиком, несколькими маршрутами и офлайн-прибытиями. */
+        const BELARUS_STOP_REGIONS = [
+            {id:'by-minsk-city', name:'Минск (город)', areaNames:['Минск'], oblast:'Минск'},
+            {id:'by-brest', name:'Брестская область — вся', areaNames:['Брестская область','Брэсцкая вобласць'], oblast:'Брестская область'},
+            {id:'by-vitebsk', name:'Витебская область — вся', areaNames:['Витебская область','Віцебская вобласць'], oblast:'Витебская область'},
+            {id:'by-gomel', name:'Гомельская область — вся', areaNames:['Гомельская область','Гомельская вобласць'], oblast:'Гомельская область'},
+            {id:'by-grodno', name:'Гродненская область — вся', areaNames:['Гродненская область','Гродзенская вобласць'], oblast:'Гродненская область'},
+            {id:'by-minsk-oblast', name:'Минская область — вся', areaNames:['Минская область','Мінская вобласць'], oblast:'Минская область'},
+            {id:'by-mogilev', name:'Могилёвская область — вся', areaNames:['Могилёвская область','Магілёўская вобласць'], oblast:'Могилёвская область'},
+            {id:'ru-smolensk', name:'Смоленская область (Россия) — вся', areaNames:['Смоленская область','Смоленская обласць'], oblast:'Россия — Смоленская область'},
+            {id:'ru-moscow-oblast', name:'Московская область (Россия) — вся', areaNames:['Московская область','Московская обл.'], oblast:'Россия — Московская область'},
+            {id:'ru-moscow-city', name:'Москва (город, Россия)', areaNames:['Москва','город Москва'], oblast:'Россия — Москва'},
+            {id:'ru-spb', name:'Санкт-Петербург (город, Россия)', areaNames:['Санкт-Петербург','город Санкт-Петербург'], oblast:'Россия — Санкт-Петербург'},
+            ...Object.entries({
+                'Брестская область':['Барановичский','Берёзовский','Ганцевичский','Дрогичинский','Жабинковский','Ивановский','Ивацевичский','Каменецкий','Кобринский','Лунинецкий','Ляховичский','Малоритский','Пинский','Пружанский','Столинский','Брестский'],
+                'Витебская область':['Бешенковичский','Браславский','Верхнедвинский','Витебский','Глубокский','Городокский','Докшицкий','Дубровенский','Лепельский','Лиозненский','Миорский','Оршанский','Полоцкий','Поставский','Россонский','Сенненский','Шарковщинский','Чашникский','Шумилинский','Ушачский','Толочинский'],
+                'Гомельская область':['Брагинский','Буда-Кошелёвский','Ветковский','Гомельский','Добрушский','Ельский','Житковичский','Жлобинский','Калинковичский','Кормянский','Лельчицкий','Лоевский','Мозырский','Наровлянский','Октябрьский','Петриковский','Речицкий','Рогачёвский','Светлогорский','Чечерский','Хойникский'],
+                'Гродненская область':['Берестовицкий','Волковысский','Вороновский','Гродненский','Дятловский','Зельвенский','Ивьевский','Кореличский','Лидский','Мостовский','Новогрудский','Островецкий','Ошмянский','Свислочский','Слонимский','Сморгонский','Щучинский'],
+                'Минская область':['Березинский','Борисовский','Вилейский','Воложинский','Дзержинский','Клецкий','Копыльский','Крупский','Логойский','Любанский','Минский','Молодечненский','Мядельский','Несвижский','Пуховичский','Слуцкий','Смолевичский','Солигорский','Стародорожский','Столбцовский','Узденский','Червенский'],
+                'Могилёвская область':['Белыничский','Бобруйский','Быховский','Горецкий','Глусский','Дрибинский','Кировский','Климовичский','Кличевский','Костюковичский','Краснопольский','Кричевский','Круглянский','Могилёвский','Мстиславский','Осиповичский','Славгородский','Хотимский','Чаусский','Чериковский','Шкловский']
+            }).flatMap(([oblast, districts]) => districts.map(name => ({
+                id:'by-'+name.toLowerCase().replace(/[^a-zа-яё0-9]+/gi,'-'),
+                name:name+' район',
+                areaNames:[name+' район', name+' раён'],
+                oblast
+            })))
+        ];
+
+        const STOP_REGION_CACHE_KEY = 'busphoto_stop_regions_loaded_v1';
+        const STOP_DATA_KEY = 'minsk_custom_osm_stops_v1';
+        let stopRegionCache = {};
+        try { stopRegionCache = JSON.parse(localStorage.getItem(STOP_REGION_CACHE_KEY) || '{}') || {}; } catch(e) { stopRegionCache = {}; }
+
+        const gameCatalog = {
+            bus: {
+                "МАЗ-101": { price: 50000, salary: [7500, 12500] },
+                "МАЗ-103": { price: 65000, salary: [7500, 12500] },
+                "МАЗ-104": { price: 65000, salary: [7500, 12500] },
+                "МАЗ-105": { price: 70000, salary: [15000, 20000] },
+                "МАЗ-107": { price: 70000, salary: [15000, 20000] },
+                "МАЗ-152": { price: 135000, salary: [15000, 20000] },
+                "МАЗ-203": { price: 100000, salary: [7500, 12500] },
+                "МАЗ-205": { price: 110000, salary: [15000, 20000] },
+                "МАЗ-206": { price: 80000, salary: [7000, 10000] },
+                "МАЗ-215": { price: 125000, salary: [15000, 20000] },
+                "МАЗ-216": { price: 125000, salary: [15000, 20000] },
+                "МАЗ-226": { price: 80000, salary: [7000, 10000] },
+                "МАЗ-231": { price: 85000, salary: [5000, 7500] },
+                "МАЗ-232": { price: 85000, salary: [5000, 7500] },
+                "МАЗ-241": { price: 60000, salary: [7000, 10000] },
+                "МАЗ-251": { price: 150000, salary: [15000, 20000] },
+                "МАЗ-256": { price: 60000, salary: [7000, 10000] },
+                "МАЗ-257": { price: 75000, salary: [7000, 10000] },
+                "МАЗ-303": { price: 130000, salary: [7500, 12500] }
+            },
+            trolleybus: {
+                "МАЗ-103Т": { price: 55000, salary: [7500, 10000] },
+                "МАЗ-203Т": { price: 65000, salary: [7500, 10000] },
+                "МАЗ-303Т": { price: 80000, salary: [7500, 10000] },
+                "АКСМ-101": { price: 50000, salary: [6000, 7500] },
+                "БКМ-201": { price: 60000, salary: [6000, 7500] },
+                "БКМ-321": { price: 60000, salary: [6000, 7500] },
+                "БКМ-420": { price: 62500, salary: [6000, 7500] },
+                "БКМ-213": { price: 65000, salary: [12500, 15000] },
+                "БКМ-333": { price: 70000, salary: [12500, 15000] },
+                "БКМ-433": { price: 80000, salary: [12500, 15000] }
+            },
+            electrobus: {
+                "МАЗ-303Е": { price: 75000, salary: [7500, 12500] },
+                "МАЗ-305Е": { price: 130000, salary: [12500, 15000] },
+                "БКМ-Е321": { price: 55000, salary: [7500, 10000] },
+                "БКМ-Е433": { price: 75000, salary: [12000, 15000] }
+            }
+        };
+
+        let mapState = {
+            map: null,
+            mode: 'select',
+            selectedRouteId: null,
+            draftStopIds: [],
+            creatingNewRoute: false,
+            stopMarkers: new Map(),
+            routeLayers: new Map(),
+            busMarkers: new Map(),
+            initialized: false,
+            osmStopsLoaded: false,
+            busAnimationTimer: null,
+            busAnimationFrame: null,
+            stopRenderTimer: null,
+            busListSignature: '',
+            lastBusUpdate: 0,
+            routeTypeFilter: 'all',
+            stopRenderZoom: 13,
+            vehicleRenderSignature: '',
+            depotMarkers: new Map(),
+            trackingVehicleId: null,
+            lastTrackPanAt: 0
+        };
+
+        let trackerState = { map:null, marker:null, routeLayer:null, initialized:false, vehicleId:null, lastPoint:null, lastPanAt:0 };
+
+        const DEPOTS = {
+            bus: { id:'ap5', name:'Автобусный парк №5', address:'ул. Гурского, 15/6', lat:53.882619, lon:27.484127, icon:'🚌' },
+            electrobus: { id:'ap5', name:'Автобусный парк №5', address:'ул. Гурского, 15/6', lat:53.882619, lon:27.484127, icon:'⚡' },
+            trolleybus: { id:'tp4', name:'Транспортный парк №4', address:'ул. Харьковская, 16', lat:53.9025, lon:27.5186, icon:'🚎' },
+        };
+
+        let gameState = {
+            balance: 50000,
+            lastPayoutDate: null,
+            owned: [],
+            routes: [],
+            log: []
+        };
+
+        function money(v) {
+            return Math.round(v).toLocaleString('ru-RU') + ' р.';
+        }
+
+        function loadGameState() {
+            try {
+                const saved = localStorage.getItem('busphoto_interactive_game');
+                if (saved) gameState = Object.assign(gameState, JSON.parse(saved));
+            } catch (e) {
+                console.warn('Не удалось загрузить игру', e);
+            }
+            if (!Array.isArray(gameState.owned)) gameState.owned = [];
+            if (!Array.isArray(gameState.routes)) gameState.routes = [];
+            // Интерактив больше не использует трамваи. Старые игровые трамвайные маршруты удаляются.
+            gameState.routes = gameState.routes.filter(r => r.routeType !== 'tram');
+            gameState.owned = gameState.owned.filter(v => v.category !== 'tram');
+            gameState.owned.forEach(v => {
+                if (!v.depot) v.depot = DEPOTS[v.category] ? DEPOTS[v.category].id : 'ap5';
+                if (!v.plate) v.plate = generateRandomPlate();
+                if (v.category === 'trolleybus' && !/^\d{4}$/.test(String(v.num || ''))) v.num = generateTrolleybusBoardNumber();
+            });
+            gameState.routes.forEach(r => {
+                if (!Array.isArray(r.vehicleIds)) {
+                    r.vehicleIds = r.vehicleId ? [r.vehicleId] : [];
+                }
+                if (!Object.prototype.hasOwnProperty.call(r, 'geometry')) r.geometry = null;
+                if (!Object.prototype.hasOwnProperty.call(r, 'calculatedDistance')) r.calculatedDistance = null;
+                if (!Object.prototype.hasOwnProperty.call(r, 'calculatedDuration')) r.calculatedDuration = null;
+                if (!r.routeType) r.routeType = 'bus';
+                if (!Object.prototype.hasOwnProperty.call(r, 'outboundGeometry')) r.outboundGeometry = null;
+                if (!Object.prototype.hasOwnProperty.call(r, 'returnGeometry')) r.returnGeometry = null;
+                if (!Object.prototype.hasOwnProperty.call(r, 'outboundDuration')) r.outboundDuration = null;
+                if (!Object.prototype.hasOwnProperty.call(r, 'returnDuration')) r.returnDuration = null;
+                if (!Object.prototype.hasOwnProperty.call(r, 'terminalStopIds')) r.terminalStopIds = Array.isArray(r.stopIds) ? r.stopIds.slice() : [];
+                if (!Object.prototype.hasOwnProperty.call(r, 'turnbackStopIds')) r.turnbackStopIds = [];
+                if (!Object.prototype.hasOwnProperty.call(r, 'turnaroundMinutes')) r.turnaroundMinutes = 2;
+            });
+            if (!Array.isArray(gameState.log)) gameState.log = [];
+            if (!Array.isArray(gameState.serviceCards)) gameState.serviceCards = [];
+            gameState.serviceCards = gameState.serviceCards.filter(card => card && card.vehicleId != null && (card.routeId != null || Array.isArray(card.schedules)));
+            gameState.serviceCards.forEach(card => {
+                if (!card.createdAt) card.createdAt = new Date().toISOString();
+                if (!Number.isFinite(Number(card.lastArrivalCount))) card.lastArrivalCount = 0;
+                card.active = card.active !== false;
+                if (!Array.isArray(card.schedules) || !card.schedules.length) {
+                    card.schedules = [{routeId:card.routeId, days:[0,1,2,3,4,5,6], startStopId:null, endStopId:null, depotTime:card.depotTime || '07:00', startTime:card.startTime || '07:30', endTime:card.endTime || '08:30', returnTime:card.returnTime || '09:00'}];
+                }
+                card.schedules = card.schedules.map(s => ({
+                    routeId: s.routeId != null ? s.routeId : card.routeId,
+                    days: Array.isArray(s.days) ? s.days.map(Number).filter(n => n >= 0 && n <= 6) : [0,1,2,3,4,5,6],
+                    startStopId: s.startStopId ?? null,
+                    endStopId: s.endStopId ?? null,
+                    depotTime: s.depotTime || card.depotTime || '05:00',
+                    startTime: s.startTime || card.startTime || '05:30',
+                    workUntil: s.workUntil || s.endTime || card.endTime || '22:00',
+                    endTime: s.endTime || card.endTime || '22:00',
+                    lastArrivalTime: s.lastArrivalTime || s.endTime || card.endTime || '22:00',
+                    returnTime: s.returnTime || card.returnTime || '22:20',
+                    turnaroundMinutes: Number.isFinite(Number(s.turnaroundMinutes)) ? Number(s.turnaroundMinutes) : 2
+                }));
+                // Последнее время обработки нужно для офлайн-прибытия на конечные.
+                if (!card.lastSimulationAt) card.lastSimulationAt = card.createdAt;
+                card.routeId = card.routeId ?? card.schedules[0]?.routeId ?? null;
+            });
+            saveGameState();
+            if (typeof gameState.balance !== 'number' || Number.isNaN(gameState.balance)) {
+                gameState.balance = 50000;
+            }
+            if (!gameState.log.length && !gameState.owned.length && gameState.balance === 0) {
+                gameState.balance = 50000;
+            }
+        }
+
+        function saveGameState() {
+            localStorage.setItem('busphoto_interactive_game', JSON.stringify(gameState));
+        }
+
+        function startNewGame() {
+            const confirmed = confirm(
+                'Начать новую игру?\n\n' +
+                'Баланс будет установлен на 50 000 р.\n' +
+                'Гараж, маршруты и история будут очищены.\n' +
+                'Это действие нельзя отменить.'
+            );
+            if (!confirmed) return;
+
+            localStorage.removeItem('busphoto_interactive_game');
+            localStorage.removeItem(STOP_DATA_KEY);
+            localStorage.removeItem(STOP_REGION_CACHE_KEY);
+            stopRegionCache = {};
+
+            gameState = {
+                balance: 50000,
+                    lastPayoutDate: null,
+                owned: [],
+                routes: [],
+                serviceCards: [],
+                log: []
+            };
+
+            // Полностью сбрасываем состояние карты перед перезапуском.
+            if (typeof mapState !== 'undefined') {
+                mapState.selectedRouteId = null;
+                mapState.draftStopIds = [];
+            }
+
+            saveGameState();
+            location.reload();
+        }
+
+        function randomSalary(range) {
+            return Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
+        }
+
+        function localDateKey(d = new Date()) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        function timeUntilNoonMs() {
+            const now = new Date();
+            const noon = new Date(now);
+            noon.setHours(12, 0, 0, 0);
+            if (now >= noon) return 0;
+            return noon.getTime() - now.getTime();
+        }
+
+
+        function dateKeyFromDate(d) {
+            return localDateKey(d);
+        }
+
+        function payoutEligibleDateKey(now = new Date()) {
+            const d = new Date(now);
+            if (d.getHours() < 12) d.setDate(d.getDate() - 1);
+            return localDateKey(d);
+        }
+
+        function dateKeysAfter(lastKey, throughKey) {
+            const result = [];
+            if (!throughKey) return result;
+            const end = new Date(`${throughKey}T12:00:00`);
+            let cur = lastKey ? new Date(`${lastKey}T12:00:00`) : null;
+            if (!cur || Number.isNaN(cur.getTime())) {
+                result.push(throughKey);
+                return result;
+            }
+            cur.setDate(cur.getDate() + 1);
+            while (cur <= end) {
+                result.push(localDateKey(cur));
+                cur.setDate(cur.getDate() + 1);
+                if (result.length > 3660) break; // защита от повреждённого сохранения
+            }
+            return result;
+        }
+
+        function processGamePayout(force = false) {
+            /*
+             * Оффлайн-начисления:
+             * - зарплата ТС продолжает начисляться, даже если вкладка/сайт были закрыты;
+             * - при следующем открытии мы считаем все пропущенные дни после последнего
+             *   начисления;
+             * - выплата за конечную тоже считается отдельно по реальному времени.
+             */
+            const now = new Date();
+            const eligibleKey = payoutEligibleDateKey(now);
+
+            if (!Array.isArray(gameState.owned) || !gameState.owned.length) {
+                if (!gameState.lastPayoutDate) gameState.lastPayoutDate = eligibleKey;
+                else if (gameState.lastPayoutDate < eligibleKey) gameState.lastPayoutDate = eligibleKey;
+                saveGameState();
+                return 0;
+            }
+
+            let total = 0;
+            const details = [];
+            const missedDates = dateKeysAfter(gameState.lastPayoutDate, eligibleKey);
+
+            if (force && !missedDates.length && gameState.lastPayoutDate === eligibleKey) {
+                return 0;
+            }
+
+            if (missedDates.length) {
+                gameState.owned.forEach(vehicle => {
+                    const catalogItem = gameCatalog[vehicle.category]?.[vehicle.model];
+                    const range = catalogItem?.salary || [0, 0];
+                    if (!Number(vehicle.currentSalary) || Number(vehicle.currentSalary) < range[0] || Number(vehicle.currentSalary) > range[1]) {
+                        vehicle.currentSalary = randomSalary(range);
+                    }
+
+                    const daily = Math.max(0, Math.round(Number(vehicle.currentSalary) || 0));
+                    const vehicleTotal = daily * missedDates.length;
+                    total += vehicleTotal;
+
+                    details.push(`${vehicle.model}: ${money(daily)} × ${missedDates.length} дн. = ${money(vehicleTotal)}`);
+                    vehicle.lastPaidDate = missedDates[missedDates.length - 1];
+                });
+
+                if (total > 0) {
+                    gameState.balance += total;
+                    gameState.log.unshift({
+                        date: missedDates[missedDates.length - 1],
+                        total,
+                        details: [
+                            missedDates.length === 1
+                                ? `Ежедневная выплата в 12:00`
+                                : `Оффлайн-выплата: ${missedDates.length} пропущенных дней`,
+                            ...details
+                        ],
+                        offline: missedDates.length > 1
+                    });
+                    gameState.log = gameState.log.slice(0, 60);
+                }
+
+                gameState.lastPayoutDate = eligibleKey;
+                saveGameState();
+            }
+
+            return total;
+        }
+
+        function processAllOfflineEarnings() {
+            return processGamePayout();
+        }
+
+        function scheduleNoonPayout() {
+            clearTimeout(window.gameNoonTimer);
+            const delay = timeUntilNoonMs();
+            if (delay === 0) {
+                processGamePayout();
+                window.gameNoonTimer = setTimeout(scheduleNoonPayout, 24 * 60 * 60 * 1000);
+            } else {
+                window.gameNoonTimer = setTimeout(() => {
+                    processGamePayout();
+                    scheduleNoonPayout();
+                }, delay);
+            }
+        }
+
+        function selectGameCategory(category, btn) {
+            const select = document.getElementById('gameCategory');
+            if (!select || !gameCatalog[category]) return;
+            select.value = category;
+            document.querySelectorAll('#gameCategoryPicker .game-category-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.category === category);
+            });
+            updateGameModelSelect();
+            if (btn) btn.focus();
+        }
+
+        function updateGameModelSelect() {
+            const category = document.getElementById('gameCategory').value;
+            document.querySelectorAll('#gameCategoryPicker .game-category-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.category === category);
+            });
+            const select = document.getElementById('gameModel');
+            select.innerHTML = '';
+            Object.keys(gameCatalog[category]).forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
