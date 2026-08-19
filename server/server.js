@@ -169,6 +169,19 @@ app.get('/api/state',auth,(req,res)=>{
   res.json({state:result.state,balance:result.state.balance,terminalEarned:result.total,telegramLinked:!!p.telegram_chat_id});
 });
 
+app.post('/api/state/restore',auth,(req,res)=>{
+  // Explicit one-time restore: the player can restore the local browser state
+  // after the first cloud sync accidentally replaced it with the default state.
+  const incoming=normalizeState(req.body.state);
+  const current=normalizeState(JSON.parse(req.player.state_json));
+  // Never allow an empty/default restore to destroy a non-empty server account.
+  const looksMeaningful = Number(incoming.balance)!==50000 || incoming.owned.length>0 || incoming.routes.length>0 || incoming.serviceCards.length>0 || incoming.log.length>0;
+  if(!looksMeaningful) return res.status(400).json({error:'restore_state_is_empty_or_default'});
+  savePlayer(req.player.id,incoming);
+  const p=db.prepare('SELECT * FROM players WHERE id=?').get(req.player.id);
+  res.json({state:normalizeState(JSON.parse(p.state_json)),balance:normalizeState(JSON.parse(p.state_json)).balance,telegramLinked:!!p.telegram_chat_id});
+});
+
 app.post('/api/state',auth,(req,res)=>{
   const incoming=normalizeState(req.body.state);
   const current=normalizeState(JSON.parse(req.player.state_json));
