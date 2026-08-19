@@ -57,7 +57,6 @@ if (window.caches) {
 <button class="game-menu-btn" onclick="showGameSection('finance', this)">💰 Финансы</button>
 <button class="game-menu-btn" onclick="showGameSection('history', this)">📜 История</button>
 <button class="game-menu-btn" onclick="showGameSection('routes', this)">🛣️ Маршруты</button>
-<button class="game-menu-btn" onclick="showGameSection('departures', this)">🗓️ Карточки выезда</button>
 <button class="game-menu-btn" onclick="showGameSection('map', this)">🗺️ Карта</button>
 <button class="game-menu-btn" onclick="showGameSection('tracker', this)">🛰️ Следить за ТС</button>
 <button class="game-menu-btn" onclick="startNewGame()" style="margin-left:auto;">🔄 Новая игра</button>
@@ -173,39 +172,6 @@ if (window.caches) {
 <div class="interactive-log" id="historyLog"></div>
 </div>
 </div>
-<div class="game-section" id="game-section-departures">
-<div class="interactive-card">
-<h3>🗓️ Карточка выезда</h3>
-<div class="interactive-muted" style="margin-bottom:10px;">Одна карточка может содержать сколько угодно выездов и разных маршрутов. Например: по будням №23, по выходным №562. Для каждого выезда выбираются дни, маршрут и конечные, а время прибытия и заезда в парк рассчитывается автоматически по времени движения маршрута.</div>
-<form id="departureCardForm" onsubmit="saveDepartureCard(event)" style="display:flex;flex-direction:column;gap:10px;">
-<div class="form-grid">
-<div class="form-group"><label>Выбрать ТС:</label><select id="departureVehicle" required onchange="updateDepartureRouteOptions()"></select></div>
-<div class="form-group"><label>Автоматический расчёт:</label><div id="departureRouteInfo" class="interactive-muted" style="margin-top:6px;">Добавь выезд и выбери маршрут.</div></div>
-</div>
-<div class="form-group" style="padding:10px;border-radius:10px;background:rgba(127,127,127,.08);">
-<div style="font-weight:800;margin-bottom:7px;">🚌 Режим работы ТС</div>
-<div style="display:flex;gap:8px;flex-wrap:wrap;">
-<label class="btn-secondary" style="cursor:pointer;"><input type="radio" name="departureRouteMode" id="departureSingleRouteMode" value="single" checked onchange="setDepartureRouteMode('single')"> 1 маршрут за смену</label>
-<label class="btn-secondary" style="cursor:pointer;"><input type="radio" name="departureRouteMode" id="departureMultiRouteMode" value="multi" onchange="setDepartureRouteMode('multi')"> 🔗 Несколько маршрутов за день</label>
-</div>
-<div id="departureMultiRouteHint" class="interactive-muted" style="margin-top:7px;">Для одного маршрута достаточно одной строки.</div>
-</div>
-<div class="departure-schedule-builder">
-<div class="departure-builder-head"><b>📅 Маршруты и выезды</b><button type="button" id="departureAddRouteBtn" class="btn-secondary" onclick="addDepartureScheduleRow()" style="display:none;">➕ Добавить дополнительный маршрут</button></div>
-<div class="departure-schedule-legend"><span>Дни</span><span>Маршрут</span><span>Откуда</span><span>Куда</span><span>Парк / отправление / до</span><span>Результат</span><span></span></div>
-<div id="departureScheduleRows"></div>
-<div id="departureCardDailySummary" class="interactive-muted" style="margin-top:10px;padding:10px;border-radius:10px;background:rgba(127,127,127,.08);">Добавь маршрут — здесь появится примерное количество рейсов за день.</div>
-</div>
-<div class="interactive-muted">💡 Сначала выбери маршрут и время выезда из парка. Отправление с выбранной первой конечной, последнее прибытие и заезд в парк рассчитываются автоматически. Поле «Работать до» задаёт конец смены — можно указать и время после полуночи, например 00:30. За каждое фактическое прибытие на конечную маршрута начисляется +100 ₽, в том числе за разные маршруты внутри одной карточки.</div>
-<button type="submit" class="btn-primary">💾 Сохранить карточку выезда</button>
-</form>
-</div>
-<div class="interactive-card" style="margin-top:12px;">
-<h3>📋 Мои карточки выезда</h3>
-<div id="departureCardsList"></div>
-</div>
-</div>
-
 <div class="game-section" id="game-section-routes">
 <div class="route-menu-grid">
 <div class="interactive-card">
