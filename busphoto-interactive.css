@@ -288,3 +288,36 @@
 .game-service-btn.active { background:#1e3f66; color:#fff; border-color:#1e3f66; }
 #gameSubmodel { min-height:40px; }
 @media(max-width:700px){ .game-service-picker{grid-template-columns:1fr 1fr;} }
+
+/* v29: Карточка ТС */
+.departure-schedule-row-v3{
+  display:grid;
+  grid-template-columns:minmax(60px,.5fr) minmax(130px,1fr) minmax(150px,1.2fr) minmax(150px,1.2fr);
+  gap:8px;
+  align-items:end;
+  padding:10px;
+  margin:8px 0;
+  border:1px solid rgba(127,127,127,.25);
+  border-radius:10px;
+  background:rgba(127,127,127,.05);
+}
+.departure-schedule-row-v3 .departure-auto-preview{
+  grid-column:1/-1;
+  padding:8px;
+  border-radius:8px;
+  background:rgba(46,125,50,.08);
+  line-height:1.45;
+}
+.departure-mode-option{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px;
+  border:1px solid rgba(127,127,127,.25);
+  border-radius:9px;
+  cursor:pointer;
+}
+.departure-mode-option input{accent-color:currentColor}
+@media(max-width:800px){
+  .departure-schedule-row-v3{grid-template-columns:1fr 1fr}
+}
