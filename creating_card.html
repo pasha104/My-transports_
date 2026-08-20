@@ -161,4 +161,75 @@ document.getElementById('vehicle').onchange=()=>{updateVehicleInfo();renderStage
 function renderStages(){document.getElementById('stages').innerHTML='';addStage();if(multi())addStage();document.getElementById('addStage').style.display=multi()?'inline-block':'none';recalc()}
 load();
 </script>
+
+<style id="v35-single-route-shift">
+/* v35: полноценная смена для одного маршрута */
+.single-route-shift-box{
+  margin-top:12px;
+  padding:12px;
+  border:1px solid rgba(127,127,127,.28);
+  border-radius:12px;
+  background:rgba(127,127,127,.05);
+}
+.single-route-shift-box .shift-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+}
+.single-route-shift-box label{
+  min-width:0;
+}
+.single-route-shift-box input,
+.single-route-shift-box select{
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+}
+@media(max-width:600px){
+  .single-route-shift-box .shift-grid{grid-template-columns:1fr}
+}
+</style>
+<script>
+/* v35 — режим «1 маршрут за день» */
+document.addEventListener('DOMContentLoaded', function(){
+  const form=document.getElementById('departureCardForm');
+  if(!form) return;
+
+  let box=document.getElementById('singleRouteShiftBox');
+  if(!box){
+    box=document.createElement('div');
+    box.id='singleRouteShiftBox';
+    box.className='single-route-shift-box';
+    box.innerHTML=`
+      <h3 style="margin-top:0">🚌 Смена: один маршрут за день</h3>
+      <div class="shift-grid">
+        <label>
+          <b>Выезд из парка</b>
+          <input id="singleShiftParkDeparture" type="time" value="05:00">
+        </label>
+        <label>
+          <b>Работать до</b>
+          <input id="singleShiftWorkUntil" type="time" value="23:00">
+        </label>
+      </div>
+      <div style="margin-top:10px" class="interactive-muted">
+        После выбора маршрута ТС работает на нём до указанного времени.
+        Если у маршрута есть привязанное обратное направление, оно используется для обратного рейса.
+        После окончания смены ТС возвращается в парк.
+      </div>`;
+    form.appendChild(box);
+  }
+
+  const single=document.getElementById('departureSingleRouteMode');
+  if(single) single.checked=true;
+
+  window.getSingleRouteShiftData=function(){
+    return {
+      parkDeparture: document.getElementById('singleShiftParkDeparture')?.value || '05:00',
+      workUntil: document.getElementById('singleShiftWorkUntil')?.value || '23:00'
+    };
+  };
+});
+</script>
+
 </body></html>

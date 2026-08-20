@@ -3023,3 +3023,28 @@ out body;
         if (document.getElementById('gameModel')) {
             initInteractiveGame();
         }
+
+
+/* v35: single-route daily shift runtime */
+(function(){
+  const KEY='busphoto_single_route_shifts_v35';
+  function load(){
+    try{return JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){return[]}
+  }
+  function save(v){localStorage.setItem(KEY,JSON.stringify(v))}
+  window.createSingleRouteShiftV35=function(data){
+    const list=load();
+    const shift={
+      id:'shift_'+Date.now(),
+      vehicleId:String(data.vehicleId||''),
+      routeId:String(data.routeId||''),
+      days:Array.isArray(data.days)?data.days:['all'],
+      parkDeparture:data.parkDeparture||'05:00',
+      workUntil:data.workUntil||'23:00',
+      mode:'single-route',
+      status:'active'
+    };
+    list.push(shift); save(list); return shift;
+  };
+  window.getSingleRouteShiftsV35=load;
+})();
