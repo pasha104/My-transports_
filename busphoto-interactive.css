@@ -321,3 +321,5 @@
 @media(max-width:800px){
   .departure-schedule-row-v3{grid-template-columns:1fr 1fr}
 }
+
+.game-menu-btn[href="creating_card.html"]{color:inherit;text-decoration:none}

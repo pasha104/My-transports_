@@ -59,7 +59,7 @@ if (window.caches) {
 <button class="game-menu-btn" onclick="showGameSection('routes', this)">🛣️ Маршруты</button>
 <button class="game-menu-btn" onclick="showGameSection('map', this)">🗺️ Карта</button>
 <button class="game-menu-btn" onclick="showGameSection('tracker', this)">🛰️ Следить за ТС</button>
-<button class="game-menu-btn" onclick="showGameSection('departure', this)">🗓️ Карточка ТС</button>
+<a class="game-menu-btn" href="creating_card.html" style="text-decoration:none;display:flex;align-items:center;justify-content:center;">🗓️ Создать карточку ТС</a>
 <button class="game-menu-btn" onclick="startNewGame()" style="margin-left:auto;">🔄 Новая игра</button>
 </div>
 <div class="game-section active" id="game-section-shop">
@@ -197,55 +197,6 @@ if (window.caches) {
 </div>
 </div>
 
-<div class="game-section" id="game-section-departure">
-<div class="interactive-dashboard">
-<div class="interactive-card">
-<h3>🗓️ Карточка ТС</h3>
-<div class="interactive-muted" style="margin-bottom:10px;">
-Настрой смену ТС: выбери дни работы, ТС и один или несколько маршрутов за день.
-Если выбран режим нескольких маршрутов, каждый следующий этап начинается после предыдущего.
-</div>
-
-<form id="departureCardForm" onsubmit="saveDepartureCard(event)">
-<div class="interactive-controls" style="grid-template-columns:1fr;">
-<label><b>1. Дни работы и режим маршрутов</b></label>
-<div class="departure-mode-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;">
-<label class="departure-mode-option"><input type="radio" name="departureRouteMode" id="departureSingleRouteMode" value="single" checked onchange="setDepartureRouteMode('single')"> Один маршрут за день</label>
-<label class="departure-mode-option"><input type="radio" name="departureRouteMode" id="departureMultiRouteMode" value="multi" onchange="setDepartureRouteMode('multi')"> 🔗 Несколько маршрутов за день</label>
-</div>
-<div id="departureMultiRouteHint" class="interactive-muted">Для одного маршрута достаточно одной строки.</div>
-
-<label style="margin-top:6px;"><b>2. Выбрать ТС</b></label>
-<select id="departureVehicle" required onchange="updateDepartureRouteOptions()"></select>
-
-<label style="margin-top:6px;"><b>3. Маршруты и последовательность дня</b></label>
-<div id="departureScheduleRows"></div>
-<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-<button type="button" class="btn-secondary" id="departureAddRouteBtn" style="display:none;" onclick="addDepartureScheduleRow()">➕ Добавить дополнительный маршрут</button>
-<button type="button" class="btn-secondary" onclick="previewDepartureRoutesOnMap()">👀 Посмотреть выбранные маршруты на карте</button>
-</div>
-<div id="departureRouteInfo" class="interactive-muted" style="margin-top:8px;"></div>
-<div id="departureCardDailySummary" class="interactive-card" style="margin-top:10px;padding:10px;"></div>
-</div>
-
-<div class="interactive-card" style="padding:10px;margin-top:10px;">
-<b>📌 Как работает</b>
-<div class="interactive-muted" style="margin-top:5px;">
-Парк → первая конечная → выбранный маршрут → следующая точка/маршрут → следующий этап → заезд в парк.
-Для каждого маршрута используется его сохранённая геометрия и рассчитанное время, если они есть.
-</div>
-</div>
-
-<button type="submit" class="btn-primary" style="margin-top:10px;">🗓️ Создать карточку ТС</button>
-</form>
-</div>
-
-<div class="interactive-card">
-<h3>📋 Созданные карточки</h3>
-<div id="departureCardsList"></div>
-</div>
-</div>
-</div>
 <div class="game-section" id="game-section-tracker">
 <div class="interactive-card">
 <h3>🛰️ Следить за ТС</h3>
