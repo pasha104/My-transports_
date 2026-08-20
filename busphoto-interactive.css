@@ -172,8 +172,8 @@
             .map-filter-row { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 3px; }
             .map-filter-btn { flex: 0 0 auto; min-height: 38px; padding: 8px 10px; font-size: 12px; }
             .map-layout { display: flex; flex-direction: column; }
-            .map-side { order: 1; width: 100%; }
-            .map-layout > div:first-child { order: 2; }
+            .map-layout > div:first-child { order: 1; width: 100%; }
+            .map-side { order: 2; width: 100%; }
             #routeMap { height: min(68vh, 560px); min-height: 360px; border-radius: 6px; }
             .map-side .map-panel:first-child { position: sticky; top: 4px; z-index: 20; box-shadow: 0 3px 12px rgba(0,0,0,.22); }
             .map-panel { padding: 10px; }
@@ -323,3 +323,16 @@
 }
 
 .game-menu-btn[href="creating_card.html"]{color:inherit;text-decoration:none}
+
+/* v31: карта всегда первой; панели не должны сдвигать её вниз */
+.map-layout { align-items: start; }
+.map-layout > div:first-child { min-width: 0; }
+#routeMap { width: 100%; }
+@media (min-width: 1001px) {
+  .map-layout > div:first-child { grid-column: 1; grid-row: 1; }
+  .map-side { grid-column: 2; grid-row: 1; }
+}
+@media (max-width: 1000px) {
+  .map-layout > div:first-child { order: 1; }
+  .map-side { order: 2; }
+}
