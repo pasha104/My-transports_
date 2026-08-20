@@ -232,4 +232,31 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 </script>
 
+
+<style id="v36-multi-cards-per-vehicle">
+.multi-card-note{
+  margin-top:10px;padding:10px;border-radius:10px;
+  border:1px solid rgba(127,127,127,.28);
+  background:rgba(127,127,127,.05);
+}
+</style>
+<script>
+/* v36: несколько независимых карточек на одно ТС */
+document.addEventListener('DOMContentLoaded', function(){
+  const form=document.getElementById('departureCardForm');
+  if(!form) return;
+  const vehicle=document.getElementById('departureVehicle');
+  if(vehicle){
+    let note=document.getElementById('multiCardVehicleNote');
+    if(!note){
+      note=document.createElement('div');
+      note.id='multiCardVehicleNote';
+      note.className='multi-card-note';
+      note.innerHTML='<b>ℹ️ Одно ТС может иметь несколько карточек.</b><br>Например: утром — карточка №1, днём — карточка №2, вечером — карточка №3. Они сохраняются отдельно и могут иметь разные дни, маршруты и время.';
+      vehicle.parentNode.insertBefore(note, vehicle.nextSibling);
+    }
+  }
+});
+</script>
+
 </body></html>

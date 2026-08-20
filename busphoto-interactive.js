@@ -3048,3 +3048,42 @@ out body;
   };
   window.getSingleRouteShiftsV35=load;
 })();
+
+
+/* v36: multiple cards per vehicle — cards are unique by cardId, not vehicleId */
+(function(){
+  const KEY='busphoto_departure_cards_v36';
+  function load(){
+    try { return JSON.parse(localStorage.getItem(KEY)||'[]'); }
+    catch(e){ return []; }
+  }
+  function save(v){ localStorage.setItem(KEY, JSON.stringify(v)); }
+
+  window.createDepartureCardV36=function(data){
+    const cards=load();
+    const card={
+      cardId:'card_'+Date.now()+'_'+Math.random().toString(36).slice(2,8),
+      vehicleId:String(data.vehicleId||''),
+      days:Array.isArray(data.days)?data.days:['all'],
+      routeId:String(data.routeId||''),
+      routes:Array.isArray(data.routes)?data.routes:[],
+      parkDeparture:data.parkDeparture||'05:00',
+      workUntil:data.workUntil||'23:00',
+      createdAt:Date.now(),
+      active:true
+    };
+    cards.push(card);
+    save(cards);
+    return card;
+  };
+
+  window.getDepartureCardsV36=load;
+
+  window.deleteDepartureCardV36=function(cardId){
+    save(load().filter(c=>c.cardId!==cardId));
+  };
+
+  window.getCardsForVehicleV36=function(vehicleId){
+    return load().filter(c=>String(c.vehicleId)===String(vehicleId));
+  };
+})();
