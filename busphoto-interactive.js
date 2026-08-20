@@ -706,108 +706,107 @@
         }
 
         // Карточка ТС — основной источник расписания, если она создана для машины.
-        function getVehicleServiceCard(vehicleId) {
+        function getVehicleServiceCards(vehicleId) {
             const cards = Array.isArray(gameState.serviceCards) ? gameState.serviceCards : [];
-            return cards.find(card => card && card.active !== false && String(card.vehicleId) === String(vehicleId)) || null;
+            return cards
+                .filter(card => card && card.active !== false && String(card.vehicleId) === String(vehicleId))
+                .sort((a,b) => String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
+        }
+        function getVehicleServiceCard(vehicleId) {
+            // Совместимость со старым кодом: возвращаем последнюю активную карточку,
+            // но вся логика движения ниже учитывает ВСЕ карточки одного ТС.
+            const cards = getVehicleServiceCards(vehicleId);
+            return cards.length ? cards[cards.length-1] : null;
         }
         function getActiveServiceRouteAndSchedule(vehicleId, now = new Date()) {
-            const card = getVehicleServiceCard(vehicleId);
-            if (!card) return {card:null, schedule:null, route:getVehicleRoute(vehicleId)};
-            const schedules = Array.isArray(card.schedules) ? card.schedules : [];
-            const ordered = schedules.map((s,i)=>({s,i})).sort((a,b)=>Number(a.s.sequenceOrder ?? a.i)-Number(b.s.sequenceOrder ?? b.i));
-            // Если соседние этапы имеют соприкасающиеся интервалы, выбираем
-            // уже начавшийся этап с большим порядковым номером.
-            for (const item of ordered.slice().reverse()) {
-                const s=item.s;
-                if (!Array.isArray(s.days) || !s.days.includes(now.getDay())) continue;
-                const route=getScheduleRoute(s);
-                if (!route) continue;
-                const abs=getScheduleAbsoluteTimes(s,new Date(now.getFullYear(),now.getMonth(),now.getDate()),route,null);
-                if (now >= abs.depot && now <= abs.return) return {card,schedule:s,route,index:item.i,absolute:abs};
-            }
-            return {card,schedule:null,route:null};
+            const cards = getVehicleServiceCards(vehicleId);
+            if (!cards.length) return {card:null, schedule:null, route:getVehicleRoute(vehicleId)};
+            const candidates=[];
+            cards.forEach(card => {
+                const schedules = Array.isArray(card.schedules) ? card.schedules : [];
+                schedules.forEach((s,i)=>{
+                    const route=getScheduleRoute(s);
+                    if (!route) return;
+                    const order=Number(s.sequenceOrder ?? i);
+                    for(let offset=0; offset<=1; offset++) {
+                        const base=new Date(now.getFullYear(),now.getMonth(),now.getDate()-offset);
+                        if(!Array.isArray(s.days) || !s.days.includes(base.getDay())) continue;
+                        const abs=getScheduleAbsoluteTimes(s,base,route,null);
+                        if(now.getTime()>=abs.depot.getTime() && now.getTime()<=abs.return.getTime())
+                            candidates.push({card,schedule:s,route,index:i,order,abs});
+                    }
+                });
+            });
+            candidates.sort((a,b)=>{
+                const ao=Number(a.order||0), bo=Number(b.order||0);
+                if(ao!==bo) return bo-ao;
+                return String(b.card.createdAt||'').localeCompare(String(a.card.createdAt||''));
+            });
+            if(candidates.length) return candidates[0];
+            return {card:cards[cards.length-1], schedule:null, route:null};
         }
         function getCardDrivenPoint(vehicle, card, now = new Date()) {
-            const schedules = (card?.schedules || []).filter(s => Array.isArray(s.days) && s.days.includes(now.getDay()));
-            if (!schedules.length) return {point:null,phase:'в парке',activeRoute:null};
-
-            // В одной карточке этапы идут последовательно. Если интервалы соседних
-            // этапов соприкасаются, приоритет получает уже начавшийся более поздний этап.
-            const ordered = schedules
-                .map((s,i)=>({s,i,order:Number(s.sequenceOrder ?? i)}))
-                .sort((a,b)=>a.order-b.order);
+            // card может быть одной карточкой или массивом карточек одного ТС.
+            const cards = Array.isArray(card) ? card : getVehicleServiceCards(vehicle.id);
             const candidates=[];
-            for (const item of ordered) {
-                const route=getScheduleRoute(item.s);
-                if (!route?.geometry) continue;
-                const abs=getScheduleAbsoluteTimes(item.s,new Date(now.getFullYear(),now.getMonth(),now.getDate()),route,vehicle);
-                candidates.push({item,route,abs});
-            }
-            if (!candidates.length) return {point:null,phase:'в парке',activeRoute:null};
-
+            cards.filter(c=>c && c.active!==false).forEach(cardItem=>{
+                const schedules=(cardItem.schedules||[]).filter(s=>Array.isArray(s.days) && s.days.includes(now.getDay()));
+                schedules.forEach((s,i)=>{
+                    const route=getScheduleRoute(s);
+                    if(!route?.geometry) return;
+                    const abs=getScheduleAbsoluteTimes(s,new Date(now.getFullYear(),now.getMonth(),now.getDate()),route,vehicle);
+                    candidates.push({card:cardItem,item:{s,i},route,abs,order:Number(s.sequenceOrder??i)});
+                });
+            });
+            if(!candidates.length) return {point:null,phase:'в парке',activeRoute:null};
+            candidates.sort((a,b)=>{
+                const ao=Number(a.order||0),bo=Number(b.order||0);
+                if(ao!==bo) return bo-ao;
+                return String(b.card.createdAt||'').localeCompare(String(a.card.createdAt||''));
+            });
             const nowMs=now.getTime();
             let chosen=null;
-            // Сначала ищем активный этап с максимальным порядком — это убирает
-            // наложение времени между концом одного этапа и началом следующего.
-            for (let i=candidates.length-1;i>=0;i--) {
-                const c=candidates[i];
-                if (nowMs>=c.abs.depot.getTime() && nowMs<=c.abs.return.getTime()) { chosen=c; break; }
+            for(const c of candidates){
+                if(nowMs>=c.abs.depot.getTime() && nowMs<=c.abs.return.getTime()){ chosen=c; break; }
             }
-            if (!chosen) {
-                const upcoming=candidates.find(c=>nowMs<c.abs.depot.getTime());
-                if (upcoming) return {point:pathPointFromGeometry(upcoming.route.geometry,0),phase:`в парке · следующий этап №${upcoming.route.number}`,activeRoute:upcoming.route};
+            if(!chosen){
+                const upcoming=candidates.filter(c=>nowMs<c.abs.depot.getTime()).sort((a,b)=>a.abs.depot-b.abs.depot)[0];
+                if(upcoming) return {point:pathPointFromGeometry(upcoming.route.geometry,0),phase:`в парке · следующий этап №${upcoming.route.number}`,activeRoute:upcoming.route};
                 return {point:null,phase:'в парке',activeRoute:null};
             }
-
             const {item,route,abs}=chosen;
-            const direction=getScheduleDirectionalRoutes(route,item.s.startStopId);
-            const forwardFirst=!item.s.startStopId || String(item.s.startStopId)===String((route.terminalStopIds||route.stopIds||[])[0]);
+            const schedule=item.s;
+            const direction=getScheduleDirectionalRoutes(route,schedule.startStopId);
+            const forwardFirst=!schedule.startStopId || String(schedule.startStopId)===String((route.terminalStopIds||route.stopIds||[])[0]);
             const forwardGeometry=direction.outboundGeometry || (forwardFirst?route.geometry:reverseGeometry(route.geometry));
             const returnGeometry=direction.returnGeometry || (forwardFirst?reverseGeometry(route.geometry):route.geometry);
             const paired=direction.reverse || findReverseRoute(route);
             const startMs=abs.start.getTime(), lastMs=abs.lastArrival.getTime();
-
-            // До начала работы автобус едет от парка к первой конечной.
-            if (nowMs<startMs) {
+            if(nowMs<startMs){
                 const depot=depotForVehicle(vehicle);
                 const progress=Math.max(0,Math.min(1,(nowMs-abs.depot.getTime())/Math.max(1,startMs-abs.depot.getTime())));
-                const point=forwardGeometry
-                    ? pathPointFromGeometry(forwardGeometry,progress)
-                    : [depot.lat,depot.lon];
-                return {point,phase:`🚍 парк → ${item.s.startStopName || route.start || 'первая конечная'}`,activeRoute:route};
+                const point=forwardGeometry?pathPointFromGeometry(forwardGeometry,progress):[depot.lat,depot.lon];
+                return {point,phase:`🚍 парк → ${schedule.startStopName || route.start || 'первая конечная'}`,activeRoute:route};
             }
-
-            // На маршруте чередуем прямую и обратную геометрию. Поэтому ТС больше
-            // не едет обратно по той же линии «как трамвай».
-            if (nowMs<=lastMs) {
+            if(nowMs<=lastMs){
                 const elapsedMin=(nowMs-startMs)/60000;
-                const duration=Math.max(1,Number(abs.duration||getRouteTerminalDurationMinutes(route,item.s.startStopId)));
+                const duration=Math.max(1,Number(abs.duration||getRouteTerminalDurationMinutes(route,schedule.startStopId)));
                 const turnaround=Math.max(0,Number(abs.turnaround||route.turnaroundMinutes||2));
                 const span=duration+turnaround;
                 const leg=Math.floor(elapsedMin/Math.max(1,span));
                 const inLeg=elapsedMin-leg*span;
                 const isForward=(leg%2===0)===forwardFirst;
                 const activeRoute=isForward?route:(paired||route);
-                const activeGeometry=isForward?forwardGeometry:returnGeometry;
-                if (inLeg>duration) {
-                    const terminal=pathPointFromGeometry(activeGeometry,1);
-                    return {point:terminal,phase:`⏸️ конечная · №${activeRoute.number}`,activeRoute};
-                }
+                const activeGeometry=isForward?forwardGeometry:(paired?.geometry||returnGeometry);
+                if(inLeg>duration) return {point:pathPointFromGeometry(activeGeometry,1),phase:`⏸️ конечная · №${activeRoute.number}`,activeRoute};
                 const progress=Math.max(0,Math.min(1,inLeg/duration));
                 return {point:pathPointFromGeometry(activeGeometry,progress),phase:`на маршруте №${activeRoute.number} ${isForward?'→':'←'}`,activeRoute};
             }
-
-            // После последнего пассажирского прибытия ТС физически возвращается
-            // в парк, а не разворачивается по пассажирской трассе.
-            if (nowMs<=abs.return.getTime()) {
-                const endPoint=endIdPoint(route,item.s.endStopId) || pathPointFromGeometry(returnGeometry,1);
-                const depot=depotForVehicle(vehicle);
-                const parkPoint=[depot.lat,depot.lon];
+            if(nowMs<=abs.return.getTime()){
+                const endPoint=endIdPoint(route,schedule.endStopId)||pathPointFromGeometry(returnGeometry,1);
+                const depot=depotForVehicle(vehicle), parkPoint=[depot.lat,depot.lon];
                 const progress=Math.max(0,Math.min(1,(nowMs-lastMs)/Math.max(1,abs.return.getTime()-lastMs)));
-                const point=[
-                    endPoint[0]+(parkPoint[0]-endPoint[0])*progress,
-                    endPoint[1]+(parkPoint[1]-endPoint[1])*progress
-                ];
+                const point=[endPoint[0]+(parkPoint[0]-endPoint[0])*progress,endPoint[1]+(parkPoint[1]-endPoint[1])*progress];
                 return {point,phase:`🏠 заезд в парк → ${depot.name||depot.id||'парк'}`,activeRoute:route};
             }
             return {point:null,phase:'в парке — этап завершён',activeRoute:null};
@@ -2052,50 +2051,52 @@ out body;
 
         function processServiceCardPayouts(now = new Date()) {
             let total=0, changed=false;
-            gameState.routeRuntime = gameState.routeRuntime || {};
-            gameState.owned.forEach(vehicle => {
-                const route=getVehicleRoute(vehicle.id);
-                if (!route || !route.geometry) return;
-                const pair=getContinuousRoutePair(route);
-                const d1=pair.outboundDuration;
-                const d2=pair.inboundDuration;
-                const turn=Math.max(0,Number(route.turnaroundMinutes ?? 2))*60;
-                const turn2=Math.max(0,Number(pair.inbound?.turnaroundMinutes ?? route.turnaroundMinutes ?? 2))*60;
-                const cycle=d1+turn+d2+turn2;
-                const key=String(vehicle.id);
-                let state=gameState.routeRuntime[key];
-                if (!state || String(state.routeId)!==String(route.id)) {
-                    state={routeId:route.id,startedAt:now.getTime(),lastProcessedArrival:0};
-                    gameState.routeRuntime[key]=state;
+            const cards=Array.isArray(gameState.serviceCards)?gameState.serviceCards:[];
+            const maxLookback=1000*60*60*24*31;
+            cards.forEach(card=>{
+                if(!card || card.active===false) return;
+                const vehicle=gameState.owned.find(v=>String(v.id)===String(card.vehicleId));
+                if(!vehicle) return;
+                const schedules=Array.isArray(card.schedules)?card.schedules:[];
+                let cursor=Number(card.lastPayoutAt||card.createdAt?new Date(card.lastPayoutAt||card.createdAt).getTime():now.getTime());
+                if(!Number.isFinite(cursor)) cursor=now.getTime();
+                // При первом запуске новой карточки не начисляем прошлые рейсы.
+                if(!card.lastPayoutAt) { card.lastPayoutAt=now.getTime(); return; }
+                const from=Math.max(cursor,now.getTime()-maxLookback);
+                const arrivals=[];
+                const firstDay=new Date(from); firstDay.setHours(0,0,0,0);
+                for(let d=0; d<=31; d++){
+                    const base=new Date(firstDay); base.setDate(firstDay.getDate()+d);
+                    if(base.getTime()>now.getTime()) break;
+                    schedules.forEach((s,idx)=>{
+                        if(!Array.isArray(s.days)||!s.days.includes(base.getDay())) return;
+                        const route=getScheduleRoute(s); if(!route) return;
+                        getGeneratedArrivalTimes(s,base).forEach((ts,j)=>{
+                            if(ts>from && ts<=now.getTime()) arrivals.push({ts,route,s,idx,j});
+                        });
+                    });
                 }
-                const ids=gameState.owned.filter(v=>String(getVehicleRoute(v.id)?.id||'')===String(route.id)).map(v=>String(v.id)).sort();
-                const idx=Math.max(0,ids.indexOf(String(vehicle.id)));
-                const count=Math.max(1,ids.length);
-                const offset=cycle*(idx/count);
-                const elapsed=Math.max(0,(now.getTime()-state.startedAt)/1000 + offset);
-                const arrivalsPerCycle=2;
-                const completedCycles=Math.floor(elapsed/cycle);
-                let arrivalCount=completedCycles*arrivalsPerCycle;
-                const within=elapsed%cycle;
-                if (within>=d1) arrivalCount++;
-                if (within>=d1+turn+d2) arrivalCount++;
-                while (state.lastProcessedArrival < arrivalCount) {
-                    state.lastProcessedArrival++; total+=100; changed=true;
-                    const arrivalNumber=state.lastProcessedArrival;
-                    const inbound=arrivalNumber%2===0;
-                    const rr=inbound?pair.inbound:pair.outbound;
-                    const t=now.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
-                    const detail=`🕐 ${t} · ТС ${vehicle.model||'—'} · маршрут №${rr?.number||'—'} · прибытие на конечную · +100 р.`;
-                    gameState.log.unshift({date:localDateKey(now),time:t,type:'route-arrival',routeNumber:rr?.number||'—',arrivalTime:t,vehicleModel:vehicle.model||'—',total:100,details:[detail]});
+                arrivals.sort((a,b)=>a.ts-b.ts);
+                if(arrivals.length){
+                    arrivals.forEach(a=>{
+                        total+=100;
+                        const t=new Date(a.ts).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+                        const detail=`🕐 ${t} · ТС ${vehicle.model||'—'} · маршрут №${a.route.number||'—'} · прибытие на конечную · +100 р.`;
+                        gameState.log=gameState.log||[];
+                        gameState.log.unshift({date:localDateKey(new Date(a.ts)),time:t,type:'route-arrival',routeNumber:a.route.number||'—',arrivalTime:t,vehicleModel:vehicle.model||'—',total:100,details:[detail]});
+                    });
+                    changed=true;
                 }
+                card.lastPayoutAt=now.getTime();
+                card.lastSimulationAt=now.toISOString();
             });
-            if (changed) {
+            if(changed){
                 gameState.balance+=total;
-                gameState.log=gameState.log.slice(0,120);
+                gameState.log=(gameState.log||[]).slice(0,200);
                 saveGameState();
                 renderInteractiveHeaderAndLightViews();
                 checkAffordableVehicleNotifications();
-            }
+            } else if(cards.some(c=>c&&c.lastPayoutAt)){ saveGameState(); }
             return total;
         }
 
@@ -2104,13 +2105,14 @@ out body;
             processServiceCardPayouts(new Date());
             const activeKeys=new Set();
             gameState.owned.forEach(vehicle=>{
-                const card=getVehicleServiceCard(vehicle.id);
+                const cards=getVehicleServiceCards(vehicle.id);
+                const card=cards.length?cards[cards.length-1]:null;
                 const directRoute=getVehicleRoute(vehicle.id);
                 const activeCardInfo=card ? getActiveServiceRouteAndSchedule(vehicle.id,new Date()) : null;
                 const route=(activeCardInfo?.route || directRoute);
                 if(!route || !route.geometry) return;
                 if(mapState.mode==='vehicles' && mapState.routeTypeFilter!=='all' && route.routeType!==mapState.routeTypeFilter) return;
-                const sim=card ? getCardDrivenPoint(vehicle,card,new Date()) : getContinuousRoutePoint(vehicle,route,new Date());
+                const sim=cards.length ? getCardDrivenPoint(vehicle,cards,new Date()) : getContinuousRoutePoint(vehicle,route,new Date());
                 if(!sim.point) return;
                 const activeRoute=sim.activeRoute||route;
                 const key=`vehicle:${vehicle.id}`; activeKeys.add(key);
@@ -2257,7 +2259,7 @@ out body;
             const select = document.getElementById('trackerVehicleSelect');
             if (!select) return;
             const prev = trackerState.vehicleId || mapState.trackingVehicleId || '';
-            const activeVehicles = gameState.owned.filter(v => getVehicleServiceCard(v.id) || getVehicleRoute(v.id));
+            const activeVehicles = gameState.owned.filter(v => getVehicleServiceCards(v.id).length || getVehicleRoute(v.id));
             select.innerHTML = '<option value="">— Выбери ТС на линии —</option>' + activeVehicles.map(v => {
                 const route = getActiveServiceRouteAndSchedule(v.id,new Date()).route || getVehicleRoute(v.id);
                 return `<option value="${escapeHtml(v.id)}">${vehicleCategoryIcon(v.category)} ${escapeHtml(v.model)} · ${escapeHtml(v.plate || v.num || 'без номера')} · №${escapeHtml(route?.number || '—')}</option>`;
