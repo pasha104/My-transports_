@@ -3087,3 +3087,13 @@ out body;
     return load().filter(c=>String(c.vehicleId)===String(vehicleId));
   };
 })();
+
+/* v38 route-link/card persistence: one vehicle may have many cards */
+(function(){
+ const K='busphoto_route_cards_v38';
+ const load=()=>{try{return JSON.parse(localStorage.getItem(K)||'[]')}catch(e){return[]}};
+ window.saveRouteAwareCard=function(d){
+   const a=load(); const c={cardId:'card_'+Date.now()+'_'+Math.random().toString(36).slice(2,8),vehicleId:String(d.vehicleId||''),days:d.days||['all'],mode:d.mode||'single',routeId:d.routeId||'',routeStages:d.routeStages||[],endTerminal:d.endTerminal||'',parkDeparture:d.parkDeparture||'05:00',workUntil:d.workUntil||'23:00',createdAt:Date.now()};
+   a.push(c);localStorage.setItem(K,JSON.stringify(a));return c;
+ };
+})();

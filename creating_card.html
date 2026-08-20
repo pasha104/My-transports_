@@ -273,4 +273,52 @@ document.addEventListener('DOMContentLoaded',function(){
   }
 });
 </script>
+
+<style id="v38-route-link-rounds">
+.v38box{margin-top:14px;padding:14px;border:1px solid #bbb;border-radius:12px}
+.v38row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.v38row select,.v38row input{width:100%;box-sizing:border-box}
+.v38rounds{display:none;margin-top:8px}.v38rounds.show{display:block}
+@media(max-width:600px){.v38row{grid-template-columns:1fr}}
+</style>
+<script>
+(function(){
+function routes(){return window.routes||window.ROUTES||window.appRoutes||JSON.parse(localStorage.getItem('routes')||'[]')}
+function id(r){return String(r?.id??r?.number??r?.name??'')}
+function ends(r){return [r?.start,r?.from,r?.firstStop,r?.origin,r?.end,r?.to,r?.lastStop,r?.destination].filter(Boolean).map(String)}
+function linked(r,terminal){
+ const t=String(terminal).toLowerCase();
+ return routes().find(x=>id(x)!=id(r)&&ends(x).some(e=>e.toLowerCase()===t))||null
+}
+function addStage(){
+ const host=document.getElementById('v38Stages'), n=host.children.length+1;
+ const row=document.createElement('div'); row.className='v38row';
+ row.innerHTML='<label><b>Маршрут '+n+'</b><select class="v38route"><option value="">Выбрать маршрут…</option></select></label><label><b>Конечная</b><select class="v38end"><option value="">Выберите маршрут</option></select><div class="v38rounds"><b>Количество кругов</b><input class="v38count" type="number" min="2" value="2"></div></label>';
+ host.appendChild(row);
+ const rs=row.querySelector('.v38route'), es=row.querySelector('.v38end'), rr=row.querySelector('.v38rounds');
+ routes().forEach(r=>{let o=document.createElement('option');o.value=id(r);o.textContent=id(r);rs.appendChild(o)});
+ rs.onchange=()=>{
+   const r=routes().find(x=>id(x)===rs.value); es.innerHTML='';
+   [...new Set(ends(r))].forEach(e=>{let o=document.createElement('option');o.value=e;o.textContent=e;es.appendChild(o)});
+   check()
+ };
+ es.onchange=check;
+ function check(){
+   const r=routes().find(x=>id(x)===rs.value), l=linked(r,es.value);
+   rr.classList.toggle('show',!!l);
+   if(l){let x=document.createElement('small');x.className='v38linked';x.textContent='Связанный маршрут: '+id(l); es.parentElement.querySelector('.v38linked')?.remove();es.parentElement.appendChild(x)}
+ }
+}
+function init(){
+ if(document.getElementById('v38box')) return;
+ const anchor=document.querySelector('#routeSelect,select[name="route"],select[id*="route" i]');
+ if(!anchor) return;
+ const box=document.createElement('section');box.id='v38box';box.className='v38box';
+ box.innerHTML='<h3>🔗 Связность маршрутов</h3><div>Выберите конечную — связанный маршрут определяется автоматически.</div><div id="v38Stages"></div><button type="button" id="v38add">➕ Добавить маршрут</button>';
+ anchor.parentElement.after(box); document.getElementById('v38add').onclick=addStage; addStage();
+}
+window.collectV38Stages=()=>[...document.querySelectorAll('.v38row')].map(r=>({routeId:r.querySelector('.v38route')?.value||'',terminal:r.querySelector('.v38end')?.value||'',rounds:Math.max(2,+r.querySelector('.v38count')?.value||2)})).filter(x=>x.routeId);
+document.readyState==='loading'?document.addEventListener('DOMContentLoaded',()=>setTimeout(init,100)):setTimeout(init,100);
+})();
+</script>
 </body></html>
