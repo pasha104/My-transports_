@@ -399,3 +399,106 @@
   .game-category-picker,.game-service-picker { grid-template-columns:1fr !important; }
   #routeMap,#trackerMap { height:46vh !important; min-height:280px !important; }
 }
+
+
+/* v34 — robust phone/tablet layout fix
+   Applies before the desktop breakpoint so devices with high DPR/zoom
+   do not receive the desktop multi-column layout. */
+@media (max-width: 1000px) {
+  html, body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden !important;
+  }
+
+  .main-wrapper,
+  .interactive-dashboard,
+  .interactive-card,
+  .interactive-controls,
+  .game-menu,
+  .game-category-picker,
+  .game-service-picker {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0 !important;
+    box-sizing: border-box;
+  }
+
+  .interactive-controls {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  .game-menu {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    overflow: visible !important;
+  }
+
+  .game-menu-btn {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    text-align: center;
+    min-height: 48px;
+  }
+
+  .game-menu-btn:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .game-category-picker,
+  .game-service-picker {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    width: 100% !important;
+  }
+
+  .game-category-btn,
+  .game-service-btn {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+
+  .interactive-controls select,
+  .interactive-controls input,
+  .interactive-card select,
+  .interactive-card input,
+  .interactive-card button {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .owned-mini-card,
+  .departure-card,
+  .departure-card-head {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .interactive-table-wrap,
+  .table-container {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 520px) {
+  .game-menu,
+  .game-category-picker,
+  .game-service-picker {
+    grid-template-columns: 1fr !important;
+  }
+
+  .game-menu-btn:last-child {
+    grid-column: auto;
+  }
+}

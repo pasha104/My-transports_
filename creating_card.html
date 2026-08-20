@@ -19,6 +19,93 @@ body{margin:0;background:#171717;color:#eee;font-family:Arial,sans-serif}.wrap{m
 }
 @media(max-width:380px){.days{grid-template-columns:1fr}.preview{height:290px}}
 </style>
+
+<style id="v34-mobile-card-fix">
+/* v34 — Карточка ТС: защита от горизонтального выезда на телефонах/планшетах */
+html, body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden !important;
+}
+.wrap, .grid, .card, .stage, .days, .row, .row3, .field, .actions {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+.grid > *, .card > *, .stage > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 1000px) {
+  .wrap {
+    width: 100%;
+    padding: 10px;
+  }
+  .grid {
+    grid-template-columns: 1fr !important;
+    width: 100%;
+  }
+  .grid > div {
+    width: 100%;
+    min-width: 0 !important;
+  }
+  .days {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    width: 100%;
+  }
+  .days label {
+    width: 100%;
+    min-width: 0 !important;
+    box-sizing: border-box;
+    overflow-wrap: anywhere;
+  }
+  .row, .row3 {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .row3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .field input, .field select {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .preview {
+    width: 100%;
+    max-width: 100%;
+  }
+  .schedule-table {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .wrap {
+    padding: 8px;
+  }
+  .days,
+  .row,
+  .row3 {
+    grid-template-columns: 1fr !important;
+  }
+  .top {
+    align-items: flex-start;
+  }
+  .top h1 {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+  .card {
+    width: 100%;
+    padding: 10px;
+  }
+  .stage {
+    width: 100%;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="wrap">
