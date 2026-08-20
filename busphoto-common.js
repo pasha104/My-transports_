@@ -26,6 +26,121 @@ function escapeHtml(value) {
         .replace(/'/g, '&#039;');
 }
 
+
+function getVehiclePhotoKey(index) {
+    const v = vehicleDB[index];
+    if (!v) return '';
+    // Стабильный ключ конкретного ТС. Госномер + борт/гар. номер предпочтительнее индекса.
+    return `${String(v.gov || '—')}|${String(v.num || '—')}|${String(v.model || '')}|${String(v.park || '')}`;
+}
+
+function getVehiclePhotoMap() {
+    try { return JSON.parse(localStorage.getItem('busphoto_vehicle_photos') || '{}'); }
+    catch(e) { return {}; }
+}
+function saveVehiclePhotoMap(map) {
+    localStorage.setItem('busphoto_vehicle_photos', JSON.stringify(map));
+}
+function getVehiclePhoto(index) {
+    const key = getVehiclePhotoKey(index);
+    return key ? (getVehiclePhotoMap()[key] || '') : '';
+}
+function openVehicleView(index) {
+    if (!vehicleDB[index]) return;
+    window.location.href = `vehicle_view.html?i=${encodeURIComponent(index)}`;
+}
+function openPhotoUploadModal() {
+    const modal = document.getElementById('photoUploadModal');
+    const select = document.getElementById('photoVehicleSelect');
+    if (!modal || !select) return;
+    select.innerHTML = '';
+    vehicleDB.forEach((v, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = `${v.model || 'ТС'} · ${v.gov && v.gov !== '—' ? v.gov : 'борт. ' + (v.num || '—')} · ${v.park || '—'}`;
+        select.appendChild(opt);
+    });
+    if (!vehicleDB.length) {
+        select.innerHTML = '<option value="">В базе нет ТС</option>';
+    }
+    select.onchange = () => updatePhotoPreviewFromStored();
+    document.getElementById('photoFileInput').value = '';
+    document.getElementById('photoPreviewWrap').style.display = 'none';
+    document.getElementById('photoUploadStatus').textContent = '';
+    modal.style.display = 'flex';
+    updatePhotoPreviewFromStored();
+}
+function closePhotoUploadModal() {
+    const modal = document.getElementById('photoUploadModal');
+    if (modal) modal.style.display = 'none';
+}
+function updatePhotoPreviewFromStored() {
+    const select = document.getElementById('photoVehicleSelect');
+    const img = document.getElementById('photoPreview');
+    const wrap = document.getElementById('photoPreviewWrap');
+    if (!select || !img || !wrap) return;
+    const photo = getVehiclePhoto(Number(select.value));
+    if (photo) { img.src = photo; wrap.style.display = 'block'; }
+    else { img.removeAttribute('src'); wrap.style.display = 'none'; }
+}
+function previewVehiclePhoto(event) {
+    const file = event.target.files?.[0];
+    const img = document.getElementById('photoPreview');
+    const wrap = document.getElementById('photoPreviewWrap');
+    if (!file || !img || !wrap) return;
+    if (!file.type.startsWith('image/')) { alert('Выберите изображение.'); event.target.value=''; return; }
+    const reader = new FileReader();
+    reader.onload = e => { img.src = e.target.result; wrap.style.display='block'; };
+    reader.readAsDataURL(file);
+}
+function saveVehiclePhoto() {
+    const select = document.getElementById('photoVehicleSelect');
+    const fileInput = document.getElementById('photoFileInput');
+    const status = document.getElementById('photoUploadStatus');
+    const index = Number(select?.value);
+    if (!vehicleDB[index]) { alert('Сначала выберите ТС из базы данных.'); return; }
+    const file = fileInput?.files?.[0];
+    if (!file) { alert('Выберите фотографию.'); return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+            const max = 1280;
+            const scale = Math.min(1, max / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const data = canvas.toDataURL('image/jpeg', 0.78);
+            const map = getVehiclePhotoMap();
+            map[getVehiclePhotoKey(index)] = data;
+            try {
+                saveVehiclePhotoMap(map);
+                status.textContent = '✅ Фото сохранено для выбранного ТС в базе этого браузера.';
+                updatePhotoPreviewFromStored();
+                renderTable();
+            } catch(err) {
+                status.textContent = '❌ Не удалось сохранить фото: хранилище браузера переполнено.';
+            }
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+function removeVehiclePhoto() {
+    const select = document.getElementById('photoVehicleSelect');
+    const index = Number(select?.value);
+    if (!vehicleDB[index]) return;
+    const map = getVehiclePhotoMap();
+    delete map[getVehiclePhotoKey(index)];
+    saveVehiclePhotoMap(map);
+    document.getElementById('photoFileInput').value = '';
+    document.getElementById('photoPreviewWrap').style.display = 'none';
+    document.getElementById('photoUploadStatus').textContent = '🗑 Фото удалено.';
+    renderTable();
+}
+
         function loadDatabase() {
             let saved = localStorage.getItem('busphoto_custom_db');
             if (saved) {
@@ -309,10 +424,10 @@ function escapeHtml(value) {
                 
                 tr.onclick = () => {
                     if (v._interactiveOwned) {
-                        alert('Это ТС куплено в интерактиве. Управлять им можно в «Мой гараж».');
+                        alert('Это ТС куплено в интерактиве. Эта база работает только с ТС, находящимися в базе данных.');
                         return;
                     }
-                    openVehicleModal(index);
+                    openVehicleView(index);
                 };
                 
                 let purposeLabel = t[v.purposeKey] ? t[v.purposeKey] : (v.purposeKey === '—' ? '—' : v.purposeKey);
@@ -332,6 +447,7 @@ function escapeHtml(value) {
                     <td>${v.decomm || '—'}</td>
                     <td>${v.util || '—'}</td>
                     <td>${v.note}</td>
+                    <td><button type="button" class="btn-secondary" style="padding:5px 8px; white-space:nowrap;" onclick="event.stopPropagation(); openVehicleView(${index})">👁 Вид ТС</button></td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -860,3 +976,16 @@ function escapeHtml(value) {
                 row.style.display = (matchesSearch && matchesPark) ? "" : "none";
             });
         }
+
+// Открытие загрузки фото по ссылке из «Вид ТС».
+document.addEventListener('DOMContentLoaded', function(){
+    if (location.hash === '#upload-photo' && document.getElementById('photoUploadModal')) {
+        setTimeout(function(){
+            openPhotoUploadModal();
+            const target = localStorage.getItem('busphoto_photo_target');
+            const select = document.getElementById('photoVehicleSelect');
+            if (target && select) { select.value = target; updatePhotoPreviewFromStored(); }
+            localStorage.removeItem('busphoto_photo_target');
+        }, 50);
+    }
+});

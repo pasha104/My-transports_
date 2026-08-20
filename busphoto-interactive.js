@@ -714,8 +714,10 @@
             const card = getVehicleServiceCard(vehicleId);
             if (!card) return {card:null, schedule:null, route:getVehicleRoute(vehicleId)};
             const schedules = Array.isArray(card.schedules) ? card.schedules : [];
-            const ordered = schedules.map((s,i)=>({s,i})).sort((a,b)=>Number(a.s.sequenceOrder||a.i)-Number(b.s.sequenceOrder||b.i));
-            for (const item of ordered) {
+            const ordered = schedules.map((s,i)=>({s,i})).sort((a,b)=>Number(a.s.sequenceOrder ?? a.i)-Number(b.s.sequenceOrder ?? b.i));
+            // Если соседние этапы имеют соприкасающиеся интервалы, выбираем
+            // уже начавшийся этап с большим порядковым номером.
+            for (const item of ordered.slice().reverse()) {
                 const s=item.s;
                 if (!Array.isArray(s.days) || !s.days.includes(now.getDay())) continue;
                 const route=getScheduleRoute(s);
@@ -728,26 +730,87 @@
         function getCardDrivenPoint(vehicle, card, now = new Date()) {
             const schedules = (card?.schedules || []).filter(s => Array.isArray(s.days) && s.days.includes(now.getDay()));
             if (!schedules.length) return {point:null,phase:'в парке',activeRoute:null};
-            const ordered=schedules.map((s,i)=>({s,i})).sort((a,b)=>Number(a.s.sequenceOrder||a.i)-Number(b.s.sequenceOrder||b.i));
-            let firstUpcoming=null;
+
+            // В одной карточке этапы идут последовательно. Если интервалы соседних
+            // этапов соприкасаются, приоритет получает уже начавшийся более поздний этап.
+            const ordered = schedules
+                .map((s,i)=>({s,i,order:Number(s.sequenceOrder ?? i)}))
+                .sort((a,b)=>a.order-b.order);
+            const candidates=[];
             for (const item of ordered) {
-                const route=getScheduleRoute(item.s); if(!route?.geometry) continue;
+                const route=getScheduleRoute(item.s);
+                if (!route?.geometry) continue;
                 const abs=getScheduleAbsoluteTimes(item.s,new Date(now.getFullYear(),now.getMonth(),now.getDate()),route,vehicle);
-                if (now < abs.depot) { if(!firstUpcoming) firstUpcoming={route,item,abs}; continue; }
-                if (now > abs.return) continue;
-                if (now < abs.start) return {point:pathPointFromGeometry(route.geometry,0),phase:`🚍 парк → ${route.start||'первая конечная'}`,activeRoute:route};
-                const duration=Math.max(1,abs.duration*60), turnaround=Math.max(1,abs.turnaround*60);
-                const elapsed=(now.getTime()-abs.start.getTime())/1000;
-                const tripSpan=duration+turnaround;
-                const tripIndex=Math.floor(elapsed/tripSpan);
-                const inTrip=elapsed-tripIndex*tripSpan;
-                if (inTrip <= duration) {
-                    return {point:pathPointFromGeometry(route.geometry,Math.max(0,Math.min(1,inTrip/duration))),phase:`на маршруте №${route.number} →`,activeRoute:route};
-                }
-                return {point:pathPointFromGeometry(route.geometry,1),phase:`на конечной №${route.number}`,activeRoute:route};
+                candidates.push({item,route,abs});
             }
-            if (firstUpcoming) return {point:pathPointFromGeometry(firstUpcoming.route.geometry,0),phase:'в парке · следующий выезд',activeRoute:firstUpcoming.route};
-            return {point:null,phase:'в парке',activeRoute:null};
+            if (!candidates.length) return {point:null,phase:'в парке',activeRoute:null};
+
+            const nowMs=now.getTime();
+            let chosen=null;
+            // Сначала ищем активный этап с максимальным порядком — это убирает
+            // наложение времени между концом одного этапа и началом следующего.
+            for (let i=candidates.length-1;i>=0;i--) {
+                const c=candidates[i];
+                if (nowMs>=c.abs.depot.getTime() && nowMs<=c.abs.return.getTime()) { chosen=c; break; }
+            }
+            if (!chosen) {
+                const upcoming=candidates.find(c=>nowMs<c.abs.depot.getTime());
+                if (upcoming) return {point:pathPointFromGeometry(upcoming.route.geometry,0),phase:`в парке · следующий этап №${upcoming.route.number}`,activeRoute:upcoming.route};
+                return {point:null,phase:'в парке',activeRoute:null};
+            }
+
+            const {item,route,abs}=chosen;
+            const direction=getScheduleDirectionalRoutes(route,item.s.startStopId);
+            const forwardFirst=!item.s.startStopId || String(item.s.startStopId)===String((route.terminalStopIds||route.stopIds||[])[0]);
+            const forwardGeometry=direction.outboundGeometry || (forwardFirst?route.geometry:reverseGeometry(route.geometry));
+            const returnGeometry=direction.returnGeometry || (forwardFirst?reverseGeometry(route.geometry):route.geometry);
+            const paired=direction.reverse || findReverseRoute(route);
+            const startMs=abs.start.getTime(), lastMs=abs.lastArrival.getTime();
+
+            // До начала работы автобус едет от парка к первой конечной.
+            if (nowMs<startMs) {
+                const depot=depotForVehicle(vehicle);
+                const progress=Math.max(0,Math.min(1,(nowMs-abs.depot.getTime())/Math.max(1,startMs-abs.depot.getTime())));
+                const point=forwardGeometry
+                    ? pathPointFromGeometry(forwardGeometry,progress)
+                    : [depot.lat,depot.lon];
+                return {point,phase:`🚍 парк → ${item.s.startStopName || route.start || 'первая конечная'}`,activeRoute:route};
+            }
+
+            // На маршруте чередуем прямую и обратную геометрию. Поэтому ТС больше
+            // не едет обратно по той же линии «как трамвай».
+            if (nowMs<=lastMs) {
+                const elapsedMin=(nowMs-startMs)/60000;
+                const duration=Math.max(1,Number(abs.duration||getRouteTerminalDurationMinutes(route,item.s.startStopId)));
+                const turnaround=Math.max(0,Number(abs.turnaround||route.turnaroundMinutes||2));
+                const span=duration+turnaround;
+                const leg=Math.floor(elapsedMin/Math.max(1,span));
+                const inLeg=elapsedMin-leg*span;
+                const isForward=(leg%2===0)===forwardFirst;
+                const activeRoute=isForward?route:(paired||route);
+                const activeGeometry=isForward?forwardGeometry:returnGeometry;
+                if (inLeg>duration) {
+                    const terminal=pathPointFromGeometry(activeGeometry,1);
+                    return {point:terminal,phase:`⏸️ конечная · №${activeRoute.number}`,activeRoute};
+                }
+                const progress=Math.max(0,Math.min(1,inLeg/duration));
+                return {point:pathPointFromGeometry(activeGeometry,progress),phase:`на маршруте №${activeRoute.number} ${isForward?'→':'←'}`,activeRoute};
+            }
+
+            // После последнего пассажирского прибытия ТС физически возвращается
+            // в парк, а не разворачивается по пассажирской трассе.
+            if (nowMs<=abs.return.getTime()) {
+                const endPoint=endIdPoint(route,item.s.endStopId) || pathPointFromGeometry(returnGeometry,1);
+                const depot=depotForVehicle(vehicle);
+                const parkPoint=[depot.lat,depot.lon];
+                const progress=Math.max(0,Math.min(1,(nowMs-lastMs)/Math.max(1,abs.return.getTime()-lastMs)));
+                const point=[
+                    endPoint[0]+(parkPoint[0]-endPoint[0])*progress,
+                    endPoint[1]+(parkPoint[1]-endPoint[1])*progress
+                ];
+                return {point,phase:`🏠 заезд в парк → ${depot.name||depot.id||'парк'}`,activeRoute:route};
+            }
+            return {point:null,phase:'в парке — этап завершён',activeRoute:null};
         }
 
         function getVehicleRoute(vehicleId) {

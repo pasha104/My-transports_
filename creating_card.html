@@ -8,745 +8,123 @@
 <link rel="stylesheet" href="busphoto-interactive.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-body{margin:0;background:#171717;color:#eee;font-family:Arial,sans-serif}.wrap{max-width:1200px;margin:auto;padding:14px}.top{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.top a{color:#fff;text-decoration:none}.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,.9fr);gap:14px}.card{background:#222;border:1px solid #444;border-radius:14px;padding:14px;margin:12px 0}.row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.field{display:flex;flex-direction:column;gap:5px}.field span{font-weight:700;color:#bbb}.field input,.field select{font-size:16px;padding:11px;border-radius:8px;border:1px solid #666;background:#111;color:#fff;box-sizing:border-box;width:100%}.stage{background:#1c1c1c;border:1px solid #555;border-radius:12px;padding:12px;margin:10px 0}.stage h4{margin:0 0 10px}.muted{color:#aaa;line-height:1.45}.days{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.days label,.mode{background:#2b2b2b;border:1px solid #555;border-radius:9px;padding:10px;display:flex;gap:7px;align-items:center}.days input,.mode input{accent-color:#2caf50}.btn{border:0;border-radius:9px;padding:11px 14px;font-weight:800;cursor:pointer}.primary{background:#24a148;color:#fff}.secondary{background:#333;color:#fff}.danger{background:#9f0000;color:#fff}.actions{display:flex;gap:8px;flex-wrap:wrap}.summary{background:#102a1a;border:1px solid #2c7042;padding:10px;border-radius:10px;line-height:1.55}.preview{height:520px;border-radius:12px;overflow:hidden;border:1px solid #555}.small{font-size:13px}.schedule-table{width:100%;border-collapse:collapse;font-size:13px}.schedule-table th,.schedule-table td{border:1px solid #555;padding:6px;text-align:center}.schedule-table th{background:#303030}.route-preview-line{padding:7px 0;border-bottom:1px dashed #555}.remove{float:right}@media(max-width:850px){.grid{grid-template-columns:1fr}.preview{height:360px}.row3{grid-template-columns:1fr}.days{grid-template-columns:repeat(2,1fr)}}
-
-@media(max-width:600px){
-  body{font-size:14px;overflow-x:hidden}.wrap{padding:8px}.top{gap:7px}.top h1{font-size:22px;margin:6px 0}.top a{font-size:13px}
-  .grid{display:flex;flex-direction:column;gap:8px}.grid>div:first-child{order:1}.grid>div:last-child{order:2}
-  .card{padding:11px;border-radius:11px;margin:7px 0}.card h2{font-size:18px;margin:0 0 10px}.row,.row3{grid-template-columns:1fr;gap:8px}.days{grid-template-columns:1fr 1fr;gap:6px}.days label,.mode{padding:10px;min-height:42px;box-sizing:border-box}
-  .field input,.field select{min-height:46px;font-size:16px;padding:10px}.actions{display:grid;grid-template-columns:1fr;gap:7px}.btn{width:100%;min-height:46px}.preview{height:330px;border-radius:10px}.schedule-table{font-size:11px}.schedule-table th,.schedule-table td{padding:5px 3px}
-  .stage{padding:10px;border-radius:10px}.stage .row3{grid-template-columns:1fr}.stage h4{font-size:16px}.summary{font-size:13px}
-}
-@media(max-width:380px){.days{grid-template-columns:1fr}.preview{height:290px}}
-</style>
-
-<style id="v34-mobile-card-fix">
-/* v34 — Карточка ТС: защита от горизонтального выезда на телефонах/планшетах */
-html, body {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden !important;
-}
-.wrap, .grid, .card, .stage, .days, .row, .row3, .field, .actions {
-  box-sizing: border-box;
-  min-width: 0;
-  max-width: 100%;
-}
-.grid > *, .card > *, .stage > * {
-  min-width: 0;
-  max-width: 100%;
-}
-
-@media (max-width: 1000px) {
-  .wrap {
-    width: 100%;
-    padding: 10px;
-  }
-  .grid {
-    grid-template-columns: 1fr !important;
-    width: 100%;
-  }
-  .grid > div {
-    width: 100%;
-    min-width: 0 !important;
-  }
-  .days {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    width: 100%;
-  }
-  .days label {
-    width: 100%;
-    min-width: 0 !important;
-    box-sizing: border-box;
-    overflow-wrap: anywhere;
-  }
-  .row, .row3 {
-    grid-template-columns: 1fr 1fr !important;
-  }
-  .row3 {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-  .field input, .field select {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-  }
-  .preview {
-    width: 100%;
-    max-width: 100%;
-  }
-  .schedule-table {
-    max-width: 100%;
-  }
-}
-
-@media (max-width: 600px) {
-  .wrap {
-    padding: 8px;
-  }
-  .days,
-  .row,
-  .row3 {
-    grid-template-columns: 1fr !important;
-  }
-  .top {
-    align-items: flex-start;
-  }
-  .top h1 {
-    max-width: 100%;
-    overflow-wrap: anywhere;
-  }
-  .card {
-    width: 100%;
-    padding: 10px;
-  }
-  .stage {
-    width: 100%;
-  }
-}
-</style>
-
-<style id="card-black-white-fixed">
-/* Карточка ТС: всегда чёрный текст на белом фоне, независимо от темы сайта */
-#v39DriverCard,
-#v39DriverCard *,
-.wrap .card,
-.wrap .card * {
-  color: #000 !important;
-  text-shadow: none !important;
-}
-#v39DriverCard,
-.wrap .card {
-  background: #fff !important;
-  border-color: #bdbdbd !important;
-}
-#v39DriverCard .sub,
-#v39DriverCard .v39-note,
-.wrap .card .muted,
-.wrap .card .small {
-  color: #000 !important;
-  opacity: 1 !important;
-}
-#v39DriverCard input,
-#v39DriverCard select,
-#v39DriverCard textarea,
-.wrap .card input,
-.wrap .card select,
-.wrap .card textarea {
-  background: #fff !important;
-  color: #000 !important;
-  border: 1px solid #777 !important;
-  opacity: 1 !important;
-  -webkit-text-fill-color: #000 !important;
-}
-#v39DriverCard option,
-.wrap .card option { background:#fff !important; color:#000 !important; }
-#v39DriverCard .v39-note,
-.wrap .card .summary,
-.wrap .card .stage {
-  background: #fff !important;
-  color: #000 !important;
-  border-color: #aaa !important;
-}
-#v39DriverCard .v39-section { border-top-color:#aaa !important; }
-#v39DriverCard button,
-.wrap .card button {
-  color:#000 !important;
-  opacity:1 !important;
-}
-#v39DriverCard select:disabled,
-#v39DriverCard input:disabled,
-.wrap .card select:disabled,
-.wrap .card input:disabled {
-  color:#333 !important;
-  background:#f2f2f2 !important;
-  -webkit-text-fill-color:#333 !important;
-  opacity:1 !important;
-}
+:root{color-scheme:light}html,body{margin:0!important;background:#fff!important;color:#000!important;overflow-x:hidden;font-family:Arial,sans-serif}body *{box-sizing:border-box}.wrap{max-width:1100px;margin:auto;padding:12px}.top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.top h1{font-size:28px;margin:6px 0}.top a{color:#000;text-decoration:none;font-weight:700}.card{background:#fff!important;color:#000!important;border:1px solid #bbb;border-radius:14px;padding:14px;margin:10px 0}.card *{color:#000!important;text-shadow:none!important}.card h2{margin:0 0 10px;font-size:21px}.muted,.note{color:#222!important}.note{background:#f3f3f3;border:1px solid #ccc;border-radius:10px;padding:10px;line-height:1.45}.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.field{display:flex;flex-direction:column;gap:5px;font-weight:700;min-width:0}.field input,.field select,.field textarea{width:100%;min-width:0;min-height:44px;padding:10px;border:1px solid #777;border-radius:8px;background:#fff!important;color:#000!important;font-size:16px;-webkit-text-fill-color:#000!important}.field select option{background:#fff!important;color:#000!important}.days,.modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.choice{display:flex;align-items:center;gap:8px;padding:11px;border:1px solid #aaa;border-radius:9px;background:#fafafa}.choice input{accent-color:#16843c}.stage{border:1px solid #aaa;border-radius:12px;padding:12px;margin-top:10px;background:#fff}.stage-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.stage h3{margin:0 0 10px;font-size:18px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.btn{border:1px solid #777;border-radius:9px;padding:11px 14px;font-weight:800;cursor:pointer;background:#eee;color:#000!important}.btn.primary{background:#159447;color:#fff!important;border-color:#159447}.btn.danger{background:#c40000;color:#fff!important;border-color:#c40000}.btn:disabled{opacity:.5;cursor:not-allowed}.summary{background:#f6fff8;border:1px solid #65a878;border-radius:10px;padding:11px;line-height:1.5}.stage-summary{margin-top:9px;background:#f6f6f6;border:1px dashed #999;border-radius:9px;padding:9px;line-height:1.45}.round-box{display:none;margin-top:8px}.round-box.show{display:block}.map{height:380px;border:1px solid #999;border-radius:10px;overflow:hidden}.cards .saved{border:1px solid #aaa;border-radius:10px;padding:10px;margin:8px 0;background:#fff}.small{font-size:13px}.schedule{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}.schedule th,.schedule td{border:1px solid #aaa;padding:6px;text-align:center}.schedule th{background:#eee}.error{color:#a00000!important;font-weight:700;margin-top:8px}.ok{color:#08752d!important;font-weight:700;margin-top:8px}@media(max-width:700px){.wrap{padding:8px}.top{align-items:flex-start}.top h1{font-size:22px}.grid2,.grid3,.days,.modes{grid-template-columns:1fr}.card{padding:10px;border-radius:11px}.map{height:310px}.actions{display:grid;grid-template-columns:1fr}.btn{width:100%;min-height:44px}.stage-head{align-items:flex-start}.stage-head .btn{width:auto}.schedule{font-size:11px}.schedule th,.schedule td{padding:4px}}
 </style>
 </head>
 <body>
-
-<style id="v39-driver-card">
-.v39-driver-card{max-width:1100px;margin:18px auto;padding:18px;border:1px solid #bbb;border-radius:16px;background:var(--card-bg,#fff);box-sizing:border-box}
-.v39-driver-card h2{margin:0 0 6px}
-.v39-driver-card .sub{opacity:.72;margin-bottom:16px}
-.v39-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.v39-grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.v39-field{min-width:0}
-.v39-field label{display:block;font-weight:700;margin-bottom:5px}
-.v39-field input,.v39-field select,.v39-field textarea{width:100%;max-width:100%;box-sizing:border-box;padding:9px;border:1px solid #aaa;border-radius:9px;background:inherit}
-.v39-section{margin-top:16px;padding-top:14px;border-top:1px solid #ccc}
-.v39-stops{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
-.v39-time-row{display:grid;grid-template-columns:repeat(9,minmax(70px,1fr));gap:7px;overflow-x:auto;padding-bottom:5px}
-.v39-break{display:grid;grid-template-columns:1fr 1fr 1.5fr;gap:10px}
-.v39-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
-.v39-note{padding:10px;border-radius:10px;background:rgba(80,130,190,.08);margin-top:10px}
-.v39-error{color:#b00020;margin-top:8px}
-@media(max-width:700px){
- .v39-grid,.v39-grid3,.v39-break{grid-template-columns:1fr}
- .v39-stops{grid-template-columns:repeat(2,minmax(0,1fr))}
- .v39-driver-card{margin:8px;padding:12px}
-}
-</style>
-
-<section class="v39-driver-card" id="v39DriverCard">
-  <h2>🚌 Карточка водителя и маршрутное расписание</h2>
-  <div class="sub">Карточка создаётся без отдельной «смены». После выбора автобуса и маршрута расписание строится автоматически.</div>
-
-  <div class="v39-grid3">
-    <div class="v39-field"><label>Маршрут №</label><select id="v39Route"><option value="">Выберите маршрут</option></select></div>
-    <div class="v39-field"><label>Карт №</label><input id="v39CardNo" placeholder="Автоматически"></div>
-    <div class="v39-field"><label>Дни работы</label><select id="v39Days"><option value="weekdays">Будни</option><option value="weekends">Выходные</option><option value="all">Все дни</option><option value="mon">Понедельник</option><option value="tue">Вторник</option><option value="wed">Среда</option><option value="thu">Четверг</option><option value="fri">Пятница</option><option value="sat">Суббота</option><option value="sun">Воскресенье</option></select></div>
-  </div>
-
-  <div class="v39-section">
-    <div class="v39-grid3">
-      <div class="v39-field"><label>Дата действия с</label><input id="v39Effective" type="date"></div>
-      <div class="v39-field"><label>Выезд из парка</label><input id="v39ParkOut" type="time" value="05:00"></div>
-      <div class="v39-field"><label>Возврат в парк</label><input id="v39ParkIn" type="time" value="23:00"></div>
-    </div>
-    <div class="v39-note" id="v39AutoInfo">Выберите автобус и маршрут — связность и примерное расписание определятся автоматически.</div>
-  </div>
-
-  <div class="v39-section">
-    <h3>🚏 Маршрут и остановки</h3>
-    <div class="v39-grid3">
-      <div class="v39-field"><label>Первая конечная / старт</label><select id="v39Start"></select></div>
-      <div class="v39-field"><label>Конечная</label><select id="v39End"></select></div>
-      <div class="v39-field"><label>По маршруту №</label><input id="v39RouteNumber" readonly></div>
-    </div>
-    <div class="v39-stops" id="v39Stops"></div>
-    <div class="v39-note">Обратное направление берётся из привязки маршрута. В карточке не нужно вручную прокладывать обратную трассу.</div>
-  </div>
-
-  <div class="v39-section">
-    <h3>⏱️ Маршрутное расписание</h3>
-    <div class="v39-field"><label>Время отправления / прибытия по точкам</label></div>
-    <div class="v39-time-row" id="v39Times"></div>
-    <div class="v39-grid3" style="margin-top:10px">
-      <div class="v39-field"><label>Рейсов в 1-й части</label><input id="v39Trips1" type="number" min="0" value="0"></div>
-      <div class="v39-field"><label>Рейсов во 2-й части</label><input id="v39Trips2" type="number" min="0" value="0"></div>
-      <div class="v39-field"><label>Всего рейсов</label><input id="v39TripsTotal" type="number" readonly></div>
-    </div>
-  </div><div class="v39-section">
-    <h3>🚌 Путевой лист / учёт работы</h3>
-    <div class="v39-grid3">
-      <div class="v39-field"><label>Марка автобуса</label><select id="v39Bus"><option value="">Выберите автобус из гаража</option></select></div>
-      <div class="v39-field"><label>Гос. номер</label><input id="v39State" readonly placeholder="Автоматически"></div>
-      <div class="v39-field"><label>Гаражный номер</label><input id="v39Garage" readonly placeholder="Автоматически"></div>
-      <div class="v39-field"><label>Режим работы</label><input id="v39Mode" placeholder="Режим"></div>
-      <div class="v39-field"><label>Дата выезда</label><input id="v39OutDate" type="date"></div>
-      <div class="v39-field"><label>Дата возврата</label><input id="v39InDate" type="date"></div>
-    </div>
-    <div class="v39-note">Троллейбусная часть из шаблона исключена. В карточке доступны только автобусы.</div>
-  </div>
-
-  <div class="v39-section">
-    <h3>👤 Водитель / кондуктор</h3>
-    <div class="v39-grid">
-      <div class="v39-field"><label>Водитель / Таб. №</label><input id="v39Driver" placeholder="ФИО водителя / табельный номер"></div>
-      <div class="v39-field"><label>Кондуктор / Таб. №</label><input id="v39Conductor" placeholder="ФИО кондуктора / табельный номер"></div>
-    </div>
-  </div></section>
-
-<script id="v39-driver-card-js">
-(function(){
-  const $=id=>document.getElementById(id);
-  const val=id=>$(id)?.value||'';
-  function arrCandidates(){
-    return window.routes||window.ROUTES||window.appRoutes||window.busRoutes||[];
-  }
-  function getRoutes(){
-    let r=arrCandidates();
-    if(Array.isArray(r)&&r.length)return r;
-    try{
-      const x=JSON.parse(localStorage.getItem('routes')||localStorage.getItem('busphoto_routes')||'[]');
-      return Array.isArray(x)?x:[];
-    }catch(e){return[]}
-  }
-  function rid(r){return String(r?.id??r?.number??r?.name??'')}
-  function endpoints(r){
-    const a=r?.start??r?.from??r?.firstStop??r?.origin??'';
-    const b=r?.end??r?.to??r?.lastStop??r?.destination??'';
-    return [String(a||''),String(b||'')].filter(Boolean);
-  }
-  function buses(){
-    const c=[window.vehicles,window.garage,window.ownedVehicles,window.ownedTS,window.tsList];
-    for(const x of c)if(Array.isArray(x))return x;
-    try{
-      const x=JSON.parse(localStorage.getItem('vehicles')||localStorage.getItem('garage')||'[]');
-      return Array.isArray(x)?x:[];
-    }catch(e){return[]}
-  }
-  function busId(b){return String(b?.id??b?.uid??b?.garageNumber??b?.number??'')}
-  function busType(b){return String(b?.type??b?.category??b?.kind??'').toLowerCase()}
-  function isTrolley(b){
-    const t=busType(b);
-    return t.includes('трол')||t.includes('trolley');
-  }
-  function populate(){
-    const rs=$('v39Route'), bs=$('v39Bus');
-    getRoutes().forEach(r=>{let o=document.createElement('option');o.value=rid(r);o.textContent=rid(r);rs.appendChild(o)});
-    buses().filter(b=>!isTrolley(b)).forEach(b=>{
-      let o=document.createElement('option');o.value=busId(b);
-      o.textContent=b.model||b.name||b.brand||('Автобус '+busId(b));bs.appendChild(o);
-    });
-  }
-  function selectedRoute(){return getRoutes().find(r=>rid(r)===val('v39Route'))}
-  function selectedBus(){return buses().find(b=>busId(b)===val('v39Bus'))}
-  function updateRoute(){
-    const r=selectedRoute(); const ep=endpoints(r||{});
-    $('v39RouteNumber').value=r?rid(r):'';
-    ['v39Start','v39End'].forEach((id,i)=>{
-      const s=$(id);s.innerHTML='';
-      ep.forEach(e=>{let o=document.createElement('option');o.value=e;o.textContent=e;s.appendChild(o)});
-    });
-    const stops=Array.isArray(r?.stops)?r.stops:[];
-    const host=$('v39Stops');host.innerHTML='';
-    (stops.length?stops:ep).forEach((st,i)=>{
-      let d=document.createElement('div');d.className='v39-field';
-      d.innerHTML='<label>Остановка '+(i+1)+'</label><input value="'+String(st?.name??st).replace(/"/g,'&quot;')+'" readonly>';
-      host.appendChild(d);
-    });
-    $('v39AutoInfo').textContent=r?'Маршрут выбран. Связанный обратный маршрут и время движения будут использоваться из данных маршрута.':'Выберите автобус и маршрут.';
-    updateTimes();
-  }
-  function updateBus(){
-    const b=selectedBus(); if(!b)return;
-    $('v39State').value=b.stateNumber||b.govNumber||b.plate||b.gos||'';
-    $('v39Garage').value=b.garageNumber||b.boardNumber||b.board||b.number||'';
-  }
-  function updateTimes(){
-    const host=$('v39Times');host.innerHTML='';
-    const r=selectedRoute(), stops=Array.isArray(r?.stops)?r.stops:[];
-    const n=Math.max(2,Math.min(9,stops.length||2));
-    for(let i=0;i<n;i++){
-      let d=document.createElement('div');d.innerHTML='<input type="time" value="'+(i===0?val('v39ParkOut'):'')+'"><small>'+(i+1)+'</small>';host.appendChild(d);
-    }
-  }
-  function updateFuel(){
-    const a=parseFloat(val('v39FuelOut'))||0,b=parseFloat(val('v39FuelRefuel'))||0,c=parseFloat(val('v39FuelIn'))||0;
-    $('v39FuelSpent').value=Math.max(0,a+b-c).toFixed(1);
-  }
-  function create(){
-    $('v39Error').textContent='';
-    if(!val('v39Bus')||!val('v39Route')){$('v39Error').textContent='Выберите автобус и маршрут.';return}
-    const data={
-      cardId:'driver_'+Date.now(),
-      busId:val('v39Bus'),routeId:val('v39Route'),days:val('v39Days'),
-      effective:val('v39Effective'),parkOut:val('v39ParkOut'),parkIn:val('v39ParkIn'),
-      start:val('v39Start'),end:val('v39End'),stops:[...document.querySelectorAll('#v39Stops input')].map(x=>x.value),
-      driver:val('v39Driver'),conductor:val('v39Conductor'),mode:val('v39Mode'),
-      outDate:val('v39OutDate'),inDate:val('v39InDate'),
-      fuel:{out:val('v39FuelOut'),refuel:val('v39FuelRefuel'),in:val('v39FuelIn'),spent:val('v39FuelSpent')},
-      createdAt:Date.now()
-    };
-    const old=JSON.parse(localStorage.getItem('driverCards')||'[]');
-    old.push(data);localStorage.setItem('driverCards',JSON.stringify(old));
-    $('v39Error').style.color='green';$('v39Error').textContent='Карточка создана.';
-  }
-  $('v39Bus').addEventListener('change',updateBus);
-  $('v39Route').addEventListener('change',updateRoute);
-  ['v39ParkOut','v39ParkIn'].forEach(id=>$(id).addEventListener('change',updateTimes));
-$('v39Create').addEventListener('click',create);
-  const previewBtn=$('v39Preview');
-  if(previewBtn) previewBtn.addEventListener('click',function(){
-    const r=selectedRoute();
-    if(r && typeof window.previewRouteOnMap==='function') window.previewRouteOnMap(r);
-    else alert('Маршрут выбран. Если карта подключена в интерактиве, предпросмотр будет показан там.');
-  });
-  populate();
-})();
-</script>
-
 <div class="wrap">
-<div class="top"><h1>🗓️ Карточка ТС</h1><a href="interactive.html">← Вернуться в интерактив</a></div>
-<div class="grid">
-<div>
-<form id="cardForm">
-<div class="card"><h2>1. Дни работы</h2><div class="days">
-<label><input type="radio" name="days" value="all" checked> Все дни</label><label><input type="radio" name="days" value="weekdays"> Будни</label><label><input type="radio" name="days" value="weekends"> Выходные</label><label><input type="radio" name="days" value="1"> Пн</label><label><input type="radio" name="days" value="2"> Вт</label><label><input type="radio" name="days" value="3"> Ср</label><label><input type="radio" name="days" value="4"> Чт</label><label><input type="radio" name="days" value="5"> Пт</label><label><input type="radio" name="days" value="6"> Сб</label><label><input type="radio" name="days" value="0"> Вс</label>
-</div></div>
-<div class="card"><h2>2. ТС</h2><div class="field"><span>Выбрать ТС</span><select id="vehicle" required></select></div><div id="vehicleInfo" class="summary" style="margin-top:9px">Выбери ТС — здесь появится его номер, модель и текущий маршрут.</div></div>
-<div class="card"><h2>3. Маршруты за день</h2><label class="mode"><input type="radio" name="mode" value="single" checked> Один маршрут за день</label><label class="mode" style="margin-top:7px"><input type="radio" name="mode" value="multi"> 🔗 Несколько маршрутов за день</label><div id="modeHint" class="muted" style="margin-top:8px">Один маршрут выполняется по расписанию смены.</div><div id="stages"></div><div class="actions"><button type="button" id="addStage" class="btn secondary" style="display:none">➕ Добавить дополнительный маршрут</button><button type="button" id="preview" class="btn secondary">🗺️ Предпросмотр на карте</button></div></div>
-<div class="card"><h2>4. Смена</h2><div class="row3"><label class="field"><span>Выезд из парка</span><input id="depot" type="time" value="05:00"></label><label class="field"><span>Работать до</span><input id="until" type="time" value="23:00"></label><label class="field"><span>Пауза на конечной, мин.</span><input id="turn" type="number" min="0" value="2"></label></div><div class="summary" id="summary" style="margin-top:10px">Выбери маршрут.</div></div>
-<div class="card"><div class="actions"><button class="btn primary" type="submit">💾 Создать реальную карточку ТС</button><button class="btn secondary" type="button" id="reset">Очистить</button></div></div>
-</form>
-<div class="card"><h2>📋 Созданные карточки</h2><div id="cards"></div></div>
+  <div class="top"><h1>🗓️ Карточка ТС</h1><a href="interactive.html">← Вернуться в интерактив</a></div>
+  <div class="note">Карточка создаётся отдельно от интерфейса интерактива. Она использует тот же гараж, маршруты и <b>localStorage</b>, поэтому созданная здесь карточка сразу сохраняется для интерактива.</div>
+
+  <form id="cardForm">
+    <section class="card">
+      <h2>1. Дни работы</h2>
+      <div class="days">
+        <label class="choice"><input type="radio" name="days" value="all" checked> Все дни</label>
+        <label class="choice"><input type="radio" name="days" value="weekdays"> Будни</label>
+        <label class="choice"><input type="radio" name="days" value="weekends"> Выходные</label>
+        <label class="choice"><input type="radio" name="days" value="1"> Пн</label>
+        <label class="choice"><input type="radio" name="days" value="2"> Вт</label>
+        <label class="choice"><input type="radio" name="days" value="3"> Ср</label>
+        <label class="choice"><input type="radio" name="days" value="4"> Чт</label>
+        <label class="choice"><input type="radio" name="days" value="5"> Пт</label>
+        <label class="choice"><input type="radio" name="days" value="6"> Сб</label>
+        <label class="choice"><input type="radio" name="days" value="0"> Вс</label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2. ТС</h2>
+      <label class="field">Выбрать ТС<select id="vehicle" required></select></label>
+      <div id="vehicleInfo" class="summary" style="margin-top:9px">Выбери автобус из гаража.</div>
+    </section>
+
+    <section class="card">
+      <h2>3. Маршруты за день</h2>
+      <div class="modes">
+        <label class="choice"><input type="radio" name="mode" value="single" checked> Один маршрут за день</label>
+        <label class="choice"><input type="radio" name="mode" value="multi"> 🔗 Несколько маршрутов за день</label>
+      </div>
+      <div id="modeHint" class="note" style="margin-top:8px">Один маршрут: ТС выезжает, делает рейсы туда/обратно по связанным трассам до указанного времени и затем возвращается в парк.</div>
+      <div id="stages"></div>
+      <div class="actions"><button type="button" id="addStage" class="btn">➕ Добавить дополнительный маршрут</button></div>
+    </section>
+
+    <section class="card">
+      <h2>4. Время работы</h2>
+      <div class="grid3">
+        <label class="field">Выезд из парка<input id="depot" type="time" value="05:00"></label>
+        <label class="field">Работать до<input id="until" type="time" value="23:00"></label>
+        <label class="field">Пауза на конечной, мин.<input id="turn" type="number" min="0" value="2"></label>
+      </div>
+      <div id="globalSummary" class="summary" style="margin-top:10px">Выбери ТС и маршрут.</div>
+    </section>
+
+    <section class="card">
+      <h2>5. Предпросмотр движения</h2>
+      <div id="map" class="map"></div>
+      <div class="note small" style="margin-top:8px">Если для маршрута существует отдельная обратная запись или указана <b>pairedRouteId</b>, используется её геометрия. Разворачивать трассу вручную не нужно.</div>
+    </section>
+
+    <section class="card">
+      <h2>6. Расписание</h2>
+      <div id="schedulePreview">—</div>
+    </section>
+
+    <section class="card">
+      <div class="actions">
+        <button class="btn primary" type="submit">💾 Создать карточку ТС</button>
+        <button class="btn" type="button" id="reset">Очистить</button>
+      </div>
+      <div id="message"></div>
+    </section>
+  </form>
+
+  <section class="card cards"><h2>📋 Созданные карточки</h2><div id="cards"></div></section>
 </div>
-<div><div class="card"><h2>👀 Предпросмотр движения</h2><div id="map" class="preview"></div><div class="muted small" style="margin-top:8px">Перед сохранением здесь подсвечиваются геометрии выбранных маршрутов. Если для маршрута есть отдельная обратная трасса, она используется отдельно, а не разворачивается автоматически.</div></div><div class="card"><h2>🧾 Расписание</h2><div id="schedulePreview" class="small muted">—</div></div></div>
-</div></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const GAME_KEY='busphoto_interactive_game'; const STOPS_KEY='minsk_custom_osm_stops_v1';
-let state={balance:50000,owned:[],routes:[],serviceCards:[]}; let map=null; let layers=[];
-function load(){try{state=Object.assign(state,JSON.parse(localStorage.getItem(GAME_KEY)||'{}'))}catch(e){};if(!Array.isArray(state.owned))state.owned=[];if(!Array.isArray(state.routes))state.routes=[];if(!Array.isArray(state.serviceCards))state.serviceCards=[];renderVehicles();renderStages();renderCards();initMap()}
-function save(){localStorage.setItem(GAME_KEY,JSON.stringify(state))}
-function esc(x){return String(x??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+const GAME_KEY='busphoto_interactive_game', STOPS_KEY='minsk_custom_osm_stops_v1';
+let state={balance:50000,owned:[],routes:[],serviceCards:[]}, map=null, layers=[];
+const $=id=>document.getElementById(id);
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function mins(t){const [h,m]=String(t||'00:00').split(':').map(Number);return h*60+m}
-function tm(n){n=((n%1440)+1440)%1440;return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0')}
+function tm(n){n=((n%1440)+1440)%1440;return String(Math.floor(n/60)).padStart(2,'0')+':'+String(Math.floor(n%60)).padStart(2,'0')}
+function durText(m){m=Math.max(1,Math.round(m));return m<60?`${m} мин.`:`${Math.floor(m/60)} ч ${m%60?m%60+' мин.':''}`}
 function dayValues(v){if(v==='weekdays')return[1,2,3,4,5];if(v==='weekends')return[0,6];if(v==='all')return[0,1,2,3,4,5,6];return[Number(v)]}
-function stops(){try{const a=JSON.parse(localStorage.getItem(STOPS_KEY)||'[]');return Array.isArray(a)?a:[]}catch(e){return[]}}
-function terms(r){const all=stops();const ids=Array.isArray(r.terminalStopIds)&&r.terminalStopIds.length>=2?r.terminalStopIds:(Array.isArray(r.stopIds)?[r.stopIds[0],r.stopIds[r.stopIds.length-1]]:[]);const got=ids.map(id=>all.find(s=>String(s.id)===String(id))).filter(Boolean);return got.length>=2?got:[{id:ids[0]||'a',name:r.start||'Первая конечная'},{id:ids[ids.length-1]||'b',name:r.end||'Конечная'}]}
-function dur(r){return Math.max(1,Math.round(Number(r?.calculatedDuration||r?.outboundDuration||900)/60))}
+function stopDB(){try{const x=JSON.parse(localStorage.getItem(STOPS_KEY)||'[]');return Array.isArray(x)?x:[]}catch{return[]}}
+function terminals(r){if(!r)return[];const ids=Array.isArray(r.terminalStopIds)&&r.terminalStopIds.length>=2?r.terminalStopIds:(Array.isArray(r.stopIds)&&r.stopIds.length>=2?[r.stopIds[0],r.stopIds[r.stopIds.length-1]]:[]);const db=stopDB();const got=ids.map(id=>db.find(s=>String(s.id)===String(id))).filter(Boolean);return got.length>=2?got:[{id:ids[0]||'start',name:r.start||'Первая конечная'},{id:ids[ids.length-1]||'end',name:r.end||'Конечная'}]}
+function termName(r,id){return terminals(r).find(t=>String(t.id)===String(id))?.name||'Конечная'}
 function compatible(v,r){return !v||!r||v.category===r.routeType||(v.category==='bus'&&r.routeType==='bus')}
 function routesFor(v){return state.routes.filter(r=>compatible(v,r))}
-function renderVehicles(){const s=document.getElementById('vehicle');const old=s.value;s.innerHTML=state.owned.length?state.owned.map(v=>`<option value="${esc(v.id)}">${esc(v.category==='trolleybus'?'🚎':'🚌')} ${esc(v.model)} · ${esc(v.submodel||'')} · ${esc(v.category==='trolleybus'?'борт. №'+v.num:(v.plate||v.num||'без номера'))}</option>`).join(''):'<option value="">В гараже нет ТС</option>';if(state.owned.some(v=>String(v.id)===String(old)))s.value=old;updateVehicleInfo();renderStages()}
-function vehicle(){return state.owned.find(v=>String(v.id)===String(document.getElementById('vehicle').value))}
-function updateVehicleInfo(){const v=vehicle();document.getElementById('vehicleInfo').innerHTML=v?`<b>${esc(v.model)}</b> · ${esc(v.submodel||'Базовая модификация')}<br>Номер: <b>${esc(v.category==='trolleybus'?'борт. №'+v.num:(v.plate||v.num||'—'))}</b><br>Маршрутов в базе: ${routesFor(v).length}`:'Выбери ТС.'}
+function routeBy(id){return state.routes.find(r=>String(r.id)===String(id))}
+function reverseRoute(r){if(!r)return null;if(r.pairedRouteId){const p=routeBy(r.pairedRouteId);if(p&&p.geometry&&p.routeType===r.routeType)return p}const same=state.routes.filter(x=>String(x.id)!==String(r.id)&&x.geometry&&x.routeType===r.routeType&&String(x.start||'').trim()===String(r.end||'').trim()&&String(x.end||'').trim()===String(r.start||'').trim());return same.sort((a,b)=>{const aa=a.pairedRouteId&&String(a.pairedRouteId)===String(r.id)?0:1,bb=b.pairedRouteId&&String(b.pairedRouteId)===String(r.id)?0:1;return aa-bb})[0]||null}
+function durationFor(r,startId){const first=(r.terminalStopIds||r.stopIds||[])[0];const forward=!startId||String(startId)===String(first);const sec=forward?Number(r.outboundDuration||0):Number(r.returnDuration||0);return Math.max(1,Math.round((sec||Number(r.calculatedDuration||900))/60))}
+function transferFor(r,startId){return durationFor(r,startId)}
+function returnTransfer(r,endId){return durationFor(r,endId)}
+function load(){try{state=Object.assign(state,JSON.parse(localStorage.getItem(GAME_KEY)||'{}'))}catch{};if(!Array.isArray(state.owned))state.owned=[];if(!Array.isArray(state.routes))state.routes=[];if(!Array.isArray(state.serviceCards))state.serviceCards=[];renderVehicles();renderStages();renderCards();initMap()}
+function save(){localStorage.setItem(GAME_KEY,JSON.stringify(state))}
+function renderVehicles(){const s=$('vehicle'),old=s.value;const buses=state.owned.filter(v=>String(v.category||'').toLowerCase()!=='trolleybus'&&!String(v.type||'').toLowerCase().includes('trolley'));s.innerHTML=buses.length?buses.map(v=>`<option value="${esc(v.id)}">🚌 ${esc(v.model)} · ${esc(v.submodel||'')} · ${esc(v.plate||v.num||'без номера')}</option>`).join(''):'<option value="">В гараже нет автобусов</option>';if(buses.some(v=>String(v.id)===String(old)))s.value=old;updateVehicleInfo()}
+function vehicle(){return state.owned.find(v=>String(v.id)===String($('vehicle').value))}
+function updateVehicleInfo(){const v=vehicle();$('vehicleInfo').innerHTML=v?`<b>${esc(v.model)}</b> · ${esc(v.submodel||'Базовая модификация')}<br>Гос. номер: <b>${esc(v.plate||v.num||'—')}</b><br>Гаражный номер: <b>${esc(v.garageNumber||v.garage||'Автоматически')}</b><br>Подходящих маршрутов: <b>${routesFor(v).length}</b>`:'Выбери автобус из гаража.';renderStages()}
 function multi(){return document.querySelector('input[name=mode]:checked')?.value==='multi'}
-function addStage(data={}){const wrap=document.getElementById('stages');const i=wrap.children.length;const d=document.createElement('div');d.className='stage';d.dataset.i=i;d.innerHTML=`<button type="button" class="btn danger remove" ${i===0?'style="display:none"':''}>🗑️</button><h4>Этап ${i+1}</h4><div class="row3"><label class="field"><span>Маршрут</span><select class="route"></select></label><label class="field"><span>С какой конечной</span><select class="from"></select></label><label class="field"><span>До какой конечной</span><select class="to"></select></label></div><div class="row3" style="margin-top:8px"><label class="field"><span>Отправление с конечной</span><input class="start" type="time" readonly></label><label class="field"><span>Время до конечной</span><input class="duration" readonly value="—"></label><label class="field"><span>Прибытие</span><input class="arrival" type="time" readonly></label></div><div class="muted small stageNote" style="margin-top:7px"></div>`;wrap.appendChild(d);d.querySelector('.remove').onclick=()=>{d.remove();renumber();recalc()};d.querySelector('.route').onchange=()=>{fillStops(d);recalc()};d.querySelector('.from').onchange=recalc;d.querySelector('.to').onchange=recalc;fillRoutes(d,data.routeId);fillStops(d,data.startStopId,data.endStopId);recalc();}
-function renumber(){[...document.querySelectorAll('.stage')].forEach((d,i)=>{d.querySelector('h4').textContent=`Этап ${i+1}`;d.querySelector('.remove').style.display=i?'':'none'})}
-function fillRoutes(d,selected){const v=vehicle();const rs=routesFor(v);const s=d.querySelector('.route');s.innerHTML=rs.length?rs.map(r=>`<option value="${esc(r.id)}">№${esc(r.number)} — ${esc(r.start||'—')} → ${esc(r.end||'—')}</option>`).join(''):'<option value="">Нет совместимых маршрутов</option>';if(selected&&rs.some(r=>String(r.id)===String(selected)))s.value=selected}
-function fillStops(d,a,b){const r=state.routes.find(x=>String(x.id)===String(d.querySelector('.route').value));const ts=terms(r);for(const [cls,val] of [['from',a],['to',b]]){const s=d.querySelector('.'+cls);s.innerHTML=ts.map(t=>`<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('');if(val&&ts.some(t=>String(t.id)===String(val)))s.value=val}if(same(d.querySelector('.from').value,d.querySelector('.to').value)&&ts[1])d.querySelector('.to').value=ts[1].id}
-function same(a,b){return String(a)===String(b)}
-function recalc(){const depot=mins(document.getElementById('depot').value);const until0=mins(document.getElementById('until').value);let until=until0;if(until<depot)until+=1440;let cursor=depot;const rows=[];[...document.querySelectorAll('.stage')].forEach((d,i)=>{const r=state.routes.find(x=>String(x.id)===String(d.querySelector('.route').value));if(!r)return;const t=terms(r);const startId=d.querySelector('.from').value;const forward=!startId||String(startId)===String((r.terminalStopIds||r.stopIds||[])[0]);const duration=forward?Math.max(1,Math.round(Number(r.outboundDuration||r.calculatedDuration||900)/60)):Math.max(1,Math.round(Number(r.returnDuration||r.calculatedDuration||900)/60));let start= i===0?Math.max(cursor+1,depot+1):Math.max(cursor+Math.max(1,Number(document.getElementById('turn').value||2)),cursor);if(i===0)start=Math.max(depot+1,start);const arrival=start+duration;cursor=arrival;d.querySelector('.start').value=tm(start);d.querySelector('.duration').value=duration>=60?`${Math.floor(duration/60)} ч ${duration%60?duration%60+' мин':''}`:`${duration} мин`;d.querySelector('.arrival').value=tm(arrival);d.querySelector('.stageNote').innerHTML=`${i?'После прибытия предыдущего этапа: ': 'Парк → '} <b>${esc(t.find(x=>String(x.id)===String(startId))?.name||r.start||'—')}</b> → <b>${esc(t.find(x=>String(x.id)===String(d.querySelector('.to').value))?.name||r.end||'—')}</b> · ${duration} мин`;rows.push({r,start,arrival,duration});});let ret=cursor+Math.max(1,Math.round(Number(document.getElementById('turn').value||2)));document.getElementById('summary').innerHTML=rows.length?`🏠 Выезд из парка <b>${esc(document.getElementById('depot').value)}</b> → ${rows.map(x=>`№${esc(x.r.number)} ${tm(x.start)}–${tm(x.arrival)}`).join(' → ')} → 🏠 заезд в парк примерно <b>${tm(ret)}</b>`:'Выбери маршрут.';document.getElementById('schedulePreview').innerHTML=rows.length?`<table class="schedule-table"><tr><th>Этап</th><th>Маршрут</th><th>Отправление</th><th>Прибытие</th><th>В пути</th></tr>${rows.map((x,i)=>`<tr><td>${i+1}</td><td>№${esc(x.r.number)}</td><td>${tm(x.start)}</td><td>${tm(x.arrival)}</td><td>${x.duration} мин</td></tr>`).join('')}</table><p>Заезд в парк: <b>${tm(ret)}</b></p>`:'—';drawPreview()}
-function selectedRoutes(){return [...document.querySelectorAll('.stage')].map(d=>state.routes.find(r=>String(r.id)===String(d.querySelector('.route').value))).filter(Boolean)}
-function initMap(){map=L.map('map',{scrollWheelZoom:true}).setView([53.9,27.56],8);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);drawPreview()}
-function geomPoints(g){if(!Array.isArray(g))return[];if(g.type==='LineString')return g.coordinates.map(p=>[p[1],p[0]]);if(Array.isArray(g[0])&&typeof g[0][0]==='number')return g.map(p=>[p[0],p[1]]);return[]}
-function drawPreview(){if(!map)return;layers.forEach(x=>x.remove());layers=[];let all=[];selectedRoutes().forEach((r,i)=>{const g=r.geometry||r.outboundGeometry;const pts=geomPoints(g);if(pts.length>1){const l=L.polyline(pts,{weight:7,opacity:.85}).addTo(map);layers.push(l);all.push(...pts)}else if(r.startLat&&r.startLng&&r.endLat&&r.endLng){const l=L.polyline([[r.startLat,r.startLng],[r.endLat,r.endLng]],{weight:5,opacity:.6}).addTo(map);layers.push(l);all.push([r.startLat,r.startLng],[r.endLat,r.endLng])}});if(all.length)map.fitBounds(L.latLngBounds(all).pad(.12))}
-function renderCards(){const el=document.getElementById('cards');const cs=state.serviceCards||[];if(!cs.length){el.innerHTML='<div class="muted">Карточек пока нет.</div>';return}el.innerHTML=cs.map(c=>{const v=state.owned.find(x=>String(x.id)===String(c.vehicleId));const rs=(c.schedules||[]).map(s=>state.routes.find(r=>String(r.id)===String(s.routeId))).filter(Boolean);return `<div class="stage"><b>🗓️ ${esc(v?.model||'ТС')}</b> · ${esc(v?.category==='trolleybus'?'борт. №'+v.num:(v?.plate||'—'))}<br><span class="muted">${rs.map(r=>'№'+esc(r.number)).join(' → ')}</span><br><span class="muted">Дни: ${esc(c.dayGroup||'all')} · ${c.active===false?'остановлена':'активна'}</span><div class="actions" style="margin-top:7px"><button class="btn secondary" onclick="toggleCard('${esc(c.id)}')">${c.active===false?'▶ Запустить':'⏸ Остановить'}</button><button class="btn danger" onclick="deleteCard('${esc(c.id)}')">Удалить</button></div></div>`}).join('')}
-function toggleCard(id){const c=(state.serviceCards||[]).find(x=>String(x.id)===String(id));if(!c)return;c.active=c.active===false;save();renderCards()}
-function deleteCard(id){state.serviceCards=(state.serviceCards||[]).filter(x=>String(x.id)!==String(id));save();renderCards()}
-document.getElementById('vehicle').onchange=()=>{updateVehicleInfo();renderStages()};document.querySelectorAll('input[name=mode]').forEach(x=>x.onchange=()=>{document.getElementById('addStage').style.display=multi()?'inline-block':'none';document.getElementById('modeHint').textContent=multi()?'Каждая строка — последовательный этап. Например №562 → №270S → №562.':'Один маршрут выполняется по расписанию смены.';recalc()});document.getElementById('addStage').onclick=()=>{addStage();renumber();recalc()};document.getElementById('depot').onchange=recalc;document.getElementById('until').onchange=recalc;document.getElementById('turn').oninput=recalc;document.getElementById('preview').onclick=()=>{drawPreview();document.getElementById('map').scrollIntoView({behavior:'smooth',block:'center'})};document.getElementById('reset').onclick=()=>{document.getElementById('stages').innerHTML='';document.getElementById('cardForm').reset();addStage();renumber();recalc()};document.getElementById('cardForm').onsubmit=e=>{e.preventDefault();const v=vehicle();const rs=[...document.querySelectorAll('.stage')].map(d=>{const r=state.routes.find(x=>String(x.id)===String(d.querySelector('.route').value));return {routeId:r?.id,startStopId:d.querySelector('.from').value,endStopId:d.querySelector('.to').value,startTime:d.querySelector('.start').value,depotTime:document.getElementById('depot').value,workUntil:document.getElementById('until').value,autoFinish:true,lastArrivalTime:d.querySelector('.arrival').value,returnTime:tm(mins(d.querySelector('.arrival').value)+Number(document.getElementById('turn').value||2)),estimatedTrips:1,sequenceOrder:0,turnaroundMinutes:Number(document.getElementById('turn').value||2)};});if(!v)return alert('Выбери ТС.');if(!rs.length||rs.some(x=>!x.routeId))return alert('Выбери маршрут.');rs.forEach((x,i)=>x.sequenceOrder=i);const days=document.querySelector('input[name=days]:checked').value;const card={id:'dep-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),vehicleId:v.id,routeId:rs[0].routeId,multiRouteMode:multi(),dayGroup:days,createdAt:new Date().toISOString(),active:true,lastArrivalCount:0,lastArrivalStamp:'',lastSimulationAt:new Date().toISOString(),schedules:rs.map(x=>({...x,days:dayValues(days)}))};state.serviceCards=Array.isArray(state.serviceCards)?state.serviceCards:[];state.serviceCards=Array.isArray(state.serviceCards)?state.serviceCards:[];state.serviceCards.push(card);save();alert('Карточка создана. ТС теперь использует расписание карточки и будет отображаться на карте по выбранному маршруту.');renderCards();drawPreview()};
-function renderStages(){document.getElementById('stages').innerHTML='';addStage();if(multi())addStage();document.getElementById('addStage').style.display=multi()?'inline-block':'none';recalc()}
+function addStage(data={}){const wrap=$('stages'),i=wrap.children.length;const d=document.createElement('div');d.className='stage';d.dataset.index=i;d.innerHTML=`<div class="stage-head"><h3>Этап ${i+1}</h3><button type="button" class="btn danger remove" ${i===0?'style="display:none"':''}>🗑️ Удалить</button></div><div class="grid3"><label class="field">Маршрут<select class="route"></select></label><label class="field">С какой конечной<select class="from"></select></label><label class="field">До какой конечной<select class="to"></select></label></div><div class="grid3" style="margin-top:9px"><label class="field">Ехать обратно?<select class="back"><option value="yes">Да</option><option value="no">Нет</option></select></label><label class="field round-box">Количество кругов<input class="rounds" type="number" min="1" max="50" value="2"></label><div class="field"><span>Время до конечной</span><input class="duration" readonly value="—"></div></div><div class="grid3" style="margin-top:9px"><label class="field">Авто: отправление с конечной<input class="start" type="time" readonly></label><label class="field">Последнее прибытие<input class="arrival" type="time" readonly></label><label class="field">Заезд в парк<input class="return" type="time" readonly></label></div><div class="stage-summary"></div>`;wrap.appendChild(d);d.querySelector('.remove').onclick=()=>{d.remove();renumber();recalc()};d.querySelector('.route').onchange=()=>{fillStops(d);recalc()};d.querySelector('.from').onchange=()=>{recalc()};d.querySelector('.to').onchange=()=>{recalc()};d.querySelector('.back').onchange=()=>{d.querySelector('.round-box').classList.toggle('show',multi()&&d.querySelector('.back').value==='yes');recalc()};d.querySelector('.rounds').oninput=recalc;fillRoutes(d,data.routeId);fillStops(d,data.startStopId,data.endStopId);recalc()}
+function renumber(){[...document.querySelectorAll('.stage')].forEach((d,i)=>{d.querySelector('h3').textContent=`Этап ${i+1}`;d.querySelector('.remove').style.display=i?'':'none';d.dataset.index=i})}
+function fillRoutes(d,selected){const rs=routesFor(vehicle()),s=d.querySelector('.route'),cur=selected||s.value;s.innerHTML=rs.length?rs.map(r=>`<option value="${esc(r.id)}">№${esc(r.number)} — ${esc(r.start||'—')} → ${esc(r.end||'—')}</option>`).join(''):'<option value="">Нет подходящих маршрутов</option>';if(cur&&rs.some(r=>String(r.id)===String(cur)))s.value=cur}
+function fillStops(d,a,b){const r=routeBy(d.querySelector('.route').value),ts=terminals(r);for(const [cl,val] of [['from',a],['to',b]]){const s=d.querySelector('.'+cl);s.innerHTML=ts.map(t=>`<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('');if(val&&ts.some(t=>String(t.id)===String(val)))s.value=val}if(!s.querySelector('option[selected]')&&s.value===d.querySelector('.from').value&&ts[1])d.querySelector('.to').value=ts[1].id;d.querySelector('.round-box').classList.toggle('show',multi()&&d.querySelector('.back').value==='yes')}
+function stageCalc(d,i,cursor){const r=routeBy(d.querySelector('.route').value);if(!r)return null;const from=d.querySelector('.from').value,to=d.querySelector('.to').value;const forwardDur=durationFor(r,from),reverse=reverseRoute(r),backDur=reverse?durationFor(reverse,from===((r.terminalStopIds||r.stopIds||[])[0])?to:from):durationFor(r,to);const turn=Math.max(0,Number($('turn').value||2));let start=i===0?mins($('depot').value)+transferFor(r,from):cursor+turn;const until0=mins($('until').value);let until=until0;if(until<mins($('depot').value))until+=1440;let legs=[];let current=start;const back=d.querySelector('.back').value==='yes';const rounds=Math.max(1,Number(d.querySelector('.rounds').value||2));if(!multi()){const target=d.querySelector('.to').value;let count=0;while(current+forwardDur<=until&&count<200){const dir=count%2===0;const dd=dir?durationFor(r,from):durationFor(reverse||r,to);if(current+dd>until)break;legs.push({route:dir?r:(reverse||r),from:dir?from:to,to:dir?to:from,start:current,arrival:current+dd,dir});current+=dd+turn;count++;if((target===from&&count%2===0)||(target===to&&count%2===1)){} }if(legs.length){current=legs[legs.length-1].arrival}else current=start+forwardDur}else{for(let n=0;n<(back?rounds*2:1);n++){const dd=n%2===0?forwardDur:durationFor(reverse||r,to);if(current+dd>until)break;legs.push({route:n%2===0?r:(reverse||r),from:n%2===0?from:to,to:n%2===0?to:from,start:current,arrival:current+dd,dir:n%2===0});current+=dd+turn}}const last=legs.length?legs[legs.length-1].arrival:start;const park=last+returnTransfer(r,to);return {r,from,to,start,legs,last,park,duration:forwardDur,rounds:legs.length,reverse,until}}
+function recalc(){let cursor=mins($('depot').value),rows=[];const ds=[...document.querySelectorAll('.stage')];ds.forEach((d,i)=>{const c=stageCalc(d,i,cursor);if(!c)return;rows.push(c);cursor=c.last+(i<ds.length-1?0:0);const s=d.querySelector('.start');const a=d.querySelector('.arrival');const ret=d.querySelector('.return');s.value=tm(c.start);a.value=tm(c.last);ret.value=tm(c.park);d.querySelector('.duration').value=durText(c.duration);d.querySelector('.stage-summary').innerHTML=`<b>№${esc(c.r.number)}</b>: ${esc(termName(c.r,c.from))} → ${esc(termName(c.r,c.to))} · ${c.legs.length} рейс(а/этапа) · последняя конечная ${esc(termName(c.r,c.legs.length?c.legs[c.legs.length-1].to:c.to))} · заезд в парк ${tm(c.park)}${c.reverse?' · 🔗 обратная трасса найдена':''}`;});const last=rows[rows.length-1];$('globalSummary').innerHTML=rows.length?`🏠 Выезд из парка <b>${esc($('depot').value)}</b> → ${rows.map(x=>`№${esc(x.r.number)} ${tm(x.start)}–${tm(x.last)}`).join(' → ')} → 🏠 парк <b>${tm(last.park)}</b>`:'Выбери ТС и маршрут.';renderSchedule(rows);drawPreview(rows)}
+function renderSchedule(rows){if(!rows.length){$('schedulePreview').innerHTML='—';return}let html='<table class="schedule"><tr><th>Этап</th><th>Маршрут</th><th>Отправление</th><th>Прибытие</th><th>Рейс</th><th>Трасса</th></tr>';rows.forEach((x,i)=>x.legs.forEach((l,j)=>{html+=`<tr><td>${i+1}</td><td>№${esc(l.route.number)}</td><td>${tm(l.start)}</td><td>${tm(l.arrival)}</td><td>${j+1}</td><td>${esc(termName(l.route,l.from))} → ${esc(termName(l.route,l.to))}</td></tr>`;}));html+='</table>'; $('schedulePreview').innerHTML=html}
+function geom(g){if(!g)return[];if(g.type==='LineString')return g.coordinates.map(p=>[p[1],p[0]]);if(Array.isArray(g)&&Array.isArray(g[0]))return g.map(p=>Array.isArray(p)&&p.length>=2?[p[0],p[1]]:null).filter(Boolean);return[]}
+function drawPreview(rows){if(!map)return;layers.forEach(l=>l.remove());layers=[];let all=[];(rows||[]).forEach(x=>x.legs.forEach(l=>{const pts=geom(l.route.geometry||l.route.outboundGeometry);if(pts.length>1){const line=L.polyline(pts,{weight:6,opacity:.8}).addTo(map);layers.push(line);all.push(...pts)}}));if(all.length)map.fitBounds(L.latLngBounds(all).pad(.12))}
+function initMap(){map=L.map('map',{scrollWheelZoom:true}).setView([53.9,27.56],8);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);drawPreview([])}
+function collect(){const days=document.querySelector('input[name=days]:checked').value;const out=[];const rows=[...document.querySelectorAll('.stage')];let cursor=mins($('depot').value);rows.forEach((d,i)=>{const c=stageCalc(d,i,cursor);const r=c?.r;if(!r)return;const daysArr=dayValues(days);const intermediate=i<rows.length-1;const base={routeId:r.id,startStopId:d.querySelector('.from').value,endStopId:d.querySelector('.to').value,depotTime:intermediate&&i>0?tm(c.start):i===0?$('depot').value:tm(c.start),startTime:tm(c.start),autoFinish:intermediate?false:true,workUntil:intermediate?tm(c.last):$('until').value,endTime:tm(c.last),lastArrivalTime:tm(c.last),returnTime:intermediate?tm(c.last):tm(c.park),estimatedTrips:Math.max(1,c.legs.length),sequenceMode:multi(),sequenceOrder:i,turnaroundMinutes:Number($('turn').value||2),dayGroup:days,startStopName:termName(r,d.querySelector('.from').value),endStopName:termName(r,d.querySelector('.to').value),returnToStart:d.querySelector('.back').value==='yes',rounds:Math.max(1,Number(d.querySelector('.rounds').value||2))};daysArr.forEach(day=>out.push({...base,days:[day]}));cursor=c.last});return out}
+function renderCards(){const el=$('cards'),cs=state.serviceCards||[];if(!cs.length){el.innerHTML='<div class="muted">Карточек пока нет.</div>';return}el.innerHTML=cs.map(c=>{const v=state.owned.find(x=>String(x.id)===String(c.vehicleId));const ss=c.schedules||[];const nums=[...new Set(ss.map(s=>routeBy(s.routeId)?.number).filter(Boolean))];return `<div class="saved"><b>🚌 ${esc(v?.model||'ТС')} · ${esc(v?.plate||v?.num||'—')}</b><br>Маршруты: <b>${nums.map(esc).join(' → ')||'—'}</b><br>Дни: ${esc(c.dayGroup||'all')} · ${c.multiRouteMode?'несколько этапов':'один маршрут'} · ${c.active===false?'⏸ остановлена':'🟢 активна'}<div class="actions"><button class="btn" onclick="toggleCard('${esc(c.id)}')">${c.active===false?'▶ Запустить':'⏸ Остановить'}</button><button class="btn danger" onclick="deleteCard('${esc(c.id)}')">🗑️ Удалить</button></div></div>`}).join('')}
+function toggleCard(id){const c=state.serviceCards.find(x=>String(x.id)===String(id));if(!c)return;c.active=c.active===false;save();renderCards()}
+function deleteCard(id){state.serviceCards=state.serviceCards.filter(x=>String(x.id)!==String(id));save();renderCards()}
+function reset(){ $('cardForm').reset();$('stages').innerHTML='';addStage();renumber();recalc();$('message').textContent=''}
+$('vehicle').onchange=()=>{updateVehicleInfo()};document.querySelectorAll('input[name=mode]').forEach(r=>r.onchange=()=>{const m=multi();$('addStage').style.display=m?'block':'none';$('modeHint').textContent=m?'Несколько этапов идут последовательно. Для каждого этапа можно выбрать, возвращаться ли обратно и сколько полных кругов выполнить. Связанный маршрут определяется автоматически.':'Один маршрут работает до указанного времени. ТС чередует прямую и обратную трассу, а затем едет в парк.';renderStages()});$('addStage').onclick=()=>{addStage();renumber();recalc()};$('depot').onchange=recalc;$('until').onchange=recalc;$('turn').oninput=recalc;$('reset').onclick=reset;$('cardForm').onsubmit=e=>{e.preventDefault();const v=vehicle();if(!v)return showMsg('Сначала выбери ТС.','error');const schedules=collect();if(!schedules.length)return showMsg('Выбери хотя бы один маршрут.','error');const card={id:'dep-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),vehicleId:v.id,routeId:schedules[0].routeId,multiRouteMode:multi(),dayGroup:document.querySelector('input[name=days]:checked').value,createdAt:new Date().toISOString(),lastArrivalCount:0,lastArrivalStamp:'',lastSimulationAt:new Date().toISOString(),active:true,schedules};state.serviceCards.unshift(card);save();renderCards();showMsg('Карточка создана и сохранена. Теперь интерактив сможет использовать её для движения ТС.','ok')};function showMsg(t,c){$('message').className=c;$('message').textContent=t}
+function renderStages(){const old=[...document.querySelectorAll('.stage')].map(d=>({routeId:d.querySelector('.route')?.value,from:d.querySelector('.from')?.value,to:d.querySelector('.to')?.value,back:d.querySelector('.back')?.value,rounds:d.querySelector('.rounds')?.value}));$('stages').innerHTML='';addStage(old[0]||{});if(multi()){for(let i=1;i<old.length||i<2;i++)addStage(old[i]||{})}renumber();$('addStage').style.display=multi()?'block':'none';recalc()}
 load();
 </script>
-
-<style id="v35-single-route-shift">
-/* v35: полноценная смена для одного маршрута */
-.single-route-shift-box{
-  margin-top:12px;
-  padding:12px;
-  border:1px solid rgba(127,127,127,.28);
-  border-radius:12px;
-  background:rgba(127,127,127,.05);
-}
-.single-route-shift-box .shift-grid{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:10px;
-}
-.single-route-shift-box label{
-  min-width:0;
-}
-.single-route-shift-box input,
-.single-route-shift-box select{
-  width:100%;
-  max-width:100%;
-  box-sizing:border-box;
-}
-@media(max-width:600px){
-  .single-route-shift-box .shift-grid{grid-template-columns:1fr}
-}
-</style>
-<script>
-/* v35 — режим «1 маршрут за день» */
-document.addEventListener('DOMContentLoaded', function(){
-  const form=document.getElementById('departureCardForm');
-  if(!form) return;
-
-  let box=document.getElementById('singleRouteShiftBox');
-  if(!box){
-    box=document.createElement('div');
-    box.id='singleRouteShiftBox';
-    box.className='single-route-shift-box';
-    box.innerHTML=`
-      <h3 style="margin-top:0">🚌 Смена: один маршрут за день</h3>
-      <div class="shift-grid">
-        <label>
-          <b>Выезд из парка</b>
-          <input id="singleShiftParkDeparture" type="time" value="05:00">
-        </label>
-        <label>
-          <b>Работать до</b>
-          <input id="singleShiftWorkUntil" type="time" value="23:00">
-        </label>
-      </div>
-      <div style="margin-top:10px" class="interactive-muted">
-        После выбора маршрута ТС работает на нём до указанного времени.
-        Если у маршрута есть привязанное обратное направление, оно используется для обратного рейса.
-        После окончания смены ТС возвращается в парк.
-      </div>`;
-    form.appendChild(box);
-  }
-
-  const single=document.getElementById('departureSingleRouteMode');
-  if(single) single.checked=true;
-
-  window.getSingleRouteShiftData=function(){
-    return {
-      parkDeparture: document.getElementById('singleShiftParkDeparture')?.value || '05:00',
-      workUntil: document.getElementById('singleShiftWorkUntil')?.value || '23:00'
-    };
-  };
-});
-</script>
-
-
-<style id="v36-multi-cards-per-vehicle">
-.multi-card-note{
-  margin-top:10px;padding:10px;border-radius:10px;
-  border:1px solid rgba(127,127,127,.28);
-  background:rgba(127,127,127,.05);
-}
-</style>
-<script>
-/* v36: несколько независимых карточек на одно ТС */
-document.addEventListener('DOMContentLoaded', function(){
-  const form=document.getElementById('departureCardForm');
-  if(!form) return;
-  const vehicle=document.getElementById('departureVehicle');
-  if(vehicle){
-    let note=document.getElementById('multiCardVehicleNote');
-    if(!note){
-      note=document.createElement('div');
-      note.id='multiCardVehicleNote';
-      note.className='multi-card-note';
-      note.innerHTML='<b>ℹ️ Одно ТС может иметь несколько карточек.</b><br>Например: утром — карточка №1, днём — карточка №2, вечером — карточка №3. Они сохраняются отдельно и могут иметь разные дни, маршруты и время.';
-      vehicle.parentNode.insertBefore(note, vehicle.nextSibling);
-    }
-  }
-});
-</script>
-
-<style id="v37-pdf-card-ui">
-/* v37: требования PDF — одна карточка может содержать несколько последовательных маршрутов */
-.pdf-requirements-note{margin-top:10px;padding:10px;border-radius:10px;border:1px solid rgba(127,127,127,.28);background:rgba(127,127,127,.05);line-height:1.45}
-</style>
-<script>
-document.addEventListener('DOMContentLoaded',function(){
-  const stage=document.getElementById('stages');
-  if(stage && !document.getElementById('pdfRequirementsNote')){
-    const n=document.createElement('div'); n.id='pdfRequirementsNote'; n.className='pdf-requirements-note';
-    n.innerHTML='<b>Схема карточки:</b> дни работы → ТС → один или несколько маршрутов за день → просмотр движения на карте → создание карточки.';
-    stage.parentNode.insertBefore(n,stage);
-  }
-});
-</script>
-
-<style id="v38-route-link-rounds">
-.v38box{margin-top:14px;padding:14px;border:1px solid #bbb;border-radius:12px}
-.v38row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
-.v38row select,.v38row input{width:100%;box-sizing:border-box}
-.v38rounds{display:none;margin-top:8px}.v38rounds.show{display:block}
-@media(max-width:600px){.v38row{grid-template-columns:1fr}}
-</style>
-<script>
-(function(){
-function routes(){return window.routes||window.ROUTES||window.appRoutes||JSON.parse(localStorage.getItem('routes')||'[]')}
-function id(r){return String(r?.id??r?.number??r?.name??'')}
-function ends(r){return [r?.start,r?.from,r?.firstStop,r?.origin,r?.end,r?.to,r?.lastStop,r?.destination].filter(Boolean).map(String)}
-function linked(r,terminal){
- const t=String(terminal).toLowerCase();
- return routes().find(x=>id(x)!=id(r)&&ends(x).some(e=>e.toLowerCase()===t))||null
-}
-function addStage(){
- const host=document.getElementById('v38Stages'), n=host.children.length+1;
- const row=document.createElement('div'); row.className='v38row';
- row.innerHTML='<label><b>Маршрут '+n+'</b><select class="v38route"><option value="">Выбрать маршрут…</option></select></label><label><b>Конечная</b><select class="v38end"><option value="">Выберите маршрут</option></select><div class="v38rounds"><b>Количество кругов</b><input class="v38count" type="number" min="2" value="2"></div></label>';
- host.appendChild(row);
- const rs=row.querySelector('.v38route'), es=row.querySelector('.v38end'), rr=row.querySelector('.v38rounds');
- routes().forEach(r=>{let o=document.createElement('option');o.value=id(r);o.textContent=id(r);rs.appendChild(o)});
- rs.onchange=()=>{
-   const r=routes().find(x=>id(x)===rs.value); es.innerHTML='';
-   [...new Set(ends(r))].forEach(e=>{let o=document.createElement('option');o.value=e;o.textContent=e;es.appendChild(o)});
-   check()
- };
- es.onchange=check;
- function check(){
-   const r=routes().find(x=>id(x)===rs.value), l=linked(r,es.value);
-   rr.classList.toggle('show',!!l);
-   if(l){let x=document.createElement('small');x.className='v38linked';x.textContent='Связанный маршрут: '+id(l); es.parentElement.querySelector('.v38linked')?.remove();es.parentElement.appendChild(x)}
- }
-}
-function init(){
- if(document.getElementById('v38box')) return;
- const anchor=document.querySelector('#routeSelect,select[name="route"],select[id*="route" i]');
- if(!anchor) return;
- const box=document.createElement('section');box.id='v38box';box.className='v38box';
- box.innerHTML='<h3>🔗 Связность маршрутов</h3><div>Выберите конечную — связанный маршрут определяется автоматически.</div><div id="v38Stages"></div><button type="button" id="v38add">➕ Добавить маршрут</button>';
- anchor.parentElement.after(box); document.getElementById('v38add').onclick=addStage; addStage();
-}
-window.collectV38Stages=()=>[...document.querySelectorAll('.v38row')].map(r=>({routeId:r.querySelector('.v38route')?.value||'',terminal:r.querySelector('.v38end')?.value||'',rounds:Math.max(2,+r.querySelector('.v38count')?.value||2)})).filter(x=>x.routeId);
-document.readyState==='loading'?document.addEventListener('DOMContentLoaded',()=>setTimeout(init,100)):setTimeout(init,100);
-})();
-</script>
-
-<style id="v40-clickability">
-#v39DriverCard, #v39DriverCard *{pointer-events:auto}
-#v39DriverCard select,#v39DriverCard input,#v39DriverCard button{
-  position:relative;z-index:20;cursor:pointer;
-  pointer-events:auto;
-}
-#v39DriverCard select{min-height:42px}
-#v39DriverCard button{min-height:42px}
-.v39-click-help{margin-top:8px;font-size:.9em;opacity:.72}
-</style>
-<script id="v40-clickability-js">
-(function(){
-  const $=id=>document.getElementById(id);
-
-  function readKeys(keys){
-    for(const k of keys){
-      try{
-        const raw=localStorage.getItem(k);
-        if(!raw) continue;
-        const x=JSON.parse(raw);
-        if(Array.isArray(x)) return x;
-        if(x && typeof x==='object') return Object.values(x);
-      }catch(e){}
-    }
-    return [];
-  }
-
-  function routeSource(){
-    try{
-      const game=JSON.parse(localStorage.getItem('busphoto_interactive_game')||'{}');
-      if(Array.isArray(game.routes) && game.routes.length) return game.routes;
-    }catch(e){}
-    const globals=[
-      window.routes,window.ROUTES,window.appRoutes,window.busRoutes,
-      window.routeDatabase,window.routesDB,window.allRoutes
-    ];
-    for(const x of globals) if(Array.isArray(x)&&x.length) return x;
-    return readKeys([
-      "routes","busphoto_routes","appRoutes","routeDatabase",
-      "routeDatabaseData","transportRoutes","savedRoutes"
-    ]);
-  }
-
-  function vehicleSource(){
-    try{
-      const game=JSON.parse(localStorage.getItem('busphoto_interactive_game')||'{}');
-      if(Array.isArray(game.owned) && game.owned.length) return game.owned;
-    }catch(e){}
-    const globals=[
-      window.vehicles,window.garage,window.ownedVehicles,
-      window.ownedTS,window.tsList,window.transportVehicles
-    ];
-    for(const x of globals) if(Array.isArray(x)&&x.length) return x;
-    return readKeys([
-      "vehicles","garage","ownedVehicles","ownedTS","tsList",
-      "transportVehicles","myVehicles"
-    ]);
-  }
-
-  const rid=r=>String(r?.id??r?.routeId??r?.number??r?.routeNumber??r?.name??"");
-  const rname=r=>String(r?.number??r?.routeNumber??r?.name??r?.id??"");
-  const endpoints=r=>{
-    const a=r?.start??r?.from??r?.firstStop??r?.origin??r?.firstTerminal??"";
-    const b=r?.end??r?.to??r?.lastStop??r?.destination??r?.lastTerminal??"";
-    return [...new Set([String(a||""),String(b||"")].filter(Boolean))];
-  };
-
-  function fillSelect(select, items, placeholder, valueFn, textFn){
-    if(!select) return;
-    const current=select.value;
-    select.innerHTML="";
-    const first=document.createElement("option");
-    first.value=""; first.textContent=placeholder; first.disabled=false;
-    select.appendChild(first);
-    for(const item of items){
-      const o=document.createElement("option");
-      o.value=valueFn(item);
-      o.textContent=textFn(item);
-      select.appendChild(o);
-    }
-    if([...select.options].some(o=>o.value===current)) select.value=current;
-  }
-
-  function syncRoutes(){
-    const rs=$("v39Route"), routes=routeSource();
-    if(!rs) return;
-    fillSelect(rs,routes,"Выберите маршрут",rid,rname);
-    if(!rs.dataset.v40bound){
-      rs.dataset.v40bound="1";
-      rs.addEventListener("change",updateRoute,true);
-      rs.addEventListener("input",updateRoute,true);
-    }
-    updateRoute();
-  }
-
-  function syncVehicles(){
-    const bs=$("v39Bus"), vehicles=vehicleSource();
-    if(!bs) return;
-    const filtered=vehicles.filter(v=>{
-      const t=String(v?.type??v?.category??v?.kind??"").toLowerCase();
-      return !(t.includes("трол")||t.includes("trolley"));
-    });
-    fillSelect(
-      bs,filtered,"Выберите автобус из гаража",
-      v=>String(v?.id??v?.uid??v?.garageNumber??v?.boardNumber??v?.number??""),
-      v=>String(v?.model??v?.name??v?.brand??v?.title??("Автобус "+(v?.garageNumber??v?.number??"")))
-    );
-    if(!bs.dataset.v40bound){
-      bs.dataset.v40bound="1";
-      bs.addEventListener("change",updateVehicle,true);
-      bs.addEventListener("input",updateVehicle,true);
-    }
-    updateVehicle();
-  }
-
-  function updateRoute(){
-    const routes=routeSource(), rs=$("v39Route");
-    const r=routes.find(x=>rid(x)===String(rs?.value||""));
-    const ends=endpoints(r||{});
-    ["v39Start","v39End"].forEach((id,i)=>{
-      const s=$(id); if(!s) return;
-      fillSelect(s,ends,"Выберите конечную",x=>x,x=>x);
-    });
-    if($("v39RouteNumber")) $("v39RouteNumber").value=r?rname(r):"";
-    const stops=Array.isArray(r?.stops)?r.stops:[];
-    const host=$("v39Stops");
-    if(host){
-      host.innerHTML="";
-      (stops.length?stops:ends).forEach((st,i)=>{
-        const name=typeof st==="object"?(st.name??st.title??st.id??"Остановка "+(i+1)):st;
-        const d=document.createElement("div");
-        d.className="v39-field";
-        d.innerHTML="<label>Остановка "+(i+1)+"</label><input readonly>";
-        d.querySelector("input").value=String(name);
-        host.appendChild(d);
-      });
-    }
-    if($("v39AutoInfo")){
-      $("v39AutoInfo").textContent=r
-        ?"Маршрут выбран. Связанные направления и примерное расписание готовы для построения."
-        :"Выберите маршрут.";
-    }
-    if(typeof window.v39UpdateTimes==="function") window.v39UpdateTimes();
-  }
-
-  function updateVehicle(){
-    const bs=vehicleSource(), b=bs.find(v=>String(v?.id??v?.uid??v?.garageNumber??v?.boardNumber??v?.number??"")===String($("v39Bus")?.value||""));
-    if(!b) return;
-    if($("v39State")) $("v39State").value=String(b.stateNumber??b.govNumber??b.plate??b.gos??"");
-    if($("v39Garage")) $("v39Garage").value=String(b.garageNumber??b.boardNumber??b.board??b.number??"");
-  }
-
-  function makeAllButtonsClickable(){
-    document.querySelectorAll("#v39DriverCard button").forEach(b=>{
-      b.disabled=false;
-      b.style.pointerEvents="auto";
-    });
-  }
-
-  function initV40(){
-    syncRoutes();
-    syncVehicles();
-    makeAllButtonsClickable();
-  }
-
-  window.v40RefreshDriverCard=initV40;
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",()=>setTimeout(initV40,100));
-  }else{
-    setTimeout(initV40,100);
-  }
-  window.addEventListener("storage",initV40);
-})();
-</script>
-
 </body></html>

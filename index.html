@@ -41,6 +41,7 @@ if (window.caches) {
 <div class="action-buttons">
 <button class="btn-secondary" onclick="openEditSelectionModal()" style="background:#1e3f66; border-color:#1e3f66;">✏️ Править ТС</button>
 <button class="btn-secondary" onclick="openDeleteModal()" style="background:#8b0000; border-color:#8b0000;">🗑 Удалить ТС</button>
+<button class="btn-secondary" onclick="openPhotoUploadModal()" style="background:#1e3f66; border-color:#1e3f66;">📷 Загрузить фото</button>
 <button class="btn-secondary" onclick="exportDatabase()">💾 Экспорт БД</button>
 <button class="btn-secondary" onclick="document.getElementById('importFile').click()">📂 Импорт БД</button>
 <input accept=".json" id="importFile" onchange="importDatabase(event)" style="display:none" type="file"/>
@@ -73,6 +74,7 @@ if (window.caches) {
 <th id="th-decomm">Списан</th>
 <th id="th-util">Утилизирован</th>
 <th id="th-note">Примечание</th>
+<th>Вид ТС</th>
 </tr>
 </thead>
 <tbody id="tableBody"></tbody>
@@ -100,7 +102,25 @@ if (window.caches) {
 <label><span id="lbl-num">Гос. или бортовой номер</span>: <input id="searchNumQuery" placeholder="например, 23145" style="width:100%; padding:5px; background:var(--bp-input-bg); color:var(--bp-text); border:1px solid var(--bp-border);" type="text"/></label>
 <button id="btn-find" onclick="executeGlobalSearch()" style="background:#28a745; color:#fff; border:none; padding:8px; cursor:pointer; font-weight:bold;">Найти в базе</button>
 </div>
-</div></div><div class="modal-overlay" id="vehicleModal">
+</div></div><div class="modal-overlay" id="photoUploadModal">
+<div class="modal-card" style="max-width: 620px; background:#fff; color:#111;">
+<span class="modal-close" onclick="closePhotoUploadModal()">×</span>
+<div class="vehicle-title" style="color:#111;">📷 Загрузить фото ТС</div>
+<div class="vehicle-subtitle" style="color:#333;">Фотография сохраняется только для выбранного ТС из базы данных.</div>
+<label style="display:block; margin:12px 0 6px; color:#111; font-weight:bold;">Выберите ТС</label>
+<select id="photoVehicleSelect" style="width:100%; box-sizing:border-box; padding:10px; background:#fff; color:#111; border:1px solid #888; border-radius:6px;"></select>
+<label style="display:block; margin:12px 0 6px; color:#111; font-weight:bold;">Фотография</label>
+<input id="photoFileInput" type="file" accept="image/*" onchange="previewVehiclePhoto(event)" style="width:100%; box-sizing:border-box; color:#111; background:#fff;">
+<div id="photoPreviewWrap" style="display:none; margin-top:12px; text-align:center;">
+<img id="photoPreview" alt="Предпросмотр" style="max-width:100%; max-height:320px; object-fit:contain; border:1px solid #bbb; border-radius:8px; background:#eee;">
+</div>
+<div style="display:flex; gap:8px; margin-top:14px;">
+<button class="btn-primary" type="button" onclick="saveVehiclePhoto()" style="flex:1;">💾 Сохранить</button>
+<button class="btn-secondary" type="button" onclick="removeVehiclePhoto()" style="flex:1; background:#8b0000; border-color:#8b0000;">🗑 Удалить фото</button>
+</div>
+<div id="photoUploadStatus" style="margin-top:10px; color:#333;"></div>
+</div>
+</div><div class="modal-overlay" id="vehicleModal">
 <div class="modal-card" style="max-width: 650px;">
 <span class="modal-close" onclick="closeVehicleModal()">×</span>
 <div class="vehicle-title" id="vmTitle">Карточка ТС</div>

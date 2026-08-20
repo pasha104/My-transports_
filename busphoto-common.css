@@ -620,3 +620,10 @@ header > div:first-child { min-width: 0; }
   .table-container { overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .modal-card { width:calc(100% - 16px); box-sizing:border-box; }
 }
+
+/* Вид конкретного ТС и загрузка фото — только раздел База данных */
+#photoUploadModal .modal-card, .vehicle-view { color: var(--bp-text); }
+@media(max-width:700px){
+  #photoUploadModal .modal-card{width:calc(100% - 14px)!important;max-height:92vh;overflow:auto;}
+  #photoUploadModal .modal-card input[type=file]{font-size:12px;}
+}
