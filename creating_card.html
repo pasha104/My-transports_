@@ -84,7 +84,7 @@
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const GAME_KEY='busphoto_interactive_game', STOPS_KEY='minsk_custom_osm_stops_v1';
+const GAME_KEY='busphoto_interactive_game', CARDS_KEY='busphoto_service_cards_v1', STOPS_KEY='minsk_custom_osm_stops_v1';
 let state={balance:50000,owned:[],routes:[],serviceCards:[]}, map=null, layers=[];
 const $=id=>document.getElementById(id);
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -102,8 +102,36 @@ function reverseRoute(r){if(!r)return null;if(r.pairedRouteId){const p=routeBy(r
 function durationFor(r,startId){const first=(r.terminalStopIds||r.stopIds||[])[0];const forward=!startId||String(startId)===String(first);const sec=forward?Number(r.outboundDuration||0):Number(r.returnDuration||0);return Math.max(1,Math.round((sec||Number(r.calculatedDuration||900))/60))}
 function transferFor(r,startId){return durationFor(r,startId)}
 function returnTransfer(r,endId){return durationFor(r,endId)}
-function load(){try{state=Object.assign(state,JSON.parse(localStorage.getItem(GAME_KEY)||'{}'))}catch{};if(!Array.isArray(state.owned))state.owned=[];if(!Array.isArray(state.routes))state.routes=[];if(!Array.isArray(state.serviceCards))state.serviceCards=[];renderVehicles();renderStages();renderCards();initMap()}
-function save(){localStorage.setItem(GAME_KEY,JSON.stringify(state))}
+function load(){
+  try{state=Object.assign(state,JSON.parse(localStorage.getItem(GAME_KEY)||'{}'))}catch{}
+  if(!Array.isArray(state.owned))state.owned=[];
+  if(!Array.isArray(state.routes))state.routes=[];
+  if(!Array.isArray(state.serviceCards))state.serviceCards=[];
+  // Карточки хранятся отдельным ключом, чтобы интерактив/другие страницы
+  // не могли случайно перезаписать их устаревшим gameState.
+  try{
+    const savedCards=JSON.parse(localStorage.getItem(CARDS_KEY)||'null');
+    if(Array.isArray(savedCards)) state.serviceCards=savedCards;
+  }catch{}
+  renderVehicles();renderStages();renderCards();initMap()
+}
+function save(){
+  localStorage.setItem(GAME_KEY,JSON.stringify(state));
+  localStorage.setItem(CARDS_KEY,JSON.stringify(state.serviceCards||[]));
+}
+function loadCardsFromStorage(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(CARDS_KEY)||'null');
+    if(Array.isArray(saved)){
+      state.serviceCards=saved;
+      renderCards();
+    }
+  }catch{}
+}
+window.addEventListener('storage',e=>{
+  if(e.key===CARDS_KEY){loadCardsFromStorage();}
+  if(e.key===GAME_KEY){load();}
+});
 function renderVehicles(){const s=$('vehicle'),old=s.value;const buses=state.owned.filter(v=>String(v.category||'').toLowerCase()!=='trolleybus'&&!String(v.type||'').toLowerCase().includes('trolley'));s.innerHTML=buses.length?buses.map(v=>`<option value="${esc(v.id)}">🚌 ${esc(v.model)} · ${esc(v.submodel||'')} · ${esc(v.plate||v.num||'без номера')}</option>`).join(''):'<option value="">В гараже нет автобусов</option>';if(buses.some(v=>String(v.id)===String(old)))s.value=old;updateVehicleInfo()}
 function vehicle(){return state.owned.find(v=>String(v.id)===String($('vehicle').value))}
 function updateVehicleInfo(){const v=vehicle();$('vehicleInfo').innerHTML=v?`<b>${esc(v.model)}</b> · ${esc(v.submodel||'Базовая модификация')}<br>Гос. номер: <b>${esc(v.plate||v.num||'—')}</b><br>Гаражный номер: <b>${esc(v.garageNumber||v.garage||'Автоматически')}</b><br>Подходящих маршрутов: <b>${routesFor(v).length}</b>`:'Выбери автобус из гаража.';renderStages()}
@@ -123,7 +151,7 @@ function renderCards(){const el=$('cards'),cs=state.serviceCards||[];if(!cs.leng
 function toggleCard(id){const c=state.serviceCards.find(x=>String(x.id)===String(id));if(!c)return;c.active=c.active===false;save();renderCards()}
 function deleteCard(id){state.serviceCards=state.serviceCards.filter(x=>String(x.id)!==String(id));save();renderCards()}
 function reset(){ $('cardForm').reset();$('stages').innerHTML='';addStage();renumber();recalc();$('message').textContent=''}
-$('vehicle').onchange=()=>{updateVehicleInfo()};document.querySelectorAll('input[name=mode]').forEach(r=>r.onchange=()=>{const m=multi();$('addStage').style.display=m?'block':'none';$('modeHint').textContent=m?'Несколько этапов идут последовательно. Для каждого этапа можно выбрать, возвращаться ли обратно и сколько полных кругов выполнить. Связанный маршрут определяется автоматически.':'Один маршрут работает до указанного времени. ТС чередует прямую и обратную трассу, а затем едет в парк.';renderStages()});$('addStage').onclick=()=>{addStage();renumber();recalc()};$('depot').onchange=recalc;$('until').onchange=recalc;$('turn').oninput=recalc;$('reset').onclick=reset;$('cardForm').onsubmit=e=>{e.preventDefault();const v=vehicle();if(!v)return showMsg('Сначала выбери ТС.','error');const schedules=collect();if(!schedules.length)return showMsg('Выбери хотя бы один маршрут.','error');const card={id:'dep-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),vehicleId:v.id,routeId:schedules[0].routeId,multiRouteMode:multi(),dayGroup:document.querySelector('input[name=days]:checked').value,createdAt:new Date().toISOString(),lastArrivalCount:0,lastArrivalStamp:'',lastSimulationAt:new Date().toISOString(),active:true,schedules};state.serviceCards.unshift(card);save();renderCards();showMsg('Карточка создана и сохранена. Теперь интерактив сможет использовать её для движения ТС.','ok')};function showMsg(t,c){$('message').className=c;$('message').textContent=t}
+$('vehicle').onchange=()=>{updateVehicleInfo()};document.querySelectorAll('input[name=mode]').forEach(r=>r.onchange=()=>{const m=multi();$('addStage').style.display=m?'block':'none';$('modeHint').textContent=m?'Несколько этапов идут последовательно. Для каждого этапа можно выбрать, возвращаться ли обратно и сколько полных кругов выполнить. Связанный маршрут определяется автоматически.':'Один маршрут работает до указанного времени. ТС чередует прямую и обратную трассу, а затем едет в парк.';renderStages()});$('addStage').onclick=()=>{addStage();renumber();recalc()};$('depot').onchange=recalc;$('until').onchange=recalc;$('turn').oninput=recalc;$('reset').onclick=reset;$('cardForm').onsubmit=e=>{e.preventDefault();const v=vehicle();if(!v)return showMsg('Сначала выбери ТС.','error');const schedules=collect();if(!schedules.length)return showMsg('Выбери хотя бы один маршрут.','error');const card={id:'dep-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),vehicleId:v.id,routeId:schedules[0].routeId,multiRouteMode:multi(),dayGroup:document.querySelector('input[name=days]:checked').value,createdAt:new Date().toISOString(),lastArrivalCount:0,lastArrivalStamp:'',lastSimulationAt:new Date().toISOString(),active:true,schedules};state.serviceCards.unshift(card);save();localStorage.setItem(CARDS_KEY,JSON.stringify(state.serviceCards));renderCards();showMsg('Карточка создана и сохранена. Теперь интерактив сможет использовать её для движения ТС.','ok')};function showMsg(t,c){$('message').className=c;$('message').textContent=t}
 function renderStages(){const old=[...document.querySelectorAll('.stage')].map(d=>({routeId:d.querySelector('.route')?.value,from:d.querySelector('.from')?.value,to:d.querySelector('.to')?.value,back:d.querySelector('.back')?.value,rounds:d.querySelector('.rounds')?.value}));$('stages').innerHTML='';addStage(old[0]||{});if(multi()){for(let i=1;i<old.length||i<2;i++)addStage(old[i]||{})}renumber();$('addStage').style.display=multi()?'block':'none';recalc()}
 load();
 </script>

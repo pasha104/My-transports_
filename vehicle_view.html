@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="busphoto-common.css?v=20260820-v41">
+<link rel="stylesheet" href="busphoto-common.css?v=20260820-v43">
 <title>BUSPHOTO — Вид ТС</title>
 <style>
 .vehicle-view{max-width:900px;margin:0 auto;background:var(--bp-card-bg);border:1px solid var(--bp-border);border-radius:10px;padding:16px;box-sizing:border-box}
@@ -14,7 +14,7 @@
 .view-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.view-actions button,.view-actions a{flex:1;min-width:180px;text-align:center;box-sizing:border-box}
 @media(max-width:700px){.vehicle-view{padding:10px}.info-grid{grid-template-columns:1fr}.view-actions{display:grid;grid-template-columns:1fr}.view-actions button,.view-actions a{min-width:0;width:100%}}
 </style>
-<script src="busphoto-common.js?v=20260820-v41" defer></script>
+<script src="busphoto-common.js?v=20260820-v43" defer></script>
 </head>
 <body class="light-theme">
 <header><div><span class="logo-box">BUSPHOTO</span><span id="header-subtitle" style="font-size:15px;font-weight:bold;margin-left:8px;">База данных ПС</span></div><div class="header-controls"><select aria-label="Язык" class="theme-toggle-btn language-select" id="headerLangSelect" onchange="changeLanguage(this.value)"><option value="ru">Русский</option><option value="be">Беларуская</option><option value="uk">Українська</option><option value="en">English</option><option value="de">Deutsch</option><option value="zh">中文</option></select><button class="theme-toggle-btn" onclick="toggleTheme()">🌓 Сменить тему</button><div style="font-size:11px;color:#c8e6c9;">ТС в базе: <b id="dbCount">0</b></div></div></header>

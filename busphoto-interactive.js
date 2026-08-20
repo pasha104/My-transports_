@@ -180,6 +180,7 @@
         }
 
         function loadGameState() {
+            const CARDS_KEY = 'busphoto_service_cards_v1';
             try {
                 const saved = localStorage.getItem('busphoto_interactive_game');
                 if (saved) gameState = Object.assign(gameState, JSON.parse(saved));
@@ -222,6 +223,13 @@
             });
             if (!Array.isArray(gameState.log)) gameState.log = [];
             if (!Array.isArray(gameState.serviceCards)) gameState.serviceCards = [];
+            // Карточки имеют отдельное постоянное хранилище. Если оно есть,
+            // оно является источником истины для карточек, чтобы переходы
+            // между creating_card.html и interactive.html не теряли их.
+            try {
+                const savedCards = JSON.parse(localStorage.getItem(CARDS_KEY) || 'null');
+                if (Array.isArray(savedCards)) gameState.serviceCards = savedCards;
+            } catch (e) {}
             if (!gameState.emailNotifications || typeof gameState.emailNotifications !== 'object') {
                 gameState.emailNotifications = {enabled:false, email:'', notifiedVehicleIds:[], lastCheckAt:null};
             } else {
@@ -255,6 +263,7 @@
                 card.routeId = card.routeId ?? card.schedules[0]?.routeId ?? null;
             });
             saveGameState();
+            try { localStorage.setItem(CARDS_KEY, JSON.stringify(gameState.serviceCards || [])); } catch (e) {}
             if (typeof gameState.balance !== 'number' || Number.isNaN(gameState.balance)) {
                 gameState.balance = 50000;
             }
@@ -265,7 +274,20 @@
 
         function saveGameState() {
             localStorage.setItem('busphoto_interactive_game', JSON.stringify(gameState));
+            try { localStorage.setItem('busphoto_service_cards_v1', JSON.stringify(gameState.serviceCards || [])); } catch (e) {}
         }
+
+        window.addEventListener('storage', function(e) {
+            if (e.key !== 'busphoto_service_cards_v1') return;
+            try {
+                const cards = JSON.parse(e.newValue || '[]');
+                if (Array.isArray(cards)) {
+                    gameState.serviceCards = cards;
+                    if (typeof renderDepartureCards === 'function') renderDepartureCards();
+                    if (typeof updateMapBusMarkers === 'function') updateMapBusMarkers(true);
+                }
+            } catch (err) {}
+        });
 
         function startNewGame() {
             const confirmed = confirm(
@@ -973,7 +995,7 @@
                         <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px;font-size:10px;">
                             <span>🎨 Цвет:</span>
                             <input type="color" value="${routeColor(route)}" onchange="changeRouteColor('${route.id}', this.value)" style="width:42px;height:24px;padding:1px;">
-                            <button class="btn-secondary" onclick="openRouteOnMap('${route.id}')">🗺️ Открыть на карте</button> <button class="btn-secondary" onclick="showRouteVehicles('${route.id}')">🚍 ТС на маршруте</button>
+                            <button class="btn-secondary" onclick="openRouteOnMap('${route.id}')">🗺️ Открыть на карте</button> <button class="btn-secondary" onclick="showRouteVehicles('${route.id}')">🚍 ТС на маршруте</button> <button class="btn-secondary" onclick="showRouteDetails('${route.id}')">ℹ️ Подробнее</button>
                         </div>
                         <div class="route-direction-panel">
                             <div>
@@ -2080,6 +2102,14 @@ out body;
                 if(arrivals.length){
                     arrivals.forEach(a=>{
                         total+=100;
+                        // v43: статистика и состояние ТС обновляются при каждом прибытии.
+                        vehicle.stats = vehicle.stats || {trips:0, arrivals:0, distanceKm:0, workMinutes:0, earned:0};
+                        vehicle.stats.trips = Number(vehicle.stats.trips||0) + 1;
+                        vehicle.stats.arrivals = Number(vehicle.stats.arrivals||0) + 1;
+                        vehicle.stats.distanceKm = Number(vehicle.stats.distanceKm||0) + Number(a.route.calculatedDistance||0)/1000;
+                        vehicle.stats.earned = Number(vehicle.stats.earned||0) + 100;
+                        vehicle.health = Math.max(0, Number(vehicle.health ?? 100) - 0.15);
+                        if (vehicle.health <= 20 && !vehicle.maintenanceDue) vehicle.maintenanceDue = true;
                         const t=new Date(a.ts).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
                         const detail=`🕐 ${t} · ТС ${vehicle.model||'—'} · маршрут №${a.route.number||'—'} · прибытие на конечную · +100 р.`;
                         gameState.log=gameState.log||[];
@@ -3161,4 +3191,113 @@ out body;
    const a=load(); const c={cardId:'card_'+Date.now()+'_'+Math.random().toString(36).slice(2,8),vehicleId:String(d.vehicleId||''),days:d.days||['all'],mode:d.mode||'single',routeId:d.routeId||'',routeStages:d.routeStages||[],endTerminal:d.endTerminal||'',parkDeparture:d.parkDeparture||'05:00',workUntil:d.workUntil||'23:00',createdAt:Date.now()};
    a.push(c);localStorage.setItem(K,JSON.stringify(a));return c;
  };
+})();
+
+
+/* ==================== v43: диспетчерская, статистика, обслуживание ==================== */
+(function(){
+  const MAINT_KEY='busphoto_maintenance_v43';
+  function maintenance(){
+    try{return JSON.parse(localStorage.getItem(MAINT_KEY)||'{}')}catch(e){return{}}
+  }
+  function saveMaint(x){localStorage.setItem(MAINT_KEY,JSON.stringify(x))}
+  function ensureVehicleStats(v){
+    v.stats=v.stats||{trips:0,arrivals:0,distanceKm:0,workMinutes:0,earned:0};
+    if(!Number.isFinite(Number(v.health))) v.health=100;
+    if(v.maintenanceDue==null) v.maintenanceDue=false;
+    return v;
+  }
+  window.ensureVehicleStatsV43=ensureVehicleStats;
+
+  window.renderDispatcherV43=function(){
+    const el=document.getElementById('dispatcherPanel'); if(!el)return;
+    const now=new Date();
+    const rows=gameState.owned.map(v=>{
+      ensureVehicleStats(v);
+      const sim=getVehicleSimulationPoint(v);
+      const active=getActiveServiceRouteAndSchedule(v.id,now);
+      const route=active?.route||sim.route||getVehicleRoute(v.id);
+      let status='🏠 В парке';
+      if(v.maintenanceDue) status='🔧 Требуется обслуживание';
+      else if(sim.point||active?.route) status='🟢 В рейсе';
+      const next=active?.absolute?.return ? new Date(active.absolute.return).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) : '—';
+      return `<div class="interactive-log-row">
+        <div><b>${vehicleCategoryIcon(v.category)} ${escapeHtml(v.model)}</b>
+        <br><span class="interactive-muted">${escapeHtml(v.plate||v.num||'без номера')} · ${route?'№'+escapeHtml(route.number):'маршрут не назначен'}</span>
+        <br><span>${status}${sim.phase?' · '+escapeHtml(sim.phase):''}</span></div>
+        <div><b>Следующий:</b> ${next}<br><button class="btn-secondary" onclick="focusVehicleV43('${v.id}')">🛰️ Следить</button></div>
+      </div>`;
+    }).join('');
+    el.innerHTML=rows||'<div class="interactive-muted">ТС нет.</div>';
+  };
+
+  window.focusVehicleV43=function(id){
+    const btn=[...document.querySelectorAll('.game-menu-btn')].find(x=String(x.getAttribute('onclick')||'').includes("'tracker'"));
+    showGameSection('tracker',btn);
+    const sel=document.getElementById('trackerVehicle');
+    if(sel){sel.value=id;sel.dispatchEvent(new Event('change'));}
+  };
+
+  window.renderVehicleStatsV43=function(){
+    const el=document.getElementById('vehicleStatsPanel'); if(!el)return;
+    const total=gameState.owned.reduce((a,v)=>a+Number(v.stats?.earned||0),0);
+    el.innerHTML=`<div class="interactive-stats" style="margin:0 0 10px">
+      <div class="interactive-stat"><div class="interactive-stat-label">ТС</div><div class="interactive-stat-value">${gameState.owned.length}</div></div>
+      <div class="interactive-stat"><div class="interactive-stat-label">Заработано ТС</div><div class="interactive-stat-value">${money(total)}</div></div>
+    </div>`+
+    gameState.owned.map(v=>{
+      ensureVehicleStats(v); const st=v.stats;
+      return `<div class="interactive-log-row"><div><b>${vehicleCategoryIcon(v.category)} ${escapeHtml(v.model)}</b><br><span class="interactive-muted">${escapeHtml(v.plate||v.num||'—')}</span></div>
+      <div style="text-align:right">Рейсов: <b>${st.trips}</b><br>Конечных: <b>${st.arrivals}</b><br>Пробег: <b>${st.distanceKm.toFixed(1)} км</b><br>Заработано: <b>${money(st.earned)}</b></div></div>`;
+    }).join('')||'<div class="interactive-muted">Нет ТС.</div>';
+  };
+
+  window.renderMaintenanceV43=function(){
+    const el=document.getElementById('maintenancePanel'); if(!el)return;
+    el.innerHTML=gameState.owned.map(v=>{
+      ensureVehicleStats(v);
+      const health=Number(v.health).toFixed(0);
+      const due=v.maintenanceDue;
+      return `<div class="interactive-log-row"><div><b>${vehicleCategoryIcon(v.category)} ${escapeHtml(v.model)}</b><br>
+        <span class="interactive-muted">${escapeHtml(v.plate||v.num||'—')}</span><br>
+        Состояние: <b>${health}%</b> ${due?'⚠️ Требуется обслуживание':''}</div>
+        <div><button class="btn-primary" onclick="serviceVehicleV43('${v.id}')">🔧 Обслужить</button></div></div>`;
+    }).join('')||'<div class="interactive-muted">Нет ТС.</div>';
+  };
+
+  window.serviceVehicleV43=function(id){
+    const v=gameState.owned.find(x=>String(x.id)===String(id)); if(!v)return;
+    ensureVehicleStats(v); v.health=100; v.maintenanceDue=false;
+    v.maintenanceCount=Number(v.maintenanceCount||0)+1;
+    const m=maintenance();m[id]={last:new Date().toISOString(),count:v.maintenanceCount};saveMaint(m);
+    gameState.log.unshift({date:localDateKey(new Date()),time:new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),type:'maintenance',total:0,details:[`🔧 ${v.model} · обслуживание выполнено · состояние 100%`]});
+    saveGameState();renderMaintenanceV43();renderVehicleStatsV43();renderDispatcherV43();
+  };
+
+  window.showRouteDetails=function(id){
+    const r=gameState.routes.find(x=>String(x.id)===String(id));if(!r)return;
+    const ids=Array.isArray(r.vehicleIds)?r.vehicleIds:[];
+    const vehicles=gameState.owned.filter(v=>ids.some(x=>String(x)===String(v.id)));
+    alert(`Маршрут №${r.number}\\n\\n${r.start||'—'} → ${r.end||'—'}\\nРасстояние: ${r.calculatedDistance?((r.calculatedDistance/1000).toFixed(2)+' км'):'не рассчитано'}\\nВремя: ${r.calculatedDuration?formatDuration(r.calculatedDuration):'не рассчитано'}\\n\\nТС на маршруте: ${vehicles.length?vehicles.map(v=>v.model+' '+(v.plate||v.num||'')).join(', '):'нет'}\\n\\nОбратное направление: ${r.pairedRouteId?'связано':'не связано'}`);
+  };
+
+  // More detailed stop/region loading remains lazy: existing region selector is reused.
+  window.renderV43Panels=function(){
+    renderDispatcherV43();renderVehicleStatsV43();renderMaintenanceV43();
+  };
+
+  // Hook into section switching without replacing the existing function.
+  const oldShow=window.showGameSection;
+  window.showGameSection=function(section,btn){
+    oldShow(section,btn);
+    if(section==='dispatch'||section==='stats'||section==='maintenance') setTimeout(renderV43Panels,30);
+  };
+
+  // Keep state fields initialized.
+  const oldLoad=window.loadGameState;
+  if(typeof oldLoad==='function'){
+    window.loadGameState=function(){oldLoad();gameState.owned.forEach(ensureVehicleStats);saveGameState();}
+  }
+
+  setInterval(()=>{ if(typeof gameState!=='undefined' && Array.isArray(gameState.owned)){gameState.owned.forEach(ensureVehicleStats); if(document.getElementById('game-section-dispatch')?.classList.contains('active'))renderDispatcherV43();}},5000);
 })();
