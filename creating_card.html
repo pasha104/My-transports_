@@ -171,18 +171,7 @@ html, body {
       <div class="v39-field"><label>Рейсов во 2-й части</label><input id="v39Trips2" type="number" min="0" value="0"></div>
       <div class="v39-field"><label>Всего рейсов</label><input id="v39TripsTotal" type="number" readonly></div>
     </div>
-  </div>
-
-  <div class="v39-section">
-    <h3>☕ Разрыв</h3>
-    <div class="v39-break">
-      <div class="v39-field"><label>С</label><input id="v39BreakFrom" type="time"></div>
-      <div class="v39-field"><label>По</label><input id="v39BreakTo" type="time"></div>
-      <div class="v39-field"><label>Станция / пункт</label><input id="v39BreakPoint" placeholder="Укажите пункт"></div>
-    </div>
-  </div>
-
-  <div class="v39-section">
+  </div><div class="v39-section">
     <h3>🚌 Путевой лист / учёт работы</h3>
     <div class="v39-grid3">
       <div class="v39-field"><label>Марка автобуса</label><select id="v39Bus"><option value="">Выберите автобус из гаража</option></select></div>
@@ -201,24 +190,7 @@ html, body {
       <div class="v39-field"><label>Водитель / Таб. №</label><input id="v39Driver" placeholder="ФИО водителя / табельный номер"></div>
       <div class="v39-field"><label>Кондуктор / Таб. №</label><input id="v39Conductor" placeholder="ФИО кондуктора / табельный номер"></div>
     </div>
-  </div>
-
-  <div class="v39-section">
-    <h3>⛽ Движение ТСМ</h3>
-    <div class="v39-grid3">
-      <div class="v39-field"><label>Остаток при выезде, л</label><input id="v39FuelOut" type="number" min="0" step="0.1"></div>
-      <div class="v39-field"><label>Заправка на линии, л</label><input id="v39FuelRefuel" type="number" min="0" step="0.1"></div>
-      <div class="v39-field"><label>Остаток при возврате, л</label><input id="v39FuelIn" type="number" min="0" step="0.1"></div>
-      <div class="v39-field"><label>Расход, л</label><input id="v39FuelSpent" type="number" readonly></div>
-    </div>
-  </div>
-
-  <div class="v39-actions">
-    <button type="button" id="v39Create">✅ Создать карточку водителя</button>
-    <button type="button" id="v39Preview">🗺️ Предпросмотр движения</button>
-  </div>
-  <div id="v39Error" class="v39-error"></div>
-</section>
+  </div></section>
 
 <script id="v39-driver-card-js">
 (function(){
@@ -319,8 +291,7 @@ html, body {
   $('v39Bus').addEventListener('change',updateBus);
   $('v39Route').addEventListener('change',updateRoute);
   ['v39ParkOut','v39ParkIn'].forEach(id=>$(id).addEventListener('change',updateTimes));
-  ['v39FuelOut','v39FuelRefuel','v39FuelIn'].forEach(id=>$(id).addEventListener('input',updateFuel));
-  $('v39Create').addEventListener('click',create);
+$('v39Create').addEventListener('click',create);
   $('v39Preview').addEventListener('click',function(){
     const r=selectedRoute();
     if(r && typeof window.previewRouteOnMap==='function') window.previewRouteOnMap(r);
@@ -543,4 +514,172 @@ window.collectV38Stages=()=>[...document.querySelectorAll('.v38row')].map(r=>({r
 document.readyState==='loading'?document.addEventListener('DOMContentLoaded',()=>setTimeout(init,100)):setTimeout(init,100);
 })();
 </script>
+
+<style id="v40-clickability">
+#v39DriverCard, #v39DriverCard *{pointer-events:auto}
+#v39DriverCard select,#v39DriverCard input,#v39DriverCard button{
+  position:relative;z-index:20;cursor:pointer;
+  pointer-events:auto;
+}
+#v39DriverCard select{min-height:42px}
+#v39DriverCard button{min-height:42px}
+.v39-click-help{margin-top:8px;font-size:.9em;opacity:.72}
+</style>
+<script id="v40-clickability-js">
+(function(){
+  const $=id=>document.getElementById(id);
+
+  function readKeys(keys){
+    for(const k of keys){
+      try{
+        const raw=localStorage.getItem(k);
+        if(!raw) continue;
+        const x=JSON.parse(raw);
+        if(Array.isArray(x)) return x;
+        if(x && typeof x==='object') return Object.values(x);
+      }catch(e){}
+    }
+    return [];
+  }
+
+  function routeSource(){
+    const globals=[
+      window.routes,window.ROUTES,window.appRoutes,window.busRoutes,
+      window.routeDatabase,window.routesDB,window.allRoutes
+    ];
+    for(const x of globals) if(Array.isArray(x)&&x.length) return x;
+    return readKeys([
+      "routes","busphoto_routes","appRoutes","routeDatabase",
+      "routeDatabaseData","transportRoutes","savedRoutes"
+    ]);
+  }
+
+  function vehicleSource(){
+    const globals=[
+      window.vehicles,window.garage,window.ownedVehicles,
+      window.ownedTS,window.tsList,window.transportVehicles
+    ];
+    for(const x of globals) if(Array.isArray(x)&&x.length) return x;
+    return readKeys([
+      "vehicles","garage","ownedVehicles","ownedTS","tsList",
+      "transportVehicles","myVehicles"
+    ]);
+  }
+
+  const rid=r=>String(r?.id??r?.routeId??r?.number??r?.routeNumber??r?.name??"");
+  const rname=r=>String(r?.number??r?.routeNumber??r?.name??r?.id??"");
+  const endpoints=r=>{
+    const a=r?.start??r?.from??r?.firstStop??r?.origin??r?.firstTerminal??"";
+    const b=r?.end??r?.to??r?.lastStop??r?.destination??r?.lastTerminal??"";
+    return [...new Set([String(a||""),String(b||"")].filter(Boolean))];
+  };
+
+  function fillSelect(select, items, placeholder, valueFn, textFn){
+    if(!select) return;
+    const current=select.value;
+    select.innerHTML="";
+    const first=document.createElement("option");
+    first.value=""; first.textContent=placeholder; first.=false;
+    select.appendChild(first);
+    for(const item of items){
+      const o=document.createElement("option");
+      o.value=valueFn(item);
+      o.textContent=textFn(item);
+      select.appendChild(o);
+    }
+    if([...select.options].some(o=>o.value===current)) select.value=current;
+  }
+
+  function syncRoutes(){
+    const rs=$("v39Route"), routes=routeSource();
+    if(!rs) return;
+    fillSelect(rs,routes,"Выберите маршрут",rid,rname);
+    if(!rs.dataset.v40bound){
+      rs.dataset.v40bound="1";
+      rs.addEventListener("change",updateRoute,true);
+      rs.addEventListener("input",updateRoute,true);
+    }
+    updateRoute();
+  }
+
+  function syncVehicles(){
+    const bs=$("v39Bus"), vehicles=vehicleSource();
+    if(!bs) return;
+    const filtered=vehicles.filter(v=>{
+      const t=String(v?.type??v?.category??v?.kind??"").toLowerCase();
+      return !(t.includes("трол")||t.includes("trolley"));
+    });
+    fillSelect(
+      bs,filtered,"Выберите автобус из гаража",
+      v=>String(v?.id??v?.uid??v?.garageNumber??v?.boardNumber??v?.number??""),
+      v=>String(v?.model??v?.name??v?.brand??v?.title??("Автобус "+(v?.garageNumber??v?.number??"")))
+    );
+    if(!bs.dataset.v40bound){
+      bs.dataset.v40bound="1";
+      bs.addEventListener("change",updateVehicle,true);
+      bs.addEventListener("input",updateVehicle,true);
+    }
+    updateVehicle();
+  }
+
+  function updateRoute(){
+    const routes=routeSource(), rs=$("v39Route");
+    const r=routes.find(x=>rid(x)===String(rs?.value||""));
+    const ends=endpoints(r||{});
+    ["v39Start","v39End"].forEach((id,i)=>{
+      const s=$(id); if(!s) return;
+      fillSelect(s,ends,"Выберите конечную",x=>x,x=>x);
+    });
+    if($("v39RouteNumber")) $("v39RouteNumber").value=r?rname(r):"";
+    const stops=Array.isArray(r?.stops)?r.stops:[];
+    const host=$("v39Stops");
+    if(host){
+      host.innerHTML="";
+      (stops.length?stops:ends).forEach((st,i)=>{
+        const name=typeof st==="object"?(st.name??st.title??st.id??"Остановка "+(i+1)):st;
+        const d=document.createElement("div");
+        d.className="v39-field";
+        d.innerHTML="<label>Остановка "+(i+1)+"</label><input readonly>";
+        d.querySelector("input").value=String(name);
+        host.appendChild(d);
+      });
+    }
+    if($("v39AutoInfo")){
+      $("v39AutoInfo").textContent=r
+        ?"Маршрут выбран. Связанные направления и примерное расписание готовы для построения."
+        :"Выберите маршрут.";
+    }
+    if(typeof window.v39UpdateTimes==="function") window.v39UpdateTimes();
+  }
+
+  function updateVehicle(){
+    const bs=vehicleSource(), b=bs.find(v=>String(v?.id??v?.uid??v?.garageNumber??v?.boardNumber??v?.number??"")===String($("v39Bus")?.value||""));
+    if(!b) return;
+    if($("v39State")) $("v39State").value=String(b.stateNumber??b.govNumber??b.plate??b.gos??"");
+    if($("v39Garage")) $("v39Garage").value=String(b.garageNumber??b.boardNumber??b.board??b.number??"");
+  }
+
+  function makeAllButtonsClickable(){
+    document.querySelectorAll("#v39DriverCard button").forEach(b=>{
+      b.=false;
+      b.style.pointerEvents="auto";
+    });
+  }
+
+  function initV40(){
+    syncRoutes();
+    syncVehicles();
+    makeAllButtonsClickable();
+  }
+
+  window.v40RefreshDriverCard=initV40;
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",()=>setTimeout(initV40,100));
+  }else{
+    setTimeout(initV40,100);
+  }
+  window.addEventListener("storage",initV40);
+})();
+</script>
+
 </body></html>
