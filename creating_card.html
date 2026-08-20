@@ -108,6 +108,228 @@ html, body {
 
 </head>
 <body>
+
+<style id="v39-driver-card">
+.v39-driver-card{max-width:1100px;margin:18px auto;padding:18px;border:1px solid #bbb;border-radius:16px;background:var(--card-bg,#fff);box-sizing:border-box}
+.v39-driver-card h2{margin:0 0 6px}
+.v39-driver-card .sub{opacity:.72;margin-bottom:16px}
+.v39-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.v39-grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.v39-field{min-width:0}
+.v39-field label{display:block;font-weight:700;margin-bottom:5px}
+.v39-field input,.v39-field select,.v39-field textarea{width:100%;max-width:100%;box-sizing:border-box;padding:9px;border:1px solid #aaa;border-radius:9px;background:inherit}
+.v39-section{margin-top:16px;padding-top:14px;border-top:1px solid #ccc}
+.v39-stops{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.v39-time-row{display:grid;grid-template-columns:repeat(9,minmax(70px,1fr));gap:7px;overflow-x:auto;padding-bottom:5px}
+.v39-break{display:grid;grid-template-columns:1fr 1fr 1.5fr;gap:10px}
+.v39-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+.v39-note{padding:10px;border-radius:10px;background:rgba(80,130,190,.08);margin-top:10px}
+.v39-error{color:#b00020;margin-top:8px}
+@media(max-width:700px){
+ .v39-grid,.v39-grid3,.v39-break{grid-template-columns:1fr}
+ .v39-stops{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .v39-driver-card{margin:8px;padding:12px}
+}
+</style>
+
+<section class="v39-driver-card" id="v39DriverCard">
+  <h2>🚌 Карточка водителя и маршрутное расписание</h2>
+  <div class="sub">Карточка создаётся без отдельной «смены». После выбора автобуса и маршрута расписание строится автоматически.</div>
+
+  <div class="v39-grid3">
+    <div class="v39-field"><label>Маршрут №</label><select id="v39Route"><option value="">Выберите маршрут</option></select></div>
+    <div class="v39-field"><label>Карт №</label><input id="v39CardNo" placeholder="Автоматически"></div>
+    <div class="v39-field"><label>Дни работы</label><select id="v39Days"><option value="weekdays">Будни</option><option value="weekends">Выходные</option><option value="all">Все дни</option><option value="mon">Понедельник</option><option value="tue">Вторник</option><option value="wed">Среда</option><option value="thu">Четверг</option><option value="fri">Пятница</option><option value="sat">Суббота</option><option value="sun">Воскресенье</option></select></div>
+  </div>
+
+  <div class="v39-section">
+    <div class="v39-grid3">
+      <div class="v39-field"><label>Дата действия с</label><input id="v39Effective" type="date"></div>
+      <div class="v39-field"><label>Выезд из парка</label><input id="v39ParkOut" type="time" value="05:00"></div>
+      <div class="v39-field"><label>Возврат в парк</label><input id="v39ParkIn" type="time" value="23:00"></div>
+    </div>
+    <div class="v39-note" id="v39AutoInfo">Выберите автобус и маршрут — связность и примерное расписание определятся автоматически.</div>
+  </div>
+
+  <div class="v39-section">
+    <h3>🚏 Маршрут и остановки</h3>
+    <div class="v39-grid3">
+      <div class="v39-field"><label>Первая конечная / старт</label><select id="v39Start"></select></div>
+      <div class="v39-field"><label>Конечная</label><select id="v39End"></select></div>
+      <div class="v39-field"><label>По маршруту №</label><input id="v39RouteNumber" readonly></div>
+    </div>
+    <div class="v39-stops" id="v39Stops"></div>
+    <div class="v39-note">Обратное направление берётся из привязки маршрута. В карточке не нужно вручную прокладывать обратную трассу.</div>
+  </div>
+
+  <div class="v39-section">
+    <h3>⏱️ Маршрутное расписание</h3>
+    <div class="v39-field"><label>Время отправления / прибытия по точкам</label></div>
+    <div class="v39-time-row" id="v39Times"></div>
+    <div class="v39-grid3" style="margin-top:10px">
+      <div class="v39-field"><label>Рейсов в 1-й части</label><input id="v39Trips1" type="number" min="0" value="0"></div>
+      <div class="v39-field"><label>Рейсов во 2-й части</label><input id="v39Trips2" type="number" min="0" value="0"></div>
+      <div class="v39-field"><label>Всего рейсов</label><input id="v39TripsTotal" type="number" readonly></div>
+    </div>
+  </div>
+
+  <div class="v39-section">
+    <h3>☕ Разрыв</h3>
+    <div class="v39-break">
+      <div class="v39-field"><label>С</label><input id="v39BreakFrom" type="time"></div>
+      <div class="v39-field"><label>По</label><input id="v39BreakTo" type="time"></div>
+      <div class="v39-field"><label>Станция / пункт</label><input id="v39BreakPoint" placeholder="Укажите пункт"></div>
+    </div>
+  </div>
+
+  <div class="v39-section">
+    <h3>🚌 Путевой лист / учёт работы</h3>
+    <div class="v39-grid3">
+      <div class="v39-field"><label>Марка автобуса</label><select id="v39Bus"><option value="">Выберите автобус из гаража</option></select></div>
+      <div class="v39-field"><label>Гос. номер</label><input id="v39State" readonly placeholder="Автоматически"></div>
+      <div class="v39-field"><label>Гаражный номер</label><input id="v39Garage" readonly placeholder="Автоматически"></div>
+      <div class="v39-field"><label>Режим работы</label><input id="v39Mode" placeholder="Режим"></div>
+      <div class="v39-field"><label>Дата выезда</label><input id="v39OutDate" type="date"></div>
+      <div class="v39-field"><label>Дата возврата</label><input id="v39InDate" type="date"></div>
+    </div>
+    <div class="v39-note">Троллейбусная часть из шаблона исключена. В карточке доступны только автобусы.</div>
+  </div>
+
+  <div class="v39-section">
+    <h3>👤 Водитель / кондуктор</h3>
+    <div class="v39-grid">
+      <div class="v39-field"><label>Водитель / Таб. №</label><input id="v39Driver" placeholder="ФИО водителя / табельный номер"></div>
+      <div class="v39-field"><label>Кондуктор / Таб. №</label><input id="v39Conductor" placeholder="ФИО кондуктора / табельный номер"></div>
+    </div>
+  </div>
+
+  <div class="v39-section">
+    <h3>⛽ Движение ТСМ</h3>
+    <div class="v39-grid3">
+      <div class="v39-field"><label>Остаток при выезде, л</label><input id="v39FuelOut" type="number" min="0" step="0.1"></div>
+      <div class="v39-field"><label>Заправка на линии, л</label><input id="v39FuelRefuel" type="number" min="0" step="0.1"></div>
+      <div class="v39-field"><label>Остаток при возврате, л</label><input id="v39FuelIn" type="number" min="0" step="0.1"></div>
+      <div class="v39-field"><label>Расход, л</label><input id="v39FuelSpent" type="number" readonly></div>
+    </div>
+  </div>
+
+  <div class="v39-actions">
+    <button type="button" id="v39Create">✅ Создать карточку водителя</button>
+    <button type="button" id="v39Preview">🗺️ Предпросмотр движения</button>
+  </div>
+  <div id="v39Error" class="v39-error"></div>
+</section>
+
+<script id="v39-driver-card-js">
+(function(){
+  const $=id=>document.getElementById(id);
+  const val=id=>$(id)?.value||'';
+  function arrCandidates(){
+    return window.routes||window.ROUTES||window.appRoutes||window.busRoutes||[];
+  }
+  function getRoutes(){
+    let r=arrCandidates();
+    if(Array.isArray(r)&&r.length)return r;
+    try{
+      const x=JSON.parse(localStorage.getItem('routes')||localStorage.getItem('busphoto_routes')||'[]');
+      return Array.isArray(x)?x:[];
+    }catch(e){return[]}
+  }
+  function rid(r){return String(r?.id??r?.number??r?.name??'')}
+  function endpoints(r){
+    const a=r?.start??r?.from??r?.firstStop??r?.origin??'';
+    const b=r?.end??r?.to??r?.lastStop??r?.destination??'';
+    return [String(a||''),String(b||'')].filter(Boolean);
+  }
+  function buses(){
+    const c=[window.vehicles,window.garage,window.ownedVehicles,window.ownedTS,window.tsList];
+    for(const x of c)if(Array.isArray(x))return x;
+    try{
+      const x=JSON.parse(localStorage.getItem('vehicles')||localStorage.getItem('garage')||'[]');
+      return Array.isArray(x)?x:[];
+    }catch(e){return[]}
+  }
+  function busId(b){return String(b?.id??b?.uid??b?.garageNumber??b?.number??'')}
+  function busType(b){return String(b?.type??b?.category??b?.kind??'').toLowerCase()}
+  function isTrolley(b){
+    const t=busType(b);
+    return t.includes('трол')||t.includes('trolley');
+  }
+  function populate(){
+    const rs=$('v39Route'), bs=$('v39Bus');
+    getRoutes().forEach(r=>{let o=document.createElement('option');o.value=rid(r);o.textContent=rid(r);rs.appendChild(o)});
+    buses().filter(b=>!isTrolley(b)).forEach(b=>{
+      let o=document.createElement('option');o.value=busId(b);
+      o.textContent=b.model||b.name||b.brand||('Автобус '+busId(b));bs.appendChild(o);
+    });
+  }
+  function selectedRoute(){return getRoutes().find(r=>rid(r)===val('v39Route'))}
+  function selectedBus(){return buses().find(b=>busId(b)===val('v39Bus'))}
+  function updateRoute(){
+    const r=selectedRoute(); const ep=endpoints(r||{});
+    $('v39RouteNumber').value=r?rid(r):'';
+    ['v39Start','v39End'].forEach((id,i)=>{
+      const s=$(id);s.innerHTML='';
+      ep.forEach(e=>{let o=document.createElement('option');o.value=e;o.textContent=e;s.appendChild(o)});
+    });
+    const stops=Array.isArray(r?.stops)?r.stops:[];
+    const host=$('v39Stops');host.innerHTML='';
+    (stops.length?stops:ep).forEach((st,i)=>{
+      let d=document.createElement('div');d.className='v39-field';
+      d.innerHTML='<label>Остановка '+(i+1)+'</label><input value="'+String(st?.name??st).replace(/"/g,'&quot;')+'" readonly>';
+      host.appendChild(d);
+    });
+    $('v39AutoInfo').textContent=r?'Маршрут выбран. Связанный обратный маршрут и время движения будут использоваться из данных маршрута.':'Выберите автобус и маршрут.';
+    updateTimes();
+  }
+  function updateBus(){
+    const b=selectedBus(); if(!b)return;
+    $('v39State').value=b.stateNumber||b.govNumber||b.plate||b.gos||'';
+    $('v39Garage').value=b.garageNumber||b.boardNumber||b.board||b.number||'';
+  }
+  function updateTimes(){
+    const host=$('v39Times');host.innerHTML='';
+    const r=selectedRoute(), stops=Array.isArray(r?.stops)?r.stops:[];
+    const n=Math.max(2,Math.min(9,stops.length||2));
+    for(let i=0;i<n;i++){
+      let d=document.createElement('div');d.innerHTML='<input type="time" value="'+(i===0?val('v39ParkOut'):'')+'"><small>'+(i+1)+'</small>';host.appendChild(d);
+    }
+  }
+  function updateFuel(){
+    const a=parseFloat(val('v39FuelOut'))||0,b=parseFloat(val('v39FuelRefuel'))||0,c=parseFloat(val('v39FuelIn'))||0;
+    $('v39FuelSpent').value=Math.max(0,a+b-c).toFixed(1);
+  }
+  function create(){
+    $('v39Error').textContent='';
+    if(!val('v39Bus')||!val('v39Route')){$('v39Error').textContent='Выберите автобус и маршрут.';return}
+    const data={
+      cardId:'driver_'+Date.now(),
+      busId:val('v39Bus'),routeId:val('v39Route'),days:val('v39Days'),
+      effective:val('v39Effective'),parkOut:val('v39ParkOut'),parkIn:val('v39ParkIn'),
+      start:val('v39Start'),end:val('v39End'),stops:[...document.querySelectorAll('#v39Stops input')].map(x=>x.value),
+      driver:val('v39Driver'),conductor:val('v39Conductor'),mode:val('v39Mode'),
+      outDate:val('v39OutDate'),inDate:val('v39InDate'),
+      fuel:{out:val('v39FuelOut'),refuel:val('v39FuelRefuel'),in:val('v39FuelIn'),spent:val('v39FuelSpent')},
+      createdAt:Date.now()
+    };
+    const old=JSON.parse(localStorage.getItem('driverCards')||'[]');
+    old.push(data);localStorage.setItem('driverCards',JSON.stringify(old));
+    $('v39Error').style.color='green';$('v39Error').textContent='Карточка создана.';
+  }
+  $('v39Bus').addEventListener('change',updateBus);
+  $('v39Route').addEventListener('change',updateRoute);
+  ['v39ParkOut','v39ParkIn'].forEach(id=>$(id).addEventListener('change',updateTimes));
+  ['v39FuelOut','v39FuelRefuel','v39FuelIn'].forEach(id=>$(id).addEventListener('input',updateFuel));
+  $('v39Create').addEventListener('click',create);
+  $('v39Preview').addEventListener('click',function(){
+    const r=selectedRoute();
+    if(r && typeof window.previewRouteOnMap==='function') window.previewRouteOnMap(r);
+    else alert('Маршрут выбран. Если карта подключена в интерактиве, предпросмотр будет показан там.');
+  });
+  populate();
+})();
+</script>
+
 <div class="wrap">
 <div class="top"><h1>🗓️ Карточка ТС</h1><a href="interactive.html">← Вернуться в интерактив</a></div>
 <div class="grid">
