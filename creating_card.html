@@ -106,6 +106,64 @@ html, body {
 }
 </style>
 
+<style id="card-black-white-fixed">
+/* Карточка ТС: всегда чёрный текст на белом фоне, независимо от темы сайта */
+#v39DriverCard,
+#v39DriverCard *,
+.wrap .card,
+.wrap .card * {
+  color: #000 !important;
+  text-shadow: none !important;
+}
+#v39DriverCard,
+.wrap .card {
+  background: #fff !important;
+  border-color: #bdbdbd !important;
+}
+#v39DriverCard .sub,
+#v39DriverCard .v39-note,
+.wrap .card .muted,
+.wrap .card .small {
+  color: #000 !important;
+  opacity: 1 !important;
+}
+#v39DriverCard input,
+#v39DriverCard select,
+#v39DriverCard textarea,
+.wrap .card input,
+.wrap .card select,
+.wrap .card textarea {
+  background: #fff !important;
+  color: #000 !important;
+  border: 1px solid #777 !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: #000 !important;
+}
+#v39DriverCard option,
+.wrap .card option { background:#fff !important; color:#000 !important; }
+#v39DriverCard .v39-note,
+.wrap .card .summary,
+.wrap .card .stage {
+  background: #fff !important;
+  color: #000 !important;
+  border-color: #aaa !important;
+}
+#v39DriverCard .v39-section { border-top-color:#aaa !important; }
+#v39DriverCard button,
+.wrap .card button {
+  color:#000 !important;
+  opacity:1 !important;
+}
+#v39DriverCard select:disabled,
+#v39DriverCard input:disabled,
+.wrap .card select:disabled,
+.wrap .card input:disabled {
+  color:#333 !important;
+  background:#f2f2f2 !important;
+  -webkit-text-fill-color:#333 !important;
+  opacity:1 !important;
+}
+</style>
 </head>
 <body>
 
@@ -292,7 +350,8 @@ html, body {
   $('v39Route').addEventListener('change',updateRoute);
   ['v39ParkOut','v39ParkIn'].forEach(id=>$(id).addEventListener('change',updateTimes));
 $('v39Create').addEventListener('click',create);
-  $('v39Preview').addEventListener('click',function(){
+  const previewBtn=$('v39Preview');
+  if(previewBtn) previewBtn.addEventListener('click',function(){
     const r=selectedRoute();
     if(r && typeof window.previewRouteOnMap==='function') window.previewRouteOnMap(r);
     else alert('Маршрут выбран. Если карта подключена в интерактиве, предпросмотр будет показан там.');
@@ -543,6 +602,10 @@ document.readyState==='loading'?document.addEventListener('DOMContentLoaded',()=
   }
 
   function routeSource(){
+    try{
+      const game=JSON.parse(localStorage.getItem('busphoto_interactive_game')||'{}');
+      if(Array.isArray(game.routes) && game.routes.length) return game.routes;
+    }catch(e){}
     const globals=[
       window.routes,window.ROUTES,window.appRoutes,window.busRoutes,
       window.routeDatabase,window.routesDB,window.allRoutes
@@ -555,6 +618,10 @@ document.readyState==='loading'?document.addEventListener('DOMContentLoaded',()=
   }
 
   function vehicleSource(){
+    try{
+      const game=JSON.parse(localStorage.getItem('busphoto_interactive_game')||'{}');
+      if(Array.isArray(game.owned) && game.owned.length) return game.owned;
+    }catch(e){}
     const globals=[
       window.vehicles,window.garage,window.ownedVehicles,
       window.ownedTS,window.tsList,window.transportVehicles
@@ -579,7 +646,7 @@ document.readyState==='loading'?document.addEventListener('DOMContentLoaded',()=
     const current=select.value;
     select.innerHTML="";
     const first=document.createElement("option");
-    first.value=""; first.textContent=placeholder; first.=false;
+    first.value=""; first.textContent=placeholder; first.disabled=false;
     select.appendChild(first);
     for(const item of items){
       const o=document.createElement("option");
@@ -661,7 +728,7 @@ document.readyState==='loading'?document.addEventListener('DOMContentLoaded',()=
 
   function makeAllButtonsClickable(){
     document.querySelectorAll("#v39DriverCard button").forEach(b=>{
-      b.=false;
+      b.disabled=false;
       b.style.pointerEvents="auto";
     });
   }
