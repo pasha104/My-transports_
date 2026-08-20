@@ -2968,6 +2968,19 @@ out body;
         function deleteDepartureCard(id) { gameState.serviceCards = gameState.serviceCards.filter(card => String(card.id) !== String(id)); saveGameState(); renderDepartureCards(); updateMapBusMarkers(true); }
         function renderDepartureSection() { updateDepartureRouteOptions(); renderDepartureCards(); const rows=document.getElementById('departureScheduleRows'); if(rows && !rows.children.length) addDepartureScheduleRow(); updateDepartureCardBuilderSummary(); }
 
+        function renderGarageVehicleRouteStatus(v){
+            const active=getActiveServiceRouteAndSchedule(v.id,new Date());
+            const cards=getVehicleServiceCards(v.id);
+            if(active && active.route){
+                const phase=getCardDrivenPoint(v,cards,new Date());
+                const dir=phase?.activeRoute||active.route;
+                const phaseText=phase?.phase||'по карточке';
+                return `<b>🚌 №${escapeHtml(dir.number||'—')}</b><br><span class=\"interactive-muted\">${escapeHtml(phaseText)}</span>`;
+            }
+            const direct=getVehicleRoute(v.id);
+            return direct ? '🛣️ №'+escapeHtml(direct.number||'—') : '<span class=\"interactive-muted\">В парке</span>';
+        }
+
         function renderInteractive() {
             const balance = document.getElementById('gameBalance');
             if (!balance) return;
@@ -3020,7 +3033,7 @@ out body;
                             <td>${money(v.price)}</td>
                             <td><b>${escapeHtml(v.category === 'trolleybus' ? ('борт. №' + v.num) : (v.plate || (v.plate = generateRandomPlate())))}</b>${v.category !== 'trolleybus' ? `<br><button class="btn-secondary" onclick="changeVehiclePlate('${v.id}')" style="margin-top:3px;">№ изменить · 5 000 р.</button>` : ''}</td>
                             <td>${v.currentSalary ? money(v.currentSalary) : '—'}</td>
-                            <td>${getVehicleRoute(v.id) ? '🛣️ №' + getVehicleRoute(v.id).number : '<span class="interactive-muted">Не назначен</span>'}</td>
+                            <td>${renderGarageVehicleRouteStatus(v)}</td>
                             <td><button class="btn-secondary" onclick="sellGameVehicle('${v.id}')">Продать</button></td>
                         </tr>
                     `).join('');
