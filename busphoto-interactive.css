@@ -336,3 +336,66 @@
   .map-layout > div:first-child { order: 1; }
   .map-side { order: 2; }
 }
+
+/* v32 — mobile-first UI polish */
+@media (max-width: 600px) {
+  body { overflow-x: hidden; }
+  .interactive-dashboard { display:flex; flex-direction:column; gap:10px; }
+  .interactive-card { padding:12px !important; border-radius:12px; overflow:visible !important; }
+  .interactive-card h2,.interactive-card h3 { font-size:18px; line-height:1.2; margin:0 0 10px; }
+  .game-menu {
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:7px !important;
+    overflow:visible !important;
+    padding:0 !important;
+  }
+  .game-menu-btn {
+    width:100%; min-width:0 !important; min-height:46px !important;
+    padding:9px 6px !important; font-size:12px !important;
+    white-space:normal !important; line-height:1.15;
+    border-radius:9px !important; text-align:center;
+  }
+  .game-menu-btn:last-child { grid-column:1/-1; }
+  .interactive-stats { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:7px !important; }
+  .interactive-stat { padding:10px !important; border-radius:10px; min-width:0; }
+  .interactive-stat-label { font-size:11px; }
+  .interactive-stat-value { font-size:18px; }
+  .game-category-picker,.game-service-picker { grid-template-columns:1fr 1fr !important; gap:7px; }
+  .game-category-btn,.game-service-btn { min-height:46px !important; font-size:12px; padding:7px 5px; border-radius:9px; }
+  .interactive-controls { display:flex !important; flex-direction:column; gap:8px !important; }
+  .interactive-controls label { width:100%; }
+  select,.map-mini-input,input:not([type=radio]):not([type=checkbox]),button.btn-primary,button.btn-secondary {
+    max-width:100%; box-sizing:border-box;
+  }
+  .interactive-card button { min-height:44px; }
+  .owned-mini-card { flex-direction:column; align-items:stretch !important; padding:10px; }
+  .owned-mini-card button { width:100%; }
+  .service-card-grid { grid-template-columns:1fr !important; }
+  .route-direction-panel { padding:9px; }
+  .map-toolbar { gap:7px; }
+  .map-mode { width:100%; }
+  .map-mode button { flex:1; min-height:44px; }
+  .map-filter-row { gap:6px; }
+  .map-filter-btn { min-height:42px !important; }
+  .map-layout { display:flex !important; flex-direction:column !important; gap:8px; }
+  .map-layout > div:first-child { width:100%; order:1; }
+  .map-side { width:100%; order:2; max-height:none !important; }
+  #routeMap { height:52vh !important; min-height:300px !important; max-height:460px; border-radius:10px; }
+  #trackerMap { height:52vh !important; min-height:300px !important; max-height:460px; }
+  .map-side .map-panel:first-child { position:static !important; }
+  .map-panel { padding:10px; border-radius:10px; }
+  .map-stop-list,.map-route-list { max-height:180px; }
+  .interactive-table { min-width:0 !important; width:100%; font-size:11px; }
+  .interactive-table th,.interactive-table td { padding:6px 4px; }
+  .departure-schedule-row-v3,.departure-schedule-row-v2 { grid-template-columns:1fr !important; }
+  .departure-schedule-row-v3 .departure-auto-preview { grid-column:auto; }
+  .departure-mode-option { min-height:44px; }
+}
+@media (max-width:380px) {
+  .game-menu { grid-template-columns:1fr 1fr !important; }
+  .game-menu-btn { font-size:11px !important; }
+  .interactive-stats { grid-template-columns:1fr !important; }
+  .game-category-picker,.game-service-picker { grid-template-columns:1fr !important; }
+  #routeMap,#trackerMap { height:46vh !important; min-height:280px !important; }
+}
