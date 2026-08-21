@@ -328,30 +328,51 @@
             return Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
         }
 
+        // Единое игровое время: Беларусь (Europe/Minsk).
+        // Никаких запросов к внешним сервисам для определения времени нет.
+        // Поэтому страница не зависает на «Определение времени…», а выплаты
+        // всегда считаются по белорусскому времени, даже если пользователь
+        // находится в другой стране.
+        const GAME_TIME_ZONE = 'Europe/Minsk';
+
+        function getGameClock(nowMs = Date.now()) {
+            const parts = new Intl.DateTimeFormat('en-GB', {
+                timeZone: GAME_TIME_ZONE,
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hourCycle: 'h23'
+            }).formatToParts(new Date(nowMs));
+            const p = Object.fromEntries(parts.map(x => [x.type, x.value]));
+            return {
+                year: Number(p.year), month: Number(p.month), day: Number(p.day),
+                hour: Number(p.hour), minute: Number(p.minute), second: Number(p.second)
+            };
+        }
+
         function localDateKey(d = new Date()) {
-            const y = d.getFullYear();
-            const m = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${y}-${m}-${day}`;
+            const c = getGameClock(d instanceof Date ? d.getTime() : Number(d));
+            return `${c.year}-${String(c.month).padStart(2,'0')}-${String(c.day).padStart(2,'0')}`;
         }
 
         function timeUntilNoonMs() {
-            const now = new Date();
-            const noon = new Date(now);
-            noon.setHours(12, 0, 0, 0);
-            if (now >= noon) return 0;
-            return noon.getTime() - now.getTime();
+            const nowMs = Date.now();
+            const c = getGameClock(nowMs);
+            if (c.hour >= 12) return 0;
+            // Полностью локально рассчитываем задержку до 12:00 по Минску.
+            const mins = (12 * 60) - (c.hour * 60 + c.minute);
+            return Math.max(1000, mins * 60000 - c.second * 1000);
         }
-
 
         function dateKeyFromDate(d) {
             return localDateKey(d);
         }
 
         function payoutEligibleDateKey(now = new Date()) {
-            const d = new Date(now);
-            if (d.getHours() < 12) d.setDate(d.getDate() - 1);
-            return localDateKey(d);
+            const c = getGameClock(now instanceof Date ? now.getTime() : Number(now));
+            // До 12:00 по Минску выплата относится к предыдущему белорусскому дню.
+            if (c.hour >= 12) return `${c.year}-${String(c.month).padStart(2,'0')}-${String(c.day).padStart(2,'0')}`;
+            const prev = new Date(Date.UTC(c.year, c.month - 1, c.day - 1, 12, 0, 0));
+            return `${prev.getUTCFullYear()}-${String(prev.getUTCMonth()+1).padStart(2,'0')}-${String(prev.getUTCDate()).padStart(2,'0')}`;
         }
 
         function dateKeysAfter(lastKey, throughKey) {
@@ -1922,10 +1943,15 @@ out body;
         }
         function pathPointFromGeometry(geometry, progress) { return interpolateRoutePoint(geometry, progress); }
         function getCurrentMinutesOfDay() {
-            const d = new Date();
-            return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+            const c = getGameClock();
+            return c.hour * 60 + c.minute + c.second / 60;
         }
 
+
+        function getGameTimeLabel() {
+            const c = getGameClock();
+            return `${String(c.hour).padStart(2,'0')}:${String(c.minute).padStart(2,'0')}:${String(c.second).padStart(2,'0')} (Беларусь)`;
+        }
 
         function hashString(value) {
             let h = 2166136261;
@@ -2154,6 +2180,17 @@ out body;
                 arrivals.sort((a,b)=>a.ts-b.ts);
                 if(arrivals.length){
                     arrivals.forEach(a=>{
+                        // Ремонт: ТС не выполняет рейсы и не получает выплаты до окончания ремонта.
+                        const repairUntil = Number(vehicle.repairUntil || 0);
+                        if (repairUntil > a.ts) return;
+                        if (repairUntil && repairUntil <= a.ts) {
+                            vehicle.repairUntil = 0;
+                            vehicle.repairStartedAt = 0;
+                            vehicle.repairCost = 0;
+                            vehicle.repairDurationMs = 0;
+                            vehicle.health = 100;
+                            vehicle.maintenanceDue = false;
+                        }
                         total+=100;
                         // v43: статистика и состояние ТС обновляются при каждом прибытии.
                         vehicle.stats = vehicle.stats || {trips:0, arrivals:0, distanceKm:0, workMinutes:0, earned:0};
@@ -2161,7 +2198,7 @@ out body;
                         vehicle.stats.arrivals = Number(vehicle.stats.arrivals||0) + 1;
                         vehicle.stats.distanceKm = Number(vehicle.stats.distanceKm||0) + Number(a.route.calculatedDistance||0)/1000;
                         vehicle.stats.earned = Number(vehicle.stats.earned||0) + 100;
-                        vehicle.health = Math.max(0, Number(vehicle.health ?? 100) - 0.15);
+                        vehicle.health = Math.max(0, Number(vehicle.health ?? 100) - 0.10);
                         if (vehicle.health <= 20 && !vehicle.maintenanceDue) vehicle.maintenanceDue = true;
                         const t=new Date(a.ts).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
                         const detail=`🕐 ${t} · ТС ${vehicle.model||'—'} · маршрут №${a.route.number||'—'} · прибытие на конечную · +100 р.`;
@@ -3316,6 +3353,15 @@ out body;
     v.stats=v.stats||{trips:0,arrivals:0,distanceKm:0,workMinutes:0,earned:0};
     if(!Number.isFinite(Number(v.health))) v.health=100;
     if(v.maintenanceDue==null) v.maintenanceDue=false;
+    if(!Number.isFinite(Number(v.repairUntil))) v.repairUntil=0;
+    if(!Number.isFinite(Number(v.repairStartedAt))) v.repairStartedAt=0;
+    if(!Number.isFinite(Number(v.repairCost))) v.repairCost=0;
+    if(!Number.isFinite(Number(v.repairDurationMs))) v.repairDurationMs=0;
+    // Завершение ремонта происходит по реальному времени, даже если сайт был закрыт.
+    if(v.repairUntil && Date.now()>=Number(v.repairUntil)){
+      v.repairUntil=0; v.repairStartedAt=0; v.repairCost=0; v.repairDurationMs=0;
+      v.health=100; v.maintenanceDue=false;
+    }
     return v;
   }
   window.ensureVehicleStatsV43=ensureVehicleStats;
@@ -3329,7 +3375,8 @@ out body;
       const active=getActiveServiceRouteAndSchedule(v.id,now);
       const route=active?.route||sim.route||getVehicleRoute(v.id);
       let status='🏠 В парке';
-      if(v.maintenanceDue) status='🔧 Требуется обслуживание';
+      if(Number(v.repairUntil)>Date.now()) status='⏳ На ремонте';
+      else if(v.maintenanceDue) status='🔧 Требуется обслуживание';
       else if(sim.point||active?.route) status='🟢 В рейсе';
       const next=active?.absolute?.return ? new Date(active.absolute.return).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) : '—';
       return `<div class="interactive-log-row">
@@ -3369,21 +3416,110 @@ out body;
       ensureVehicleStats(v);
       const health=Number(v.health).toFixed(0);
       const due=v.maintenanceDue;
-      return `<div class="interactive-log-row"><div><b>${vehicleCategoryIcon(v.category)} ${escapeHtml(v.model)}</b><br>
-        <span class="interactive-muted">${escapeHtml(v.plate||v.num||'—')}</span><br>
-        Состояние: <b>${health}%</b> ${due?'⚠️ Требуется обслуживание':''}</div>
-        <div><button class="btn-primary" onclick="serviceVehicleV43('${v.id}')">🔧 Обслужить</button></div></div>`;
+      const repairing=Number(v.repairUntil)>Date.now();
+      const remaining=repairing ? Math.max(0,Number(v.repairUntil)-Date.now()) : 0;
+      const repairText=repairing
+        ? `⏳ Ремонт: <b>${formatRepairDuration(remaining)}</b><br><span class="interactive-muted">ТС временно не работает</span><br>Оплачено: <b>${money(v.repairCost||0)}</b>`
+        : (v.repairStartedAt && Number(v.repairUntil)<=Date.now()
+          ? `✅ Ремонт завершён · состояние <b>100%</b>` : '');
+      const button=repairing
+        ? `<button class="btn-secondary" disabled>🔧 Ремонтируется</button>`
+        : `<button class="btn-primary" onclick="serviceVehicleV43('${v.id}')">${health>=100?'🔧 Обслужить':'🔧 Отправить на ремонт'}</button>`;
+      return `<div class="interactive-log-row">
+        <div><b>${vehicleCategoryIcon(v.category)} ${escapeHtml(v.model)}</b><br>
+          <span class="interactive-muted">${escapeHtml(v.plate||v.num||'—')}</span><br>
+          Состояние: <b>${health}%</b> ${due?'⚠️ Требуется обслуживание':''}
+          ${repairText?'<br>'+repairText:''}
+        </div>
+        <div>${button}</div>
+      </div>`;
     }).join('')||'<div class="interactive-muted">Нет ТС.</div>';
   };
 
+
   window.serviceVehicleV43=function(id){
     const v=gameState.owned.find(x=>String(x.id)===String(id)); if(!v)return;
-    ensureVehicleStats(v); v.health=100; v.maintenanceDue=false;
-    v.maintenanceCount=Number(v.maintenanceCount||0)+1;
-    const m=maintenance();m[id]={last:new Date().toISOString(),count:v.maintenanceCount};saveMaint(m);
-    gameState.log.unshift({date:localDateKey(new Date()),time:new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),type:'maintenance',total:0,details:[`🔧 ${v.model} · обслуживание выполнено · состояние 100%`]});
-    saveGameState();renderMaintenanceV43();renderVehicleStatsV43();renderDispatcherV43();
+    ensureVehicleStats(v);
+    const now=Date.now();
+
+    // Если ТС уже ремонтируется — ничего повторно не списываем.
+    if(Number(v.repairUntil)>now){
+      renderMaintenanceV43();
+      return;
+    }
+
+    // Стоимость и длительность зависят от степени износа.
+    const health=Math.max(0,Math.min(100,Number(v.health)));
+    const wear=100-health;
+    if(wear<=0){
+      v.maintenanceDue=false;
+      saveGameState(); renderMaintenanceV43(); renderVehicleStatsV43(); renderDispatcherV43();
+      return;
+    }
+
+    // Не слишком быстрый износ: ремонт становится заметным только после накопления износа.
+    const basePrice=Math.max(150, Number(v.price||0)*0.0009);
+    const cost=Math.max(150, Math.round(basePrice*wear/10/50)*50);
+    const durationMs=Math.max(5*60*1000, Math.round((wear/100)*90*60*1000));
+
+    if(Number(gameState.balance||0)<cost){
+      alert(`Недостаточно денег для ремонта.\n\nСтоимость ремонта: ${money(cost)}\nВаш баланс: ${money(gameState.balance||0)}`);
+      return;
+    }
+
+    gameState.balance-=cost;
+    v.repairStartedAt=now;
+    v.repairDurationMs=durationMs;
+    v.repairUntil=now+durationMs;
+    v.repairCost=cost;
+    v.maintenanceDue=false;
+
+    gameState.log=gameState.log||[];
+    gameState.log.unshift({
+      date:localDateKey(new Date(now)),
+      time:new Date(now).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),
+      type:'maintenance',
+      total:-cost,
+      details:[`🔧 ${v.model||'ТС'} · отправлен на ремонт · состояние ${health.toFixed(0)}% · списано ${money(cost)} · срок ${formatRepairDuration(durationMs)}`]
+    });
+
+    saveGameState();
+    renderMaintenanceV43(); renderVehicleStatsV43(); renderDispatcherV43();
   };
+
+  function formatRepairDuration(ms){
+    const min=Math.max(1,Math.ceil(Number(ms||0)/60000));
+    if(min<60) return `${min} мин.`;
+    const h=Math.floor(min/60), m=min%60;
+    return m ? `${h} ч ${m} мин.` : `${h} ч`;
+  }
+
+  window.finishRepairV43=function(id){
+    const v=gameState.owned.find(x=>String(x.id)===String(id)); if(!v)return;
+    ensureVehicleStats(v);
+    if(Number(v.repairUntil)>Date.now()) return;
+    if(v.repairStartedAt || v.repairUntil){
+      v.repairUntil=0; v.repairStartedAt=0; v.repairCost=0; v.repairDurationMs=0;
+      v.health=100; v.maintenanceDue=false;
+      saveGameState();
+    }
+    renderMaintenanceV43(); renderVehicleStatsV43(); renderDispatcherV43();
+  };
+
+  window.updateRepairTimersV43=function(){
+    let changed=false;
+    gameState.owned.forEach(v=>{
+      ensureVehicleStats(v);
+      if(Number(v.repairUntil)>0 && Date.now()>=Number(v.repairUntil)){
+        v.repairUntil=0; v.repairStartedAt=0; v.repairCost=0; v.repairDurationMs=0;
+        v.health=100; v.maintenanceDue=false; changed=true;
+      }
+    });
+    if(changed) saveGameState();
+    if(document.getElementById('maintenancePanel')) renderMaintenanceV43();
+    if(document.getElementById('dispatcherPanel')) renderDispatcherV43();
+  };
+  setInterval(window.updateRepairTimersV43,1000);
 
   window.showRouteDetails=function(id){
     const r=gameState.routes.find(x=>String(x.id)===String(id));if(!r)return;
