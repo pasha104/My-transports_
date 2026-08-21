@@ -5,83 +5,48 @@ const app = express();
 const PORT = Number(process.env.PORT) || 10000;
 const BOT_TOKEN = process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
 const SITE_ORIGIN = process.env.SITE_ORIGIN || "*";
-const SUPABASE_URL = process.env.SUPABASE_URL || "";
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const API_SECRET = process.env.API_SECRET || "";
 
 if (!BOT_TOKEN) {
   console.error("ERROR: BOT_TOKEN environment variable is not set.");
   process.exit(1);
 }
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("WARNING: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are not set. Accounts and Telegram linking will not work.");
-}
 
 app.use(cors({
   origin: SITE_ORIGIN === "*" ? true : SITE_ORIGIN.split(",").map(s => s.trim()),
   methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-API-Key"]
+  allowedHeaders: ["Content-Type"]
 }));
 app.use(express.json({ limit: "100kb" }));
 
-const sbHeaders = () => ({
-  "apikey": SUPABASE_SERVICE_ROLE_KEY,
-  "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-  "Content-Type": "application/json"
-});
-async function sb(path, options={}) {
-  if(!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase is not configured on Render");
-  const r=await fetch(`${SUPABASE_URL.replace(/\/$/,"")}${path}`,{
-    ...options, headers:{...sbHeaders(),...(options.headers||{})}
-  });
-  const text=await r.text();
-  let data=null; try{data=text?JSON.parse(text):null}catch{}
-  if(!r.ok) throw new Error(data?.message||data?.error_description||text||`Supabase HTTP ${r.status}`);
-  return data;
-}
-async function getUserFromBearer(req){
-  const h=req.get("Authorization")||"";
-  if(!h.startsWith("Bearer ")) throw new Error("Authorization Bearer token is required");
-  const token=h.slice(7).trim();
-  if(!token) throw new Error("Empty bearer token");
-  if(!SUPABASE_URL||!SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase is not configured");
-  const r=await fetch(`${SUPABASE_URL.replace(/\/$/,"")}/auth/v1/user`,{
-    headers:{apikey:SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${token}`}
-  });
-  const data=await r.json().catch(()=>null);
-  if(!r.ok||!data?.id) throw new Error("Invalid or expired session");
-  return data;
-}
-async function ensureProfile(user){
-  await sb("/rest/v1/profiles?on_conflict=id",{
-    method:"POST",
-    headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},
-    body:JSON.stringify({id:user.id,email:user.email||null})
-  });
-}
-async function getProfile(userId){
-  const rows=await sb(`/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=id,email,telegram_chat_id`);
-  return rows?.[0]||null;
-}
+// Простое хранилище для привязки Telegram. Для первого/простого варианта
+// никакой Supabase, SQL или API-ключей сайта не требуется.
+const pending = new Map();       // code -> { userId, expiresAt }
+const connections = new Map();   // userId -> chatId
+const chatToUser = new Map();    // chatId -> userId
 
 function telegramUrl(method){return `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;}
 async function telegram(method,payload={}){
   const response=await fetch(telegramUrl(method),{
-    method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(payload)
   });
   const data=await response.json();
-  if(!response.ok||!data.ok) throw new Error(`Telegram API: ${data?.description||`HTTP ${response.status}`}`);
+  if(!response.ok || !data.ok) throw new Error(`Telegram API: ${data?.description || `HTTP ${response.status}`}`);
   return data.result;
 }
 async function sendMessage(chatId,text){
   return telegram("sendMessage",{chat_id:String(chatId),text:String(text).slice(0,4096)});
 }
-
 function makeCode(){
   const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let s="";
-  for(let i=0;i<6;i++) s+=chars[Math.floor(Math.random()*chars.length)];
+  for(let i=0;i<6;i++) s += chars[Math.floor(Math.random()*chars.length)];
   return "MY-"+s;
+}
+function cleanPending(){
+  const now=Date.now();
+  for(const [code,item] of pending) if(item.expiresAt<now) pending.delete(code);
 }
 
 async function handleUpdate(update){
@@ -89,32 +54,27 @@ async function handleUpdate(update){
   if(!message?.chat) return;
   const chatId=String(message.chat.id);
   const text=(message.text||"").trim();
-  if(!text)return;
+  if(!text) return;
 
-  // One-time website account linking code.
   if(/^MY-[A-Z0-9]{6}$/i.test(text)){
+    cleanPending();
     const code=text.toUpperCase();
-    const rows=await sb(`/rest/v1/telegram_link_codes?code=eq.${encodeURIComponent(code)}&select=code,user_id,expires_at,used_at`);
-    const link=rows?.[0];
-    if(!link||link.used_at||new Date(link.expires_at).getTime()<Date.now()){
+    const item=pending.get(code);
+    if(!item){
       await sendMessage(chatId,"❌ Код недействителен или уже истёк. Создайте новый код на сайте.");
       return;
     }
-    await ensureProfile({id:link.user_id});
-    await sb(`/rest/v1/profiles?id=eq.${encodeURIComponent(link.user_id)}`,{
-      method:"PATCH",body:JSON.stringify({telegram_chat_id:chatId})
-    });
-    await sb(`/rest/v1/telegram_link_codes?code=eq.${encodeURIComponent(code)}`,{
-      method:"PATCH",body:JSON.stringify({used_at:new Date().toISOString()})
-    });
-    await sendMessage(chatId,"✅ Telegram успешно подключён к вашему My-transports аккаунту!");
+    connections.set(item.userId,chatId);
+    chatToUser.set(chatId,item.userId);
+    pending.delete(code);
+    await sendMessage(chatId,"✅ Telegram успешно подключён к вашему My-transports профилю!");
     return;
   }
 
   if(text==="/start"){
     await sendMessage(chatId,
       "🤖 Бот My-transports работает!\n\n"+
-      "Для подключения к сайту откройте в аккаунте: 👤 → 🤖 Telegram и отправьте полученный код сюда.\n\n"+
+      "Для подключения откройте на сайте 👤 Профиль → 🤖 Подключить Telegram и отправьте полученный код сюда.\n\n"+
       "/id — показать chat_id\n/status — состояние сервера\n/help — помощь");
     return;
   }
@@ -143,54 +103,41 @@ async function startPolling(){
   }
 }
 
-async function auth(req,res,next){
-  try{req.user=await getUserFromBearer(req);next();}
-  catch(e){res.status(401).json({ok:false,error:e.message});}
-}
+app.get("/",(_req,res)=>res.json({ok:true,service:"my-transports-telegram-server",mode:"simple"}));
+app.get("/health",(_req,res)=>res.json({ok:true,telegram:Boolean(BOT_TOKEN),polling,lastUpdateAt,connectedUsers:connections.size}));
 
-app.get("/",(_req,res)=>res.json({ok:true,service:"my-transports-telegram-server"}));
-app.get("/health",(_req,res)=>res.json({ok:true,telegram:Boolean(BOT_TOKEN),polling,lastUpdateAt,supabase:Boolean(SUPABASE_URL&&SUPABASE_SERVICE_ROLE_KEY)}));
-
-app.post("/api/telegram/link/start",auth,async(req,res)=>{
+app.post("/api/telegram/link/start",(req,res)=>{
   try{
-    await ensureProfile(req.user);
+    cleanPending();
+    const userId=String(req.body?.userId||"").trim();
+    if(!userId) return res.status(400).json({ok:false,error:"userId is required"});
+    for(const [code,item] of pending) if(item.userId===userId) pending.delete(code);
     const code=makeCode();
-    const expires=new Date(Date.now()+10*60*1000).toISOString();
-    await sb("/rest/v1/telegram_link_codes",{
-      method:"POST",headers:{"Prefer":"return=minimal"},
-      body:JSON.stringify({code,user_id:req.user.id,expires_at:expires})
-    });
-    res.json({ok:true,code,expiresAt:expires});
+    const expiresAt=Date.now()+10*60*1000;
+    pending.set(code,{userId,expiresAt});
+    res.json({ok:true,code,expiresAt:new Date(expiresAt).toISOString()});
   }catch(e){res.status(500).json({ok:false,error:e.message});}
 });
 
-app.get("/api/telegram/link/status",auth,async(req,res)=>{
-  try{
-    const p=await getProfile(req.user.id);
-    res.json({ok:true,connected:Boolean(p?.telegram_chat_id),chatId:p?.telegram_chat_id||null});
-  }catch(e){res.status(500).json({ok:false,error:e.message});}
+app.get("/api/telegram/link/status",(req,res)=>{
+  const userId=String(req.query.userId||"").trim();
+  const chatId=connections.get(userId)||null;
+  res.json({ok:true,connected:Boolean(chatId),chatId});
 });
 
-app.post("/api/telegram/send",auth,async(req,res)=>{
+app.post("/api/telegram/send",async(req,res)=>{
   try{
-    const p=await getProfile(req.user.id);
-    if(!p?.telegram_chat_id)return res.status(400).json({ok:false,error:"Telegram не подключён"});
+    const userId=String(req.body?.userId||"").trim();
     const text=String(req.body?.text||"").trim();
-    if(!text)return res.status(400).json({ok:false,error:"text is required"});
-    const r=await sendMessage(p.telegram_chat_id,text);
+    const chatId=connections.get(userId);
+    if(!chatId) return res.status(400).json({ok:false,error:"Telegram не подключён"});
+    if(!text) return res.status(400).json({ok:false,error:"text is required"});
+    const r=await sendMessage(chatId,text);
     res.json({ok:true,messageId:r.message_id});
   }catch(e){res.status(500).json({ok:false,error:e.message});}
 });
 
-// Optional server-to-server route for future scheduled notifications.
-app.post("/api/internal/telegram/send",async(req,res)=>{
-  if(!API_SECRET||req.get("X-API-Key")!==API_SECRET)return res.status(401).json({ok:false,error:"Unauthorized"});
-  try{
-    const p=await getProfile(String(req.body?.userId||""));
-    if(!p?.telegram_chat_id)return res.status(400).json({ok:false,error:"Telegram не подключён"});
-    const r=await sendMessage(p.telegram_chat_id,String(req.body?.text||""));
-    res.json({ok:true,messageId:r.message_id});
-  }catch(e){res.status(500).json({ok:false,error:e.message});}
+app.listen(PORT,"0.0.0.0",()=>{
+  console.log(`Telegram bridge listening on 0.0.0.0:${PORT}`);
+  startPolling();
 });
-
-app.listen(PORT,"0.0.0.0",()=>{console.log(`Telegram bridge listening on 0.0.0.0:${PORT}`);startPolling();});
