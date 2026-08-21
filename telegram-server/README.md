@@ -1,36 +1,48 @@
-# Telegram server for My-transports
+# My-transports Telegram + accounts
 
-## Render settings
-
-- Language: Node
+## Render
 - Root Directory: `telegram-server`
 - Build Command: `npm install`
 - Start Command: `npm start`
 - Instance: Free
 
-## Environment Variables
-
-Required:
-
-- `BOT_TOKEN` — Telegram bot token from BotFather
-- `API_SECRET` — a private random string used by the website when calling `/api/telegram/send`
+## Required Render Environment Variables
+- `BOT_TOKEN` — token from BotFather. Never put it in GitHub.
+- `SUPABASE_URL` — URL of the Supabase project.
+- `SUPABASE_SERVICE_ROLE_KEY` — Supabase service-role key. Never put it in GitHub.
+- `SITE_ORIGIN` — e.g. `https://pasha104.github.io`
 
 Optional:
+- `API_SECRET` — private secret for future server-to-server notifications.
 
-- `TELEGRAM_CHAT_ID` — your Telegram chat ID after you send `/start` to the bot
-- `SITE_ORIGIN` — your GitHub Pages origin, for example `https://pasha104.github.io`
+## Supabase
+1. Create a Supabase project.
+2. Open SQL Editor and run `supabase_schema.sql`.
+3. In Supabase project settings copy:
+   - Project URL
+   - Publishable/anon key
+4. Put the Project URL and anon key into `busphoto-cloud-config.js`.
+5. Put the Project URL and service-role key into Render Environment Variables.
 
-Do not put the bot token or API secret into GitHub source code.
+## User accounts
+The website uses Supabase Auth (email/password). Interactive data is stored per user in `user_state`:
+- balance
+- owned vehicles
+- routes
+- service cards
+- history and other interactive state
 
-## First test
+The public database of reference vehicles remains separate.
 
-1. Deploy the service on Render.
-2. Open the bot in Telegram and send `/start`.
-3. The bot replies with your `chat_id`.
-4. Put that ID into Render as `TELEGRAM_CHAT_ID` and redeploy.
-5. Open `https://YOUR-SERVICE.onrender.com/health` and check that it returns JSON.
-6. The website can later call `POST /api/telegram/send` with:
-   - Header: `X-API-Key: API_SECRET`
-   - JSON: `{ "text": "Тестовое уведомление" }`
+## Telegram
+1. Log in on the website.
+2. Open the floating `👤` account button.
+3. Choose `🤖 Telegram`.
+4. The website gives a one-time code.
+5. Open the My-transports bot and send that code.
+6. The bot links its chat_id to the current user account.
 
-The server uses Telegram long polling (`getUpdates`) and sends messages with `sendMessage`.
+Each user gets a different Telegram connection. The bot token is shared by the bot, but chat IDs and game data are separated by user ID.
+
+## Important
+Do not publish `SUPABASE_SERVICE_ROLE_KEY` or `BOT_TOKEN` in the GitHub repository.
