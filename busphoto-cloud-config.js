@@ -1,5 +1,4 @@
-// Простая настройка My-transports.
-// Здесь НИЧЕГО менять не нужно, если Render-сервер имеет этот адрес.
+// My-transports Telegram: менять ничего не нужно после деплоя Render.
 window.BP_TELEGRAM_CONFIG = {
   apiBase: "https://my-transports-telegram.onrender.com"
 };

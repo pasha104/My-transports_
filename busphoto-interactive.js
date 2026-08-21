@@ -277,6 +277,8 @@
         function saveGameState() {
             localStorage.setItem('busphoto_interactive_game', JSON.stringify(gameState));
             try { localStorage.setItem('busphoto_service_cards_v1', JSON.stringify(gameState.serviceCards || [])); } catch (e) {}
+            // Telegram синхронизируется мягко и не блокирует игровой интерфейс.
+            if (typeof window.syncTelegramGameState === 'function') window.syncTelegramGameState();
         }
 
         window.addEventListener('storage', function(e) {
@@ -335,47 +337,23 @@
             return `${y}-${m}-${day}`;
         }
 
-        // Игровая выплата всегда работает по белорусскому времени (Europe/Minsk),
-        // независимо от страны/часового пояса телефона. Никаких сетевых запросов
-        // для определения времени нет — время берётся из системных часов устройства
-        // и преобразуется локально, поэтому интерактив запускается мгновенно.
-        function belarusTimeParts(now = new Date()) {
-            const parts = new Intl.DateTimeFormat('en-GB', {
-                timeZone: 'Europe/Minsk',
-                year: 'numeric', month: '2-digit', day: '2-digit',
-                hour: '2-digit', minute: '2-digit', second: '2-digit',
-                hourCycle: 'h23'
-            }).formatToParts(now);
-            const out = {};
-            parts.forEach(p => { if (p.type !== 'literal') out[p.type] = Number(p.value); });
-            return out;
-        }
-
-        function belarusDateKey(now = new Date()) {
-            const p = belarusTimeParts(now);
-            return `${p.year}-${String(p.month).padStart(2,'0')}-${String(p.day).padStart(2,'0')}`;
-        }
-
         function timeUntilNoonMs() {
             const now = new Date();
-            const p = belarusTimeParts(now);
-            let target = Date.UTC(p.year, p.month - 1, p.day, 12, 0, 0);
-            // Belarus is UTC+3 year-round. Date.UTC is used only as a wall-clock
-            // calculation, so the difference remains correct regardless of device TZ.
-            const wallNow = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
-            if (wallNow >= target) target += 24 * 60 * 60 * 1000;
-            return Math.max(0, target - wallNow);
+            const noon = new Date(now);
+            noon.setHours(12, 0, 0, 0);
+            if (now >= noon) return 0;
+            return noon.getTime() - now.getTime();
         }
+
 
         function dateKeyFromDate(d) {
             return localDateKey(d);
         }
 
         function payoutEligibleDateKey(now = new Date()) {
-            const p = belarusTimeParts(now);
-            const d = new Date(Date.UTC(p.year, p.month - 1, p.day));
-            if (p.hour < 12) d.setUTCDate(d.getUTCDate() - 1);
-            return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+            const d = new Date(now);
+            if (d.getHours() < 12) d.setDate(d.getDate() - 1);
+            return localDateKey(d);
         }
 
         function dateKeysAfter(lastKey, throughKey) {
@@ -1403,7 +1381,7 @@
                 });
             }
             if(!el)return;
-            el.innerHTML=cps.length?cps.map((x,i)=>`<div class="map-stop-item" style="display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;"><span class="map-stop-num">${i+1}</span><span><b>🎯 Точка ${i+1}</b><br><small>${Number(x.point.lat).toFixed(5)}, ${Number(x.point.lon).toFixed(5)}</small></span><button type="button" class="btn-secondary" style="padding:4px 7px;font-size:11px;" onclick='removeControlPoint(${JSON.stringify(String(x.point.id))})'>🗑️ Удалить</button></div>`).join(''):'<div class="map-help">Контрольных точек пока нет. На карте они отмечаются чёрными кружками с номерами.</div>';
+            el.innerHTML=cps.length?cps.map((x,i)=>`<div class="map-stop-item" style="display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;"><span class="map-stop-num">${i+1}</span><span><b>🎯 Точка ${i+1}</b><br><small>${Number(x.point.lat).toFixed(5)}, ${Number(x.point.lon).toFixed(5)}</small></span><button type="button" class="btn-secondary" style="padding:4px 7px;font-size:11px;" onclick="removeControlPoint('${String(x.point.id).replace(/'/g,"\\'")}')">🗑️ Удалить</button></div>`).join(''):'<div class="map-help">Контрольных точек пока нет. На карте они отмечаются чёрными кружками с номерами.</div>';
         }
         function removeControlPoint(id){
             const before=mapState.draftPath.length;
@@ -3112,10 +3090,8 @@ out body;
 
             const now = new Date();
             const badge = document.getElementById('gameClockBadge');
-            const bp = belarusTimeParts(now);
-            const hhmm = `${String(bp.hour).padStart(2,'0')}:${String(bp.minute).padStart(2,'0')}`;
-            badge.textContent = `🇧🇾 ${hhmm}` +
-                (bp.hour >= 12 ? ' • выплата сегодня выполнена/ожидается' : ' • выплата в 12:00');
+            badge.textContent = now.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) +
+                (now.getHours() >= 12 ? ' • начисление сегодня выполнено/ожидается' : ' • следующее начисление в 12:00');
 
             updateGameModelSelect();
             initStopRegionSelect();
@@ -3253,20 +3229,7 @@ out body;
         }
 
         if (document.getElementById('gameModel')) {
-            // Не ждём Supabase/Render: интерактив запускается сразу из localStorage.
-            // Облачное состояние подтянется в фоне и обновит экран событием.
             initInteractiveGame();
-            window.addEventListener('bpcloudhydrated', () => {
-                try {
-                    loadGameState();
-                    processAllOfflineEarnings();
-                    processServiceCardPayouts(new Date());
-                    renderInteractive();
-                    if (typeof renderDepartureCards === 'function') renderDepartureCards();
-                } catch (e) {
-                    console.warn('Cloud refresh failed', e);
-                }
-            });
         }
 
 
@@ -3355,6 +3318,8 @@ out body;
     v.stats=v.stats||{trips:0,arrivals:0,distanceKm:0,workMinutes:0,earned:0};
     if(!Number.isFinite(Number(v.health))) v.health=100;
     if(v.maintenanceDue==null) v.maintenanceDue=false;
+    if(v.repairUntil===undefined) v.repairUntil=null;
+    if(v.repairCost===undefined) v.repairCost=0;
     return v;
   }
   window.ensureVehicleStatsV43=ensureVehicleStats;
@@ -3402,28 +3367,64 @@ out body;
     }).join('')||'<div class="interactive-muted">Нет ТС.</div>';
   };
 
+  function repairCostFor(v){
+    const damage=Math.max(0,100-Number(v.health||100));
+    return Math.round((500 + damage*120)/100)*100;
+  }
+  function repairMinutesFor(v){
+    const damage=Math.max(0,100-Number(v.health||100));
+    return Math.max(5,Math.round(5+damage*2));
+  }
+  function finishCompletedRepairs(){
+    const now=Date.now(); let changed=false;
+    gameState.owned.forEach(v=>{
+      ensureVehicleStats(v);
+      if(v.repairUntil && new Date(v.repairUntil).getTime()<=now){
+        v.health=100; v.maintenanceDue=false; v.repairUntil=null; v.repairCost=0; changed=true;
+        gameState.log.unshift({date:localDateKey(new Date()),time:new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),type:'maintenance',total:0,details:[`🔧 ${v.model} · ремонт завершён · состояние 100%`]});
+      }
+    });
+    if(changed){saveGameState();}
+    return changed;
+  }
   window.renderMaintenanceV43=function(){
     const el=document.getElementById('maintenancePanel'); if(!el)return;
+    finishCompletedRepairs();
     el.innerHTML=gameState.owned.map(v=>{
       ensureVehicleStats(v);
-      const health=Number(v.health).toFixed(0);
-      const due=v.maintenanceDue;
-      return `<div class="interactive-log-row"><div><b>${vehicleCategoryIcon(v.category)} ${escapeHtml(v.model)}</b><br>
-        <span class="interactive-muted">${escapeHtml(v.plate||v.num||'—')}</span><br>
-        Состояние: <b>${health}%</b> ${due?'⚠️ Требуется обслуживание':''}</div>
-        <div><button class="btn-primary" onclick="serviceVehicleV43('${v.id}')">🔧 Обслужить</button></div></div>`;
+      const health=Math.max(0,Math.min(100,Number(v.health))).toFixed(0);
+      const due=!!v.maintenanceDue;
+      const repairing=v.repairUntil && new Date(v.repairUntil).getTime()>Date.now();
+      const cost=v.repairCost||repairCostFor(v);
+      const mins=repairMinutesFor(v);
+      let right='';
+      if(repairing){
+        const left=Math.max(0,new Date(v.repairUntil).getTime()-Date.now());
+        right=`<div><b>⏳ Идёт ремонт</b><br>Осталось: <b>${formatRepairCountdown(left)}</b><br><span class="interactive-muted">Окончание: ${new Date(v.repairUntil).toLocaleString('ru-RU')}</span></div>`;
+      }else{
+        const disabled=health>=100?'disabled':'';
+        right=`<div><b>Стоимость:</b> ${money(cost)}<br><span class="interactive-muted">Время: ${formatRepairMinutes(mins)}</span><br><button class="btn-primary" ${disabled} onclick="serviceVehicleV43('${v.id}')">🔧 Отправить в ремонт</button></div>`;
+      }
+      return `<div class="interactive-log-row"><div><b>${vehicleCategoryIcon(v.category)} ${escapeHtml(v.model)}</b><br><span class="interactive-muted">${escapeHtml(v.plate||v.num||'—')}</span><br>Состояние: <b>${health}%</b>${due&&!repairing?' ⚠️ требуется ремонт':''}</div>${right}</div>`;
     }).join('')||'<div class="interactive-muted">Нет ТС.</div>';
   };
-
+  function formatRepairMinutes(m){const n=Math.max(1,Math.round(Number(m||0)));if(n<60)return n+' мин.';const h=Math.floor(n/60),mm=n%60;return h+' ч'+(mm?' '+mm+' мин.':'');}
+  function formatRepairCountdown(ms){const sec=Math.max(0,Math.ceil(ms/1000));const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;return (h?String(h).padStart(2,'0')+':':'')+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
   window.serviceVehicleV43=function(id){
     const v=gameState.owned.find(x=>String(x.id)===String(id)); if(!v)return;
-    ensureVehicleStats(v); v.health=100; v.maintenanceDue=false;
+    ensureVehicleStats(v); finishCompletedRepairs();
+    if(v.repairUntil && new Date(v.repairUntil).getTime()>Date.now()){alert('Это ТС уже находится в ремонте.');return;}
+    const health=Math.max(0,Math.min(100,Number(v.health)));
+    if(health>=100){alert('ТС уже полностью исправно.');return;}
+    const cost=repairCostFor(v), minutes=repairMinutesFor(v);
+    if(Number(gameState.balance)<cost){alert(`Недостаточно денег.\n\nРемонт: ${money(cost)}\nБаланс: ${money(gameState.balance)}`);return;}
+    gameState.balance-=cost;
+    v.maintenanceDue=true; v.repairCost=cost; v.repairStartedAt=new Date().toISOString(); v.repairUntil=new Date(Date.now()+minutes*60000).toISOString();
     v.maintenanceCount=Number(v.maintenanceCount||0)+1;
-    const m=maintenance();m[id]={last:new Date().toISOString(),count:v.maintenanceCount};saveMaint(m);
-    gameState.log.unshift({date:localDateKey(new Date()),time:new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),type:'maintenance',total:0,details:[`🔧 ${v.model} · обслуживание выполнено · состояние 100%`]});
-    saveGameState();renderMaintenanceV43();renderVehicleStatsV43();renderDispatcherV43();
+    const m=maintenance();m[id]={last:new Date().toISOString(),count:v.maintenanceCount,cost,durationMinutes:minutes};saveMaint(m);
+    gameState.log.unshift({date:localDateKey(new Date()),time:new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),type:'maintenance',total:-cost,details:[`🔧 ${v.model} · отправлен в ремонт · ${health}% → 100%`,`💸 стоимость ${money(cost)}`,`⏳ время ${formatRepairMinutes(minutes)}`]});
+    saveGameState();renderMaintenanceV43();renderVehicleStatsV43();renderDispatcherV43();renderInteractiveHeaderAndLightViews();
   };
-
   window.showRouteDetails=function(id){
     const r=gameState.routes.find(x=>String(x.id)===String(id));if(!r)return;
     const ids=Array.isArray(r.vehicleIds)?r.vehicleIds:[];
@@ -3441,6 +3442,7 @@ out body;
   window.showGameSection=function(section,btn){
     oldShow(section,btn);
     if(section==='dispatch'||section==='stats'||section==='maintenance') setTimeout(renderV43Panels,30);
+    if(section==='profile') setTimeout(()=>window.renderTelegramProfileStatus?.(),30);
   };
 
   // Keep state fields initialized.
@@ -3449,5 +3451,37 @@ out body;
     window.loadGameState=function(){oldLoad();gameState.owned.forEach(ensureVehicleStats);saveGameState();}
   }
 
-  setInterval(()=>{ if(typeof gameState!=='undefined' && Array.isArray(gameState.owned)){gameState.owned.forEach(ensureVehicleStats); if(document.getElementById('game-section-dispatch')?.classList.contains('active'))renderDispatcherV43();}},5000);
+  setInterval(()=>{ if(typeof gameState!=='undefined' && Array.isArray(gameState.owned)){gameState.owned.forEach(ensureVehicleStats); finishCompletedRepairs(); if(document.getElementById('game-section-dispatch')?.classList.contains('active'))renderDispatcherV43(); if(document.getElementById('game-section-maintenance')?.classList.contains('active'))renderMaintenanceV43();}},5000);
+})();
+
+
+/* ==================== Telegram bridge ==================== */
+(function(){
+  let syncTimer=null, actionTimer=null;
+  function snapshot(){
+    if(typeof gameState==='undefined') return null;
+    return gameState;
+  }
+  window.syncTelegramGameState=function(){
+    if(!window.bpCloud || typeof window.bpCloud.syncState!=='function') return;
+    clearTimeout(syncTimer);
+    syncTimer=setTimeout(()=>window.bpCloud.syncState(snapshot()),1200);
+  };
+  window.renderTelegramProfileStatus=async function(){
+    const el=document.getElementById('profileTelegramStatus'); if(!el||!window.bpCloud?.telegramStatus)return;
+    const s=await window.bpCloud.telegramStatus();
+    el.innerHTML=s.connected?`<div><b>🟢 Telegram подключён</b><br><span class="interactive-muted">chat_id: ${escapeHtml(String(s.chatId||''))}</span></div><span>🤖</span>`:`<div><b>⚪ Telegram не подключён</b><br><span class="interactive-muted">Нажми «Подключить Telegram».</span></div><span>🔌</span>`;
+  };
+  async function pollActions(){
+    if(!window.bpCloud?.pullActions)return;
+    const actions=await window.bpCloud.pullActions();
+    for(const a of actions){
+      if(a.type==='repair' && typeof window.serviceVehicleV43==='function') window.serviceVehicleV43(a.vehicleId);
+    }
+  }
+  document.addEventListener('DOMContentLoaded',()=>{
+    setTimeout(()=>{window.renderTelegramProfileStatus?.();window.syncTelegramGameState?.();},800);
+    actionTimer=setInterval(()=>{pollActions();if(document.getElementById('game-section-profile')?.classList.contains('active'))window.renderTelegramProfileStatus?.();},8000);
+  });
+  window.addEventListener('visibilitychange',()=>{if(!document.hidden){pollActions();window.syncTelegramGameState?.();}});
 })();

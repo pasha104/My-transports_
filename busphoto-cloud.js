@@ -1,97 +1,70 @@
-/* My-transports — простой локальный профиль + Telegram без Supabase.
-   Все данные игры продолжают храниться в localStorage.
-   Telegram подключается через Render.
+/* My-transports — лёгкий профиль + Telegram.
+   Игровая логика остаётся локальной. Сервер Telegram получает только снимок
+   состояния, нужный для меню бота, и не вмешивается в базу данных сайта.
 */
 (function(){
-  const cfg = window.BP_TELEGRAM_CONFIG || {apiBase:"https://my-transports-telegram.onrender.com"};
+  const cfg = window.BP_TELEGRAM_CONFIG || {};
   const apiBase = String(cfg.apiBase || '').replace(/\/$/,'');
-  const USER_KEY = 'mytransports_local_user_v1';
-  const TG_KEY = 'mytransports_telegram_status_v1';
-  const KEYS = ['busphoto_interactive_game','busphoto_service_cards_v1'];
-
+  const USER_KEY = 'mytransports_local_user_v2';
   let profile = null;
-  try { profile = JSON.parse(localStorage.getItem(USER_KEY) || 'null'); } catch {}
+  try { profile = JSON.parse(localStorage.getItem(USER_KEY) || 'null'); } catch(e) {}
   if(!profile || !profile.id){
-    profile = { id: 'local-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now()+'-'+Math.random().toString(36).slice(2)), createdAt: new Date().toISOString() };
+    const uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now()+'-'+Math.random().toString(36).slice(2);
+    profile = {id:'local-'+uid, createdAt:new Date().toISOString()};
     localStorage.setItem(USER_KEY, JSON.stringify(profile));
   }
 
-  function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
-  async function jsonFetch(path, options={}){
-    const r=await fetch(apiBase+path, options);
-    const j=await r.json().catch(()=>({ok:false,error:'Сервер вернул неверный ответ'}));
-    if(!r.ok || j.ok===false) throw new Error(j.error || `Ошибка сервера ${r.status}`);
+  async function api(path, options={}){
+    if(!apiBase) throw new Error('Telegram-сервер не настроен');
+    const r = await fetch(apiBase+path, options);
+    const j = await r.json().catch(()=>({ok:false,error:'Неверный ответ сервера'}));
+    if(!r.ok || j.ok===false) throw new Error(j.error || ('Ошибка сервера '+r.status));
     return j;
   }
   async function startTelegramLink(){
-    return jsonFetch('/api/telegram/link/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:profile.id})});
+    return api('/api/telegram/link/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:profile.id})});
   }
   async function telegramStatus(){
-    try{return await jsonFetch('/api/telegram/link/status?userId='+encodeURIComponent(profile.id));}
+    try{return await api('/api/telegram/link/status?userId='+encodeURIComponent(profile.id));}
     catch(e){return {ok:false,connected:false,error:e.message};}
   }
   async function sendTelegram(text){
-    return jsonFetch('/api/telegram/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:profile.id,text})});
+    return api('/api/telegram/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:profile.id,text})});
   }
-  function logout(){
-    if(!confirm('Удалить локальный профиль с этого устройства?')) return;
-    localStorage.removeItem(USER_KEY); localStorage.removeItem(TG_KEY); location.reload();
+  async function syncState(state){
+    if(!apiBase || !state) return false;
+    try{
+      const safe={
+        balance:Number(state.balance||0),
+        owned:(state.owned||[]).map(v=>({id:String(v.id),model:v.model,submodel:v.submodel,category:v.category,plate:v.plate,num:v.num,price:Number(v.price||0),currentSalary:Number(v.currentSalary||0),health:Number(v.health==null?100:v.health),maintenanceDue:!!v.maintenanceDue,repairUntil:v.repairUntil||null,repairCost:Number(v.repairCost||0),stats:v.stats||{trips:0,arrivals:0,distanceKm:0,workMinutes:0,earned:0}})),
+        cards:(state.serviceCards||[]).map(c=>({id:c.id,vehicleId:c.vehicleId,active:c.active!==false,routeId:c.routeId,parkDeparture:c.parkDeparture,startTime:c.startTime,endTime:c.endTime,workUntil:c.workUntil})),
+        log:(state.log||[]).slice(0,20).map(x=>({date:x.date,time:x.time,type:x.type,total:Number(x.total||0),details:Array.isArray(x.details)?x.details.slice(0,3):[]})),
+        updatedAt:new Date().toISOString()
+      };
+      await api('/api/telegram/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:profile.id,state:safe})});
+      return true;
+    }catch(e){return false;}
+  }
+  async function pullActions(){
+    if(!apiBase) return [];
+    try{const r=await api('/api/telegram/actions?userId='+encodeURIComponent(profile.id));return Array.isArray(r.actions)?r.actions:[];}catch(e){return [];}
   }
 
-  window.bpCloudReady = Promise.resolve();
-  window.bpCloud = {
-    get user(){return profile},
-    get supabase(){return null},
-    syncNow: async()=>true,
-    startTelegramLink,
-    telegramStatus,
-    sendTelegram,
-    logout,
-    configured:()=>true,
-    openAuth
-  };
+  window.bpCloudReady=Promise.resolve();
+  window.bpCloud={user:profile,get supabase(){return null;},configured:()=>Boolean(apiBase),startTelegramLink,telegramStatus,sendTelegram,syncState,pullActions,openAuth:function(){ if(typeof window.openTelegramProfile==='function') window.openTelegramProfile(); }};
 
-  function renderBar(){
-    if(!document.body || document.getElementById('bpAuthBar')) return;
-    const bar=document.createElement('div'); bar.id='bpAuthBar';
-    bar.innerHTML='<button type="button" id="bpAuthButton">👤 Профиль</button>';
-    const style=document.createElement('style'); style.textContent=`
-      #bpAuthBar{position:fixed;right:10px;bottom:10px;z-index:100000}
-      #bpAuthButton{border:1px solid #55718c;border-radius:999px;background:#1e3f66;color:#fff;padding:9px 13px;font-weight:700;box-shadow:0 4px 18px #0004;cursor:pointer}
-      #bpAuthModal{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;z-index:100001;padding:15px}
-      #bpAuthCard{width:min(430px,100%);background:#fff;color:#111;border-radius:16px;padding:18px;box-shadow:0 15px 60px #0008}
-      #bpAuthCard h2{margin:0 0 12px} #bpAuthCard button{padding:11px 14px;border:0;border-radius:9px;margin:5px 4px 0 0;cursor:pointer;font-weight:700}
-      .bp-primary{background:#1e3f66;color:#fff}.bp-secondary{background:#eee;color:#111}.bp-danger{background:#b00020;color:#fff}
-      #bpAuthMsg{min-height:20px;margin:10px 0;color:#444;line-height:1.45}.bp-user-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-    `; document.head.appendChild(style); document.body.appendChild(bar); bar.querySelector('button').onclick=openAuth;
-  }
-  function openAuth(){
-    let old=document.getElementById('bpAuthModal'); if(old){old.remove();return;}
-    const m=document.createElement('div'); m.id='bpAuthModal';
-    m.innerHTML=`<div id="bpAuthCard">
-      <h2>👤 My-transports</h2>
-      <div><b>Профиль устройства</b></div>
-      <div style="font-size:12px;color:#666;margin-top:5px;word-break:break-all">ID: ${esc(profile.id)}</div>
-      <div id="bpAuthMsg">Профиль уже готов. Регистрация и Supabase для работы сайта не нужны.</div>
-      <div class="bp-user-row">
-        <button class="bp-primary" id="bpTg">🤖 Подключить Telegram</button>
-        <button class="bp-secondary" id="bpClose">Закрыть</button>
-        <button class="bp-danger" id="bpLogout">Сбросить профиль</button>
-      </div>
-    </div>`;
+  window.openTelegramProfile=async function(){
+    const old=document.getElementById('bpTelegramModal'); if(old){old.remove();return;}
+    const m=document.createElement('div');m.id='bpTelegramModal';
+    const css=`<style id="bpTelegramStyle">#bpTelegramModal{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}#bpTelegramCard{width:min(430px,100%);background:var(--bp-panel,#fff);color:var(--bp-text,#111);border:1px solid var(--bp-border,#ccc);border-radius:18px;padding:18px;box-shadow:0 15px 50px #0008}#bpTelegramCard button{padding:11px 14px;border:0;border-radius:10px;font-weight:700;margin:5px 5px 0 0;cursor:pointer}#bpTelegramConnect{background:#2481cc;color:#fff}#bpTelegramClose{background:#e9e9e9;color:#111}#bpTelegramMsg{margin:12px 0;line-height:1.45;word-break:break-word}.bp-tg-code{font-size:24px;font-weight:900;letter-spacing:2px;text-align:center;padding:12px;border-radius:10px;background:rgba(30,63,102,.12)}</style>`;
+    m.innerHTML=css+`<div id="bpTelegramCard"><h2 style="margin:0 0 8px">👤 My-transports</h2><div class="interactive-muted">Профиль этого устройства</div><div style="font-size:11px;opacity:.7;margin-top:4px;word-break:break-all">ID: ${profile.id}</div><div id="bpTelegramMsg">Проверяем Telegram…</div><button id="bpTelegramConnect">🤖 Подключить Telegram</button><button id="bpTelegramClose">Закрыть</button></div>`;
     document.body.appendChild(m);
-    m.querySelector('#bpClose').onclick=()=>m.remove();
-    m.querySelector('#bpLogout').onclick=logout;
-    m.querySelector('#bpTg').onclick=async()=>{
-      const msg=m.querySelector('#bpAuthMsg');
-      try{
-        const st=await telegramStatus();
-        if(st.connected){msg.textContent='✅ Telegram уже подключён к этому профилю.';return;}
-        const r=await startTelegramLink();
-        msg.innerHTML=`🤖 Откройте бота и отправьте ему код <b>${esc(r.code)}</b>.<br>Код действует 10 минут.`;
-        let n=0; const timer=setInterval(async()=>{n++; const s=await telegramStatus(); if(s.connected){clearInterval(timer);msg.textContent='✅ Telegram успешно подключён!';} if(n>=30)clearInterval(timer)},2000);
-      }catch(e){msg.textContent='❌ '+e.message;}
+    m.querySelector('#bpTelegramClose').onclick=()=>m.remove();
+    const msg=m.querySelector('#bpTelegramMsg');
+    const check=async()=>{const s=await telegramStatus(); if(s.connected){msg.innerHTML='✅ Telegram подключён.<br><span style="font-size:12px;opacity:.75">chat_id: '+s.chatId+'</span>';return true;} msg.textContent='Telegram ещё не подключён.';return false;};
+    await check();
+    m.querySelector('#bpTelegramConnect').onclick=async()=>{
+      try{const r=await startTelegramLink();msg.innerHTML=`Отправь этот код своему боту:<div class="bp-tg-code">${r.code}</div><div style="font-size:12px;margin-top:7px">Код действует 10 минут. После отправки боту окно можно оставить открытым — подключение определится автоматически.</div>`;let n=0;const t=setInterval(async()=>{n++;if(await check()){clearInterval(t);if(typeof window.syncTelegramGameState==='function')window.syncTelegramGameState();}if(n>=60)clearInterval(t)},2000);}catch(e){msg.textContent='❌ '+e.message;}
     };
-  }
-  window.addEventListener('DOMContentLoaded',renderBar);
+  };
 })();
