@@ -156,6 +156,7 @@
             stopRenderZoom: 13,
             vehicleRenderSignature: '',
             depotMarkers: new Map(),
+            controlMarkers: new Map(),
             trackingVehicleId: null,
             lastTrackPanAt: 0
         };
@@ -1361,11 +1362,39 @@
             renderMapDraftInfo(); renderControlPoints();
         }
         function renderControlPoints(){
-            const el=document.getElementById('mapControlPointList'); if(!el)return;
+            const el=document.getElementById('mapControlPointList');
             const cps=mapState.draftPath.filter(x=>x.kind==='control');
-            el.innerHTML=cps.length?cps.map((x,i)=>`<div class="map-stop-item"><span class="map-stop-num">${i+1}</span><span>📍 Контрольная точка · ${Number(x.point.lat).toFixed(5)}, ${Number(x.point.lon).toFixed(5)}</span></div>`).join(''):'<div class="map-help">Контрольных точек пока нет.</div>';
+            // Сначала убираем старые маркеры, чтобы на карте не оставались удалённые точки.
+            if (mapState.controlMarkers) {
+                mapState.controlMarkers.forEach(m=>{ try{m.remove();}catch(e){} });
+                mapState.controlMarkers.clear();
+            }
+            if (mapState.map && window.L) {
+                cps.forEach((x,i)=>{
+                    const p=x.point;
+                    const icon=L.divIcon({className:'control-point-icon',html:`<span style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#111;color:#fff;border:3px solid #fff;box-shadow:0 2px 7px rgba(0,0,0,.45);font-size:12px;font-weight:800;">${i+1}</span>`,iconSize:[28,28],iconAnchor:[14,14]});
+                    const marker=L.marker([Number(p.lat),Number(p.lon)],{icon,zIndexOffset:900}).addTo(mapState.map);
+                    marker.bindPopup(`<b>🎯 Контрольная точка №${i+1}</b><br>${Number(p.lat).toFixed(5)}, ${Number(p.lon).toFixed(5)}`);
+                    mapState.controlMarkers.set(String(p.id),marker);
+                });
+            }
+            if(!el)return;
+            el.innerHTML=cps.length?cps.map((x,i)=>`<div class="map-stop-item" style="display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;"><span class="map-stop-num">${i+1}</span><span><b>🎯 Точка ${i+1}</b><br><small>${Number(x.point.lat).toFixed(5)}, ${Number(x.point.lon).toFixed(5)}</small></span><button type="button" class="btn-secondary" style="padding:4px 7px;font-size:11px;" onclick="removeControlPoint('${String(x.point.id).replace(/'/g,\"\\'\")}')">🗑️ Удалить</button></div>`).join(''):'<div class="map-help">Контрольных точек пока нет. На карте они отмечаются чёрными кружками с номерами.</div>';
         }
-        function clearControlPoints(){ mapState.draftPath=mapState.draftPath.filter(x=>x.kind!=='control'); renderMapDraftInfo(); renderControlPoints(); mapSetStatus('Контрольные точки очищены'); }
+        function removeControlPoint(id){
+            const before=mapState.draftPath.length;
+            mapState.draftPath=mapState.draftPath.filter(x=>!(x.kind==='control' && String(x.point?.id)===String(id)));
+            if(mapState.draftPath.length===before){ mapSetStatus('Контрольная точка не найдена'); return; }
+            renderMapDraftInfo();
+            renderControlPoints();
+            mapSetStatus('Контрольная точка удалена. Остальные точки сохранены.');
+        }
+        function clearControlPoints(){
+            mapState.draftPath=mapState.draftPath.filter(x=>x.kind!=='control');
+            renderMapDraftInfo();
+            renderControlPoints();
+            mapSetStatus('Контрольные точки очищены');
+        }
 
         function clearRouteDraft() {
             mapState.draftStopIds = [];
