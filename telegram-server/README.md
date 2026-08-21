@@ -46,3 +46,8 @@ Each user gets a different Telegram connection. The bot token is shared by the b
 
 ## Important
 Do not publish `SUPABASE_SERVICE_ROLE_KEY` or `BOT_TOKEN` in the GitHub repository.
+
+## Быстрый тест
+После деплоя открой `https://my-transports-telegram.onrender.com`.
+Если сервер настроен, он вернёт JSON с `ok: true`.
+Команда `/start` в Telegram должна отвечать сообщением бота.
