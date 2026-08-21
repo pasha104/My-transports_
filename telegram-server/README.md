@@ -1,23 +1,15 @@
-# My-transports Telegram — простой режим
+# Telegram — максимально простая настройка
 
-Этот сервер работает БЕЗ Supabase и БЕЗ SQL.
+1. В Render создай Web Service из папки `telegram-server`.
+2. Language: Node.
+3. Build Command: `npm install`
+4. Start Command: `npm start`
+5. Instance: Free.
+6. Environment Variables:
+   - `BOT_TOKEN` — токен Telegram-бота.
+   - `SITE_ORIGIN` — `https://pasha104.github.io`
+   - `SITE_URL` — `https://pasha104.github.io/My-transports_/interactive.html`
 
-## Render
+Больше ничего не нужно.
 
-- Language: Node
-- Root Directory: `telegram-server`
-- Build Command: `npm install`
-- Start Command: `npm start`
-- Instance: Free
-
-Нужна только одна переменная:
-
-- `BOT_TOKEN` — токен Telegram-бота
-
-`SITE_ORIGIN` можно не задавать: для простого режима сервер разрешает запросы с сайта.
-
-## Подключение
-
-На сайте: 👤 Профиль → 🤖 Подключить Telegram → отправить код боту.
-
-ВАЖНО: привязки хранятся в памяти Render. При перезапуске/сне бесплатного сервиса привязку Telegram может потребоваться сделать заново. Данные интерактива при этом остаются в localStorage браузера.
+После деплоя проверь `https://ТВОЙ-АДРЕС.onrender.com/health` — должен вернуться JSON с `ok:true`.

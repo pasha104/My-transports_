@@ -1,18 +1,11 @@
 {
   "name": "my-transports-telegram-server",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Telegram bridge for the My-transports interactive site",
+  "description": "My-transports Telegram bridge",
   "main": "server.js",
   "type": "commonjs",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "engines": {
-    "node": ">=20 <25"
-  },
-  "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^5.1.0"
-  }
+  "scripts": {"start":"node server.js"},
+  "engines": {"node": ">=20 <25"},
+  "dependencies": {"cors":"^2.8.5","express":"^5.1.0"}
 }
