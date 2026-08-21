@@ -2180,6 +2180,12 @@ out body;
                 mapState.busMarkers.set(key,marker);
             });
             mapState.busMarkers.forEach((marker,key)=>{if(!activeKeys.has(key)){marker.remove();mapState.busMarkers.delete(key);}});
+            renderMapTrackerSelect();
+            const tracked=mapState.trackingVehicleId ? gameState.owned.find(v=>String(v.id)===String(mapState.trackingVehicleId)) : null;
+            if(tracked){
+                const sim=getVehicleSimulationPoint(tracked); const status=document.getElementById('mapTrackerStatus');
+                if(status && sim.route) status.textContent=`${vehicleCategoryIcon(tracked.category)} ${tracked.model} · №${tracked.plate||tracked.num||'—'} · маршрут №${sim.route.number} · ${sim.phase}`;
+            }
             if(!forceVehicleMode) renderMapBusList();
         }
 
@@ -2529,11 +2535,54 @@ out body;
             window.trackerTimer=setTimeout(loop,0);
         }
 
+        function renderMapTrackerSelect() {
+            const select=document.getElementById('mapTrackerVehicleSelect');
+            if(!select) return;
+            const activeVehicles=gameState.owned.filter(v=>getVehicleServiceCards(v.id).length || getVehicleRoute(v.id));
+            const prev=mapState.trackingVehicleId || '';
+            select.innerHTML='<option value="">— Выбери ТС на линии —</option>'+activeVehicles.map(v=>{
+                const active=getActiveServiceRouteAndSchedule(v.id,new Date());
+                const route=active?.route||getVehicleRoute(v.id);
+                return `<option value="${escapeHtml(v.id)}">${vehicleCategoryIcon(v.category)} ${escapeHtml(v.model)} · ${escapeHtml(v.plate||v.num||'без номера')} · №${escapeHtml(route?.number||'—')}</option>`;
+            }).join('');
+            if(prev && activeVehicles.some(v=>String(v.id)===String(prev))) select.value=prev;
+        }
+
+        window.selectMapTrackedVehicle=function(vehicleId){
+            mapState.trackingVehicleId=vehicleId||null;
+            mapState.lastTrackPanAt=0;
+            const status=document.getElementById('mapTrackerStatus');
+            const v=gameState.owned.find(x=>String(x.id)===String(vehicleId));
+            if(!v){ if(status) status.textContent='Выбери ТС для слежения.'; return; }
+            const sim=getVehicleSimulationPoint(v);
+            const active=getActiveServiceRouteAndSchedule(v.id,new Date());
+            const route=active?.route||sim.route||getVehicleRoute(v.id);
+            if(status) status.textContent=route ? `${vehicleCategoryIcon(v.category)} ${v.model} · №${v.plate||v.num||'—'} · маршрут №${route.number} · ${sim.phase}` : `${vehicleCategoryIcon(v.category)} ${v.model}: сейчас в парке.`;
+            if(mapState.map){ updateMapBusMarkers(true); if(sim.point) mapState.map.setView(sim.point,Math.max(mapState.map.getZoom(),14),{animate:false}); }
+        };
+
+        window.centerMapTrackedVehicle=function(){
+            if(!mapState.trackingVehicleId || !mapState.map) return;
+            const v=gameState.owned.find(x=>String(x.id)===String(mapState.trackingVehicleId));
+            if(!v) return;
+            const sim=getVehicleSimulationPoint(v);
+            if(sim.point) mapState.map.setView(sim.point,Math.max(mapState.map.getZoom(),14),{animate:false});
+            const status=document.getElementById('mapTrackerStatus');
+            if(status && sim.route) status.textContent=`${vehicleCategoryIcon(v.category)} ${v.model} · маршрут №${sim.route.number} · ${sim.phase}`;
+        };
+
+        window.stopMapTrackingVehicle=function(){
+            mapState.trackingVehicleId=null; mapState.lastTrackPanAt=0;
+            const select=document.getElementById('mapTrackerVehicleSelect'); if(select) select.value='';
+            const status=document.getElementById('mapTrackerStatus'); if(status) status.textContent='Слежение снято.';
+        };
+
         async function renderMapIfReady() {
             if (!document.getElementById('routeMap')) return;
             await initRouteMap();
             if (!mapState.map) return;
             renderMapRouteControls();
+            renderMapTrackerSelect();
             renderMapStops();
             renderMapRouteLayers();
             renderMapDraftInfo();
@@ -2552,10 +2601,6 @@ out body;
             // Это было одной из главных причин задержек на телефонах и ПК.
             if (section === 'map') {
                 setTimeout(renderMapIfReady, 60);
-            } else if (section === 'tracker') {
-                stopMapBusAnimation();
-                setTimeout(initTrackerMap, 60);
-                renderTrackerVehicleSelect();
             } else {
                 stopMapBusAnimation();
                 if (section === 'routes') renderRoutes();
@@ -3269,7 +3314,7 @@ out body;
   };
 
   window.focusVehicleV43=function(id){
-    const btn=[...document.querySelectorAll('.game-menu-btn')].find(x=String(x.getAttribute('onclick')||'').includes("'tracker'"));
+    const btn=[...document.querySelectorAll('.game-menu-btn')].find(x=String(x.getAttribute('onclick')||'').includes("'map'"));
     showGameSection('tracker',btn);
     const sel=document.getElementById('trackerVehicle');
     if(sel){sel.value=id;sel.dispatchEvent(new Event('change'));}

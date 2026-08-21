@@ -66,7 +66,6 @@ if (window.caches) {
 <button class="game-menu-btn" onclick="showGameSection('history', this)">📜 История</button>
 <button class="game-menu-btn" onclick="showGameSection('routes', this)">🛣️ Маршруты</button>
 <button class="game-menu-btn" onclick="showGameSection('map', this)">🗺️ Карта</button>
-<button class="game-menu-btn" onclick="showGameSection('tracker', this)">🛰️ Следить за ТС</button>
 <a class="game-menu-btn" href="creating_card.html" style="text-decoration:none;display:flex;align-items:center;justify-content:center;">🗓️ Создать карточку ТС</a>
 <button class="game-menu-btn" onclick="showGameSection('dispatch', this)">🚦 Диспетчерская</button>
 <button class="game-menu-btn" onclick="showGameSection('stats', this)">📊 Статистика ТС</button>
@@ -208,23 +207,6 @@ if (window.caches) {
 </div>
 </div>
 
-<div class="game-section" id="game-section-tracker">
-<div class="interactive-card">
-<h3>🛰️ Следить за ТС</h3>
-<div class="interactive-muted" style="margin-bottom:10px;">Выбери ТС — карта будет автоматически следить за ним. Движение остаётся игровой симуляцией.</div>
-<div class="tracker-controls">
-<label style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:220px;">ТС
-<select class="map-mini-input" id="trackerVehicleSelect" onchange="selectTrackedVehicle(this.value)"></select></label>
-<button class="btn-primary" type="button" onclick="centerTrackedVehicle()">🎯 Центрировать</button>
-<button class="btn-secondary" type="button" onclick="stopTrackingVehicle()">⏹ Снять слежение</button>
-</div>
-<div class="tracker-status" id="trackerStatus">Выбери ТС для слежения.</div>
-</div>
-<div class="interactive-card">
-<div id="trackerMap"></div>
-</div>
-</div>
-
 <div class="game-section" id="game-section-map">
 <div class="interactive-card">
 <h3>🗺️ Карта Минска и Минского района</h3>
@@ -297,6 +279,17 @@ if (window.caches) {
 <button class="btn-secondary" onclick="startNewMapRoute()" style="width:100%; margin-top:6px;">🆕 Новый маршрут</button>
 <button class="btn-primary" onclick="buildSelectedRoute()" style="width:100%; margin-top:6px;">🛣️ Построить по дорогам</button>
 <button class="btn-secondary" onclick="saveMapRouteGeometry()" style="width:100%; margin-top:6px;">💾 Сохранить маршрут</button>
+</div>
+<div class="map-panel" id="mapTrackerPanel">
+<h4>🛰️ Следить за ТС</h4>
+<div class="interactive-muted" style="margin-bottom:7px;">Выбери ТС прямо здесь. Камера карты будет следить за ним, а текущий маршрут и состояние берутся из его активной карточки.</div>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;align-items:end;">
+<label style="display:flex;flex-direction:column;gap:4px;">ТС
+<select class="map-mini-input" id="mapTrackerVehicleSelect" onchange="selectMapTrackedVehicle(this.value)"></select></label>
+<button class="btn-primary" type="button" onclick="centerMapTrackedVehicle()">🎯 Центр</button>
+<button class="btn-secondary" type="button" onclick="stopMapTrackingVehicle()">⏹ Снять</button>
+</div>
+<div class="tracker-status" id="mapTrackerStatus" style="margin-top:7px;">Выбери ТС для слежения.</div>
 </div>
 <div class="map-panel">
 <h4>🚍 ТС на линии</h4>

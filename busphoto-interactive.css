@@ -502,3 +502,6 @@
     grid-column: auto;
   }
 }
+/* v48: слежение встроено непосредственно в карту */
+#mapTrackerPanel .tracker-status{padding:6px 8px;border:1px solid var(--bp-border);border-radius:6px;background:var(--bp-panel,#fff);font-size:11px}
+@media(max-width:640px){#mapTrackerPanel>div[style*="grid-template-columns"]{grid-template-columns:1fr!important}#mapTrackerPanel button{width:100%}}
