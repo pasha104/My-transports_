@@ -1379,7 +1379,7 @@
                 });
             }
             if(!el)return;
-            el.innerHTML=cps.length?cps.map((x,i)=>`<div class="map-stop-item" style="display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;"><span class="map-stop-num">${i+1}</span><span><b>🎯 Точка ${i+1}</b><br><small>${Number(x.point.lat).toFixed(5)}, ${Number(x.point.lon).toFixed(5)}</small></span><button type="button" class="btn-secondary" style="padding:4px 7px;font-size:11px;" onclick="removeControlPoint('${String(x.point.id).replace(/'/g,\"\\'\")}')">🗑️ Удалить</button></div>`).join(''):'<div class="map-help">Контрольных точек пока нет. На карте они отмечаются чёрными кружками с номерами.</div>';
+            el.innerHTML=cps.length?cps.map((x,i)=>`<div class="map-stop-item" style="display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;"><span class="map-stop-num">${i+1}</span><span><b>🎯 Точка ${i+1}</b><br><small>${Number(x.point.lat).toFixed(5)}, ${Number(x.point.lon).toFixed(5)}</small></span><button type="button" class="btn-secondary" style="padding:4px 7px;font-size:11px;" onclick='removeControlPoint(${JSON.stringify(String(x.point.id))})'>🗑️ Удалить</button></div>`).join(''):'<div class="map-help">Контрольных точек пока нет. На карте они отмечаются чёрными кружками с номерами.</div>';
         }
         function removeControlPoint(id){
             const before=mapState.draftPath.length;
@@ -3227,7 +3227,7 @@ out body;
         }
 
         if (document.getElementById('gameModel')) {
-            initInteractiveGame();
+            Promise.resolve(window.bpCloudReady).then(() => initInteractiveGame());
         }
 
 
