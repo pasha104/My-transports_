@@ -1,0 +1,4 @@
+# Secrets / local files
+.env
+.env.*
+telegram-server/.env

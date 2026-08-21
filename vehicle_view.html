@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="busphoto-common.css?v=20260820-v43">
+<title>BUSPHOTO — Вид ТС</title>
+<style>
+.vehicle-view{max-width:900px;margin:0 auto;background:var(--bp-card-bg);border:1px solid var(--bp-border);border-radius:10px;padding:16px;box-sizing:border-box}
+.vehicle-view h1{margin:0 0 4px;font-size:22px}.vehicle-view .muted{color:var(--bp-muted);margin-bottom:16px}
+.vehicle-photo{width:100%;max-height:520px;object-fit:contain;background:var(--bp-input-bg);border:1px solid var(--bp-border);border-radius:10px;display:block}
+.no-photo{min-height:260px;display:flex;align-items:center;justify-content:center;color:var(--bp-muted);font-size:18px;border:1px dashed var(--bp-border);border-radius:10px;background:var(--bp-input-bg)}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.info-item{padding:10px;border:1px solid var(--bp-border);border-radius:7px;background:var(--bp-panel)}.info-item b{display:block;margin-bottom:4px}
+.view-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.view-actions button,.view-actions a{flex:1;min-width:180px;text-align:center;box-sizing:border-box}
+@media(max-width:700px){.vehicle-view{padding:10px}.info-grid{grid-template-columns:1fr}.view-actions{display:grid;grid-template-columns:1fr}.view-actions button,.view-actions a{min-width:0;width:100%}}
+</style>
+<script src="busphoto-common.js?v=20260820-v43" defer></script>
+</head>
+<body class="light-theme">
+<header><div><span class="logo-box">BUSPHOTO</span><span id="header-subtitle" style="font-size:15px;font-weight:bold;margin-left:8px;">База данных ПС</span></div><div class="header-controls"><select aria-label="Язык" class="theme-toggle-btn language-select" id="headerLangSelect" onchange="changeLanguage(this.value)"><option value="ru">Русский</option><option value="be">Беларуская</option><option value="uk">Українська</option><option value="en">English</option><option value="de">Deutsch</option><option value="zh">中文</option></select><button class="theme-toggle-btn" onclick="toggleTheme()">🌓 Сменить тему</button><div style="font-size:11px;color:#c8e6c9;">ТС в базе: <b id="dbCount">0</b></div></div></header>
+<nav><a class="nav-btn active" href="index.html">📋 База данных + поиск</a><a class="nav-btn" href="models.html">🚍 Список моделей</a><a class="nav-btn" href="interactive.html">🎮 Интерактив</a></nav>
+<div class="main-wrapper"><div class="vehicle-view" id="vehicleView"><div>Загрузка…</div></div></div>
+<script>
+window.addEventListener('DOMContentLoaded', () => setTimeout(renderVehicleView, 0));
+function renderVehicleView(){
+  loadDatabase();
+  const idx=Number(new URLSearchParams(location.search).get('i'));
+  const v=vehicleDB[idx];
+  const root=document.getElementById('vehicleView');
+  if(!v){root.innerHTML='<h1>ТС не найдено</h1><p>Запись отсутствует в базе данных.</p><a class="btn-secondary" href="index.html">← Вернуться в базу</a>';return;}
+  document.getElementById('dbCount').textContent=vehicleDB.length;
+  const photo=getVehiclePhoto(idx);
+  const t=translations[currentLang]||translations.ru;
+  const purpose=t[v.purposeKey]||v.purposeKey||'—';
+  const status=t[v.statusKey]||v.statusKey||'—';
+  root.innerHTML=`
+    <h1>🚍 ${escapeHtml(v.model||'ТС')}</h1>
+    <div class="muted">${escapeHtml(v.gov&&v.gov!=='—'?v.gov:'Без госномера')} · Борт./гар. № ${escapeHtml(v.num||'—')}</div>
+    <div>${photo?`<img class="vehicle-photo" src="${photo}" alt="Фото ${escapeHtml(v.model||'ТС')}">`:`<div class="no-photo">📷 Фото для этого ТС ещё не загружено</div>`}</div>
+    <div class="view-actions"><button class="btn-primary" onclick="goPhoto()">📷 ${photo?'Заменить фото':'Загрузить фото'}</button><button class="btn-secondary" onclick="history.back()">← Вернуться в базу</button></div>
+    <div class="info-grid">
+      <div class="info-item"><b>Парк</b>${escapeHtml(v.park)}</div><div class="info-item"><b>Модель</b>${escapeHtml(v.model)}</div>
+      <div class="info-item"><b>Модель / подмодель</b>${escapeHtml(v.modelPrefix||'—')}</div><div class="info-item"><b>Гос. номер</b>${escapeHtml(v.gov||'—')}</div>
+      <div class="info-item"><b>Борт. / гар. №</b>${escapeHtml(v.num||'—')}</div><div class="info-item"><b>Назначение</b>${escapeHtml(purpose)}</div>
+      <div class="info-item"><b>Заводской №</b>${escapeHtml(v.factory||'—')}</div><div class="info-item"><b>VIN</b>${escapeHtml(v.vin||'—')}</div>
+      <div class="info-item"><b>Построен</b>${escapeHtml(v.build||'—')}</div><div class="info-item"><b>Поступил</b>${escapeHtml(v.arrive||'—')}</div>
+      <div class="info-item"><b>Начал работу</b>${escapeHtml(v.start||'—')}</div><div class="info-item"><b>Отставлен</b>${escapeHtml(v.out||'—')}</div>
+      <div class="info-item"><b>Списан</b>${escapeHtml(v.decomm||'—')}</div><div class="info-item"><b>Утилизирован</b>${escapeHtml(v.util||'—')}</div>
+      <div class="info-item"><b>Статус</b>${escapeHtml(status)}</div><div class="info-item"><b>Примечание</b>${escapeHtml(v.note||'—')}</div>
+    </div>`;
+}
+function goPhoto(){
+  const idx=new URLSearchParams(location.search).get('i');
+  localStorage.setItem('busphoto_photo_target',idx||'');
+  location.href='index.html#upload-photo';
+}
+</script>
+</body></html>
