@@ -1,0 +1,105 @@
+MY-TRANSPORTS — ПРОСТАЯ НАСТРОЙКА
+=================================
+
+ВАЖНО: не нужно менять код сайта. Для первого запуска сделай только эти шаги.
+
+1. SUPABASE
+-----------
+Создай проект в Supabase.
+
+После создания открой Project Settings / Connect и возьми:
+- Project URL
+- Publishable key (или старый anon key)
+
+Затем открой SQL Editor → New query.
+Открой файл supabase_schema.sql из этого архива, скопируй ВЕСЬ текст,
+вставь в SQL Editor и нажми Run.
+
+2. НАСТРОЙ САЙТ
+---------------
+Открой файл:
+    busphoto-cloud-config.js
+
+Замени только:
+    https://YOUR-PROJECT.supabase.co
+на свой Project URL.
+
+И замени:
+    YOUR_SUPABASE_ANON_KEY
+на свой Publishable/anon key.
+
+Ничего другого в этом файле менять не нужно.
+
+3. GITHUB
+---------
+Загрузи содержимое этого архива в репозиторий GitHub.
+После обновления GitHub Pages подхватит изменения.
+
+4. RENDER / TELEGRAM
+--------------------
+Telegram-сервер уже находится в папке:
+    telegram-server
+
+На Render создай Web Service из этого репозитория.
+Укажи:
+    Root Directory: telegram-server
+    Build Command: npm install
+    Start Command: npm start
+    Instance: Free
+
+Добавь Environment Variables:
+
+    BOT_TOKEN = токен бота от BotFather
+    SUPABASE_URL = тот же Project URL
+    SUPABASE_SERVICE_ROLE_KEY = Secret/service_role key из Supabase
+    SITE_ORIGIN = https://pasha104.github.io
+
+ВНИМАНИЕ:
+BOT_TOKEN и SUPABASE_SERVICE_ROLE_KEY НЕЛЬЗЯ помещать в GitHub.
+Они должны быть только в Environment Variables Render.
+
+5. ПРОВЕРКА
+-----------
+После деплоя открой:
+    https://my-transports-telegram.onrender.com
+
+Должно появиться:
+    {"ok":true,"service":"my-transports-telegram-server"}
+
+Потом открой сайт GitHub Pages.
+Нажми 👤 My-transports → Создать аккаунт.
+
+После входа:
+    👤 My-transports → 🤖 Telegram
+
+Сайт выдаст код вида:
+    MY-XXXXXX
+
+Отправь этот код своему Telegram-боту.
+После этого Telegram будет привязан именно к этому аккаунту.
+
+ЧТО ГДЕ ХРАНИТСЯ
+-----------------
+Основная база ТС — отдельная и общая для сайта.
+Она НЕ является личным гаражом пользователя.
+
+Supabase хранит личные данные интерактива:
+- баланс;
+- гараж;
+- карточки;
+- маршруты;
+- историю и состояние игры.
+
+Telegram связывается с конкретным аккаунтом через user_id + chat_id.
+
+ЕСЛИ САЙТ ПОКАЗЫВАЕТ «ТС В БАЗЕ: 0»
+----------------------------------
+Это счётчик ОСНОВНОЙ базы данных ТС.
+Он не относится к Supabase-аккаунту и не означает, что гараж пустой.
+
+НЕ НАСТРАИВАЙ СЕЙЧАС КАРТУ, ТОПЛИВО И ДРУГИЕ ФУНКЦИИ.
+Сначала проверь:
+1) регистрация;
+2) вход;
+3) сохранение интерактива;
+4) Telegram.
