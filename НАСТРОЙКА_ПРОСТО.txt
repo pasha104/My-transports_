@@ -1,105 +1,39 @@
-MY-TRANSPORTS — ПРОСТАЯ НАСТРОЙКА
-=================================
+MY-TRANSPORTS — САМЫЙ ПРОСТОЙ РЕЖИМ
 
-ВАЖНО: не нужно менять код сайта. Для первого запуска сделай только эти шаги.
+ТЕБЕ НЕ НУЖНЫ:
+- Supabase
+- SQL
+- базы Supabase
+- ключи Supabase
 
-1. SUPABASE
------------
-Создай проект в Supabase.
+1. ЗАГРУЗИ ПРОЕКТ НА GITHUB
+   Загрузить все файлы из этой папки в свой репозиторий.
 
-После создания открой Project Settings / Connect и возьми:
-- Project URL
-- Publishable key (или старый anon key)
+2. TELEGRAM / RENDER
+   В Render открой My-transports-telegram.
+   Environment → проверь только:
 
-Затем открой SQL Editor → New query.
-Открой файл supabase_schema.sql из этого архива, скопируй ВЕСЬ текст,
-вставь в SQL Editor и нажми Run.
+   BOT_TOKEN = токен твоего Telegram-бота
 
-2. НАСТРОЙ САЙТ
----------------
-Открой файл:
-    busphoto-cloud-config.js
+   Больше ничего добавлять НЕ НУЖНО.
 
-Замени только:
-    https://YOUR-PROJECT.supabase.co
-на свой Project URL.
+   После изменения нажми Save, rebuild, and deploy.
 
-И замени:
-    YOUR_SUPABASE_ANON_KEY
-на свой Publishable/anon key.
+3. САЙТ
+   Открой GitHub Pages.
+   Внизу сайта появится кнопка 👤 Профиль.
 
-Ничего другого в этом файле менять не нужно.
+4. TELEGRAM
+   Нажми 👤 Профиль → 🤖 Подключить Telegram.
+   Сайт покажет код вида MY-XXXXXX.
+   Отправь этот код своему Telegram-боту.
 
-3. GITHUB
----------
-Загрузи содержимое этого архива в репозиторий GitHub.
-После обновления GitHub Pages подхватит изменения.
+5. ГОТОВО
+   После ответа бота Telegram подключён к этому профилю.
 
-4. RENDER / TELEGRAM
---------------------
-Telegram-сервер уже находится в папке:
-    telegram-server
-
-На Render создай Web Service из этого репозитория.
-Укажи:
-    Root Directory: telegram-server
-    Build Command: npm install
-    Start Command: npm start
-    Instance: Free
-
-Добавь Environment Variables:
-
-    BOT_TOKEN = токен бота от BotFather
-    SUPABASE_URL = тот же Project URL
-    SUPABASE_SERVICE_ROLE_KEY = Secret/service_role key из Supabase
-    SITE_ORIGIN = https://pasha104.github.io
-
-ВНИМАНИЕ:
-BOT_TOKEN и SUPABASE_SERVICE_ROLE_KEY НЕЛЬЗЯ помещать в GitHub.
-Они должны быть только в Environment Variables Render.
-
-5. ПРОВЕРКА
------------
-После деплоя открой:
-    https://my-transports-telegram.onrender.com
-
-Должно появиться:
-    {"ok":true,"service":"my-transports-telegram-server"}
-
-Потом открой сайт GitHub Pages.
-Нажми 👤 My-transports → Создать аккаунт.
-
-После входа:
-    👤 My-transports → 🤖 Telegram
-
-Сайт выдаст код вида:
-    MY-XXXXXX
-
-Отправь этот код своему Telegram-боту.
-После этого Telegram будет привязан именно к этому аккаунту.
-
-ЧТО ГДЕ ХРАНИТСЯ
------------------
-Основная база ТС — отдельная и общая для сайта.
-Она НЕ является личным гаражом пользователя.
-
-Supabase хранит личные данные интерактива:
-- баланс;
-- гараж;
-- карточки;
-- маршруты;
-- историю и состояние игры.
-
-Telegram связывается с конкретным аккаунтом через user_id + chat_id.
-
-ЕСЛИ САЙТ ПОКАЗЫВАЕТ «ТС В БАЗЕ: 0»
-----------------------------------
-Это счётчик ОСНОВНОЙ базы данных ТС.
-Он не относится к Supabase-аккаунту и не означает, что гараж пустой.
-
-НЕ НАСТРАИВАЙ СЕЙЧАС КАРТУ, ТОПЛИВО И ДРУГИЕ ФУНКЦИИ.
-Сначала проверь:
-1) регистрация;
-2) вход;
-3) сохранение интерактива;
-4) Telegram.
+ВАЖНО:
+- Интерактив работает сразу из localStorage.
+- Supabase не нужен.
+- Основная база ТС не связана с Telegram-профилем.
+- Если Render уснёт или перезапустится, Telegram-привязку может понадобиться сделать заново.
+- Данные игры в браузере не удаляются из-за перезапуска Render.
