@@ -140,6 +140,7 @@
             mode: 'select',
             selectedRouteId: null,
             draftStopIds: [],
+            draftPath: [],
             creatingNewRoute: false,
             stopMarkers: new Map(),
             routeLayers: new Map(),
@@ -701,7 +702,7 @@
             const type = document.getElementById('mapRouteType')?.value || 'bus';
             const name = document.getElementById('mapNewRouteName')?.value.trim() || `${stops[0].name} — ${stops[stops.length-1].name}`;
             const classicStops = stops.filter(s => s.stopType !== 'turnback');
-            const route = { id:Date.now()+Math.random(), number, name, start:(classicStops[0]||stops[0]).name, end:(classicStops[classicStops.length-1]||stops[stops.length-1]).name, distance:0, stopCount:stops.length, stops:stops.map(s=>s.name), stopIds:ids, terminalStopIds:classicStops.map(s=>s.id), turnbackStopIds:stops.filter(s=>s.stopType==='turnback').map(s=>s.id), turnaroundMinutes:2, color:type==='trolleybus'?'#1565c0':(type==='electrobus'?'#00897b':'#1e88e5'), note:'Создано через карту', routeType:type, vehicleId:null, vehicleIds:[], geometry:null, outboundGeometry:null, returnGeometry:null, reverseStopIds:ids.slice().reverse(), calculatedDistance:null, calculatedDuration:null, createdAt:localDateKey(), source:'map' };
+            const route = { id:Date.now()+Math.random(), number, name, start:(classicStops[0]||stops[0]).name, end:(classicStops[classicStops.length-1]||stops[stops.length-1]).name, distance:0, stopCount:stops.length, stops:stops.map(s=>s.name), stopIds:ids, terminalStopIds:classicStops.map(s=>s.id), turnbackStopIds:stops.filter(s=>s.stopType==='turnback').map(s=>s.id), turnaroundMinutes:2, color:type==='trolleybus'?'#1565c0':(type==='electrobus'?'#00897b':'#1e88e5'), note:'Создано через карту', routeType:type, vehicleId:null, vehicleIds:[], geometry:null, outboundGeometry:null, returnGeometry:null, reverseStopIds:ids.slice().reverse(), calculatedDistance:null, calculatedDuration:null, createdAt:localDateKey(), source:'map', controlPoints:mapState.draftPath.filter(x=>x.kind==='control').map(x=>x.point), pathNodes:mapState.draftPath.map(x=>x.kind==='control'?{kind:'control',point:x.point}:{kind:'stop',stopId:x.stopId}) };
             gameState.routes.push(route);
             mapState.selectedRouteId = route.id;
             mapState.creatingNewRoute = false;
@@ -722,7 +723,8 @@
                 // уже выбранные остановки первого направления считались бы выбранными
                 // и повторно нажать на них было невозможно.
                 mapState.draftStopIds = [];
-                renderMapDraftInfo();
+                mapState.draftPath = [];
+                renderMapDraftInfo(); renderControlPoints();
                 renderMapStops();
             }
         }
@@ -1117,7 +1119,7 @@
             const btn = document.getElementById(
                 mode === 'select' ? 'mapModeSelect' :
                 mode === 'add' ? 'mapModeAdd' :
-                mode === 'route' ? 'mapModeRoute' : 'mapModeVehicles'
+                mode === 'route' ? 'mapModeRoute' : mode === 'control' ? 'mapModeControl' : 'mapModeVehicles'
             );
             if (btn) btn.classList.add('active');
 
@@ -1130,6 +1132,7 @@
                 mapSetStatus('Режим сборки: нажимай остановки по порядку — каждая точка добавляется сразу.');
                 return;
             }
+            if (mode === 'control') { renderMapStops(); renderControlPoints(); mapSetStatus('Контрольные точки: кликай по карте в нужном порядке.'); return; }
             if (mode === 'vehicles') {
                 mapState.stopMarkers.forEach(m => m.remove());
                 mapState.stopMarkers.clear();
@@ -1169,6 +1172,14 @@
         }
 
         function onMapClick(e) {
+            if (mapState.mode === 'control') {
+                const cp = {id:'cp-'+Date.now()+'-'+Math.random().toString(36).slice(2,7), lat:e.latlng.lat, lon:e.latlng.lng, name:'Контрольная точка'};
+                mapState.draftPath.push({kind:'control', point:cp});
+                renderMapDraftInfo();
+                mapSetStatus(`Добавлена контрольная точка №${mapState.draftPath.filter(x=>x.kind==='control').length}.`);
+                renderControlPoints();
+                return;
+            }
             if (mapState.mode !== 'add') return;
 
             const name = prompt('Название новой остановки:', 'Новая остановка');
@@ -1336,19 +1347,30 @@
             const sid = String(stop.id);
             if (!mapState.draftStopIds.some(x => String(x) === sid)) {
                 mapState.draftStopIds.push(stop.id);
+                mapState.draftPath.push({kind:'stop', stopId:stop.id});
             }
             renderMapDraftInfo();
             mapSetStatus(`Добавлена остановка №${mapState.draftStopIds.length}: ${stop.name}`);
         }
 
         function removeDraftStop(index) {
-            mapState.draftStopIds.splice(index, 1);
-            renderMapDraftInfo();
+            const ids=mapState.draftStopIds.slice(); const id=ids[index];
+            mapState.draftStopIds.splice(index,1);
+            const pos=mapState.draftPath.findIndex(x=>x.kind==='stop' && String(x.stopId)===String(id));
+            if(pos>=0) mapState.draftPath.splice(pos,1);
+            renderMapDraftInfo(); renderControlPoints();
         }
+        function renderControlPoints(){
+            const el=document.getElementById('mapControlPointList'); if(!el)return;
+            const cps=mapState.draftPath.filter(x=>x.kind==='control');
+            el.innerHTML=cps.length?cps.map((x,i)=>`<div class="map-stop-item"><span class="map-stop-num">${i+1}</span><span>📍 Контрольная точка · ${Number(x.point.lat).toFixed(5)}, ${Number(x.point.lon).toFixed(5)}</span></div>`).join(''):'<div class="map-help">Контрольных точек пока нет.</div>';
+        }
+        function clearControlPoints(){ mapState.draftPath=mapState.draftPath.filter(x=>x.kind!=='control'); renderMapDraftInfo(); renderControlPoints(); mapSetStatus('Контрольные точки очищены'); }
 
         function clearRouteDraft() {
             mapState.draftStopIds = [];
-            renderMapDraftInfo();
+            mapState.draftPath = [];
+            renderMapDraftInfo(); renderControlPoints();
             mapSetStatus('Точки маршрута очищены');
         }
 
@@ -1356,10 +1378,8 @@
             const el = document.getElementById('mapDraftInfo');
             if (!el) return;
             const stops = getMapStops();
-            const names = mapState.draftStopIds
-                .map(id => stops.find(s => String(s.id) === String(id)))
-                .filter(Boolean)
-                .map((s, i) => `${i + 1}. ${escapeHtml(s.name)}`);
+            const nodes = (mapState.draftPath && mapState.draftPath.length) ? mapState.draftPath : mapState.draftStopIds.map(id=>({kind:'stop',stopId:id}));
+            const names = nodes.map((n,i)=>{ const s=n.kind==='control'?null:stops.find(x=>String(x.id)===String(n.stopId)); return `${i+1}. ${n.kind==='control' ? '🎯 Контрольная точка' : escapeHtml(s?.name||'Остановка')}`; });
 
             const mobileBar = document.getElementById('mobileDraftBar');
             if (mobileBar) {
@@ -1656,7 +1676,8 @@ out body;
                 const route = gameState.routes.find(r => String(r.id) === String(routeId));
                 if (route && Array.isArray(route.stopIds)) {
                     mapState.draftStopIds = route.stopIds.slice();
-                    renderMapDraftInfo();
+                    mapState.draftPath = Array.isArray(route.pathNodes) && route.pathNodes.length ? route.pathNodes.map(x=>x.kind==='control'?{kind:'control',point:x.point}:{kind:'stop',stopId:x.stopId}) : mapState.draftStopIds.map(id=>({kind:'stop',stopId:id}));
+                    renderMapDraftInfo(); renderControlPoints();
                 }
             }
             renderMapRouteLayers();
@@ -1670,6 +1691,7 @@ out body;
             mapState.selectedRouteId = null;
             mapState.creatingNewRoute = true;
             mapState.draftStopIds = [];
+            mapState.draftPath = [];
             const num = document.getElementById('mapNewRouteNumber');
             const name = document.getElementById('mapNewRouteName');
             if (num) { num.value = ''; num.focus(); }
@@ -1692,11 +1714,11 @@ out body;
             }
 
             const stops = getMapStops();
-            const points = mapState.draftStopIds
-                .map(id => stops.find(s => String(s.id) === String(id)))
-                .filter(Boolean);
+            const path = (mapState.draftPath && mapState.draftPath.length) ? mapState.draftPath : mapState.draftStopIds.map(id=>({kind:'stop',stopId:id}));
+            const points = path.map(x=> x.kind==='control' ? ({id:x.point.id, name:x.point.name||'Контрольная точка', lat:x.point.lat, lon:x.point.lon, stopType:'control'}) : stops.find(s=>String(s.id)===String(x.stopId))).filter(Boolean);
+            const routeStops = points.filter(p=>p.stopType!=='control');
 
-            if (points.length < 2) {
+            if (routeStops.length < 2) {
                 alert('Для построения маршрута нужно минимум 2 остановки.');
                 return;
             }
@@ -1720,7 +1742,7 @@ out body;
                 route.outboundGeometry = null;
                 route.returnGeometry = null;
                 route.reverseStopIds = points.map(s => s.id).reverse();
-                const classicStops = points.filter(s => s.stopType !== 'turnback');
+                const classicStops = routeStops.filter(s => s.stopType !== 'turnback');
                 const terminalStops = classicStops.length >= 2 ? classicStops : points;
                 route.terminalStopIds = terminalStops.map(s => s.id);
                 route.turnbackStopIds = points.filter(s => s.stopType === 'turnback').map(s => s.id);
@@ -1762,7 +1784,9 @@ out body;
                 } catch(e) { console.warn('Не удалось построить подъезд к парку',e); }
                 route.routeType = route.routeType || 'bus';
                 if (!route.calculatedDuration) route.calculatedDuration = result.duration;
-                route.stopIds = points.map(s => s.id);
+                route.stopIds = routeStops.map(s => s.id);
+                route.controlPoints = points.filter(s=>s.stopType==='control').map(s=>({id:s.id,name:s.name,lat:s.lat,lon:s.lon}));
+                route.pathNodes = path.map(x=>x.kind==='control'?{kind:'control',point:x.point}:{kind:'stop',stopId:x.stopId});
                 route.stopCount = points.length;
                 route.start = terminalStops[0].name;
                 route.end = terminalStops[terminalStops.length - 1].name;

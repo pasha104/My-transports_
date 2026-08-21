@@ -233,6 +233,7 @@ if (window.caches) {
 <button class="active" id="mapModeSelect" onclick="setMapMode('select')">🖱️ Выбор</button>
 <button id="mapModeAdd" onclick="setMapMode('add')">📍 Своя остановка</button>
 <button id="mapModeRoute" onclick="setMapMode('route')">🛣️ Сборка маршрута</button>
+<button id="mapModeControl" onclick="setMapMode('control')">🎯 Контрольная точка</button>
 <button id="mapModeVehicles" onclick="setMapMode('vehicles')">🚍 Местоположение ТС</button>
 </div>
 <div class="map-custom-stop-tools" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px;width:100%;">
@@ -290,7 +291,8 @@ if (window.caches) {
 <input class="map-mini-input" id="mapNewRouteNumber" placeholder="Номер нового маршрута" style="margin-top:6px;"/>
 <input class="map-mini-input" id="mapNewRouteName" placeholder="Название нового маршрута" style="margin-top:6px;"/>
 <div class="map-help" id="mapDraftInfo">Точек маршрута: 0</div>
-<div class="map-help" style="margin-top:5px;">Кликай остановки по порядку от первой конечной до второй. После создания маршрут автоматически получает первую и последнюю остановку как конечные, а обратное направление строится по той же линии в обратную сторону.</div>
+<div class="map-panel" style="margin-top:6px;"><b>🎯 Контрольные точки</b><div id="mapControlPointList" class="map-route-list" style="margin-top:5px;"></div><button class="btn-secondary" onclick="clearControlPoints()" style="width:100%;margin-top:5px;">🗑️ Очистить контрольные точки</button></div>
+<div class="map-help" style="margin-top:5px;">Кликай остановки по порядку от первой конечной до второй. Для сложных участков включи «🎯 Контрольная точка» и расставь точки на дороге в нужном порядке — построение будет проходить через них. После создания маршрут автоматически получает первую и последнюю остановку как конечные, а обратное направление строится по той же линии в обратную сторону.</div>
 <button class="btn-primary" onclick="createRouteFromMapDraft()" style="width:100%; margin-top:6px;">➕ Создать маршрут из карты</button>
 <button class="btn-secondary" onclick="startNewMapRoute()" style="width:100%; margin-top:6px;">🆕 Новый маршрут</button>
 <button class="btn-primary" onclick="buildSelectedRoute()" style="width:100%; margin-top:6px;">🛣️ Построить по дорогам</button>
