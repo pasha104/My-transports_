@@ -248,7 +248,10 @@ if (window.caches) {
 <select class="map-mini-input" id="stopRegionSelect" onchange="showSelectedStopRegionInfo()"></select></label>
 <button class="btn-secondary" onclick="loadSelectedStopRegion()">🚏 Загрузить выбранный регион</button>
 <button class="btn-secondary" onclick="clearSelectedStopRegion()">🧹 Очистить регион</button>
-<div class="map-help" id="stopRegionInfo">Выбирай область или район. Загруженные регионы сохраняются в браузере, поэтому повторно скачивать их не нужно.</div>
+<div class="map-help" id="stopRegionInfo">Выбирай область или район. Загруженные регионы сохраняются в браузере, поэтому повторно скачивать их не нужно.</div><div class="v46-stop-search" style="margin-top:8px;display:grid;gap:6px;">
+<label>🔎 Поиск остановки в загруженных городах <input id="stopSearchV46" class="map-mini-input" placeholder="Например: Янки Брыля, Вокзал, Парк Победы" oninput="searchStopsV46(this.value)"></label>
+<div id="stopSearchResultsV46" class="map-help">Начни вводить название — поиск работает по уже загруженным остановкам.</div>
+</div>
 </div>
 <button class="btn-secondary" onclick="clearRouteDraft()">Очистить точки</button>
 <span class="map-status" id="mapStatus">Готово</span>
