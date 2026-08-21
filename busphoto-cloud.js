@@ -58,15 +58,15 @@
         await syncNow();
       }
       originalSet.call(localStorage,'bp_last_user_id',user.id);
-      if(sessionStorage.getItem(flag)!=='1'){
-        sessionStorage.setItem(flag,'1');
-        hydrating=false;
-        location.reload();
-        return;
-      }
+      // Не перезагружаем страницу после облачной загрузки.
+      // Интерактив уже запущен из localStorage; обновление произойдёт
+      // через событие bpcloudhydrated в фоне.
     }catch(e){
       console.error('State load error',e);
-    }finally{ hydrating=false; }
+    }finally{
+      hydrating=false;
+      try { window.dispatchEvent(new CustomEvent('bpcloudhydrated')); } catch(e) {}
+    }
   }
 
   function installStorageSync(){

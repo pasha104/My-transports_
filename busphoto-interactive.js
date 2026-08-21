@@ -335,23 +335,47 @@
             return `${y}-${m}-${day}`;
         }
 
-        function timeUntilNoonMs() {
-            const now = new Date();
-            const noon = new Date(now);
-            noon.setHours(12, 0, 0, 0);
-            if (now >= noon) return 0;
-            return noon.getTime() - now.getTime();
+        // Игровая выплата всегда работает по белорусскому времени (Europe/Minsk),
+        // независимо от страны/часового пояса телефона. Никаких сетевых запросов
+        // для определения времени нет — время берётся из системных часов устройства
+        // и преобразуется локально, поэтому интерактив запускается мгновенно.
+        function belarusTimeParts(now = new Date()) {
+            const parts = new Intl.DateTimeFormat('en-GB', {
+                timeZone: 'Europe/Minsk',
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hourCycle: 'h23'
+            }).formatToParts(now);
+            const out = {};
+            parts.forEach(p => { if (p.type !== 'literal') out[p.type] = Number(p.value); });
+            return out;
         }
 
+        function belarusDateKey(now = new Date()) {
+            const p = belarusTimeParts(now);
+            return `${p.year}-${String(p.month).padStart(2,'0')}-${String(p.day).padStart(2,'0')}`;
+        }
+
+        function timeUntilNoonMs() {
+            const now = new Date();
+            const p = belarusTimeParts(now);
+            let target = Date.UTC(p.year, p.month - 1, p.day, 12, 0, 0);
+            // Belarus is UTC+3 year-round. Date.UTC is used only as a wall-clock
+            // calculation, so the difference remains correct regardless of device TZ.
+            const wallNow = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+            if (wallNow >= target) target += 24 * 60 * 60 * 1000;
+            return Math.max(0, target - wallNow);
+        }
 
         function dateKeyFromDate(d) {
             return localDateKey(d);
         }
 
         function payoutEligibleDateKey(now = new Date()) {
-            const d = new Date(now);
-            if (d.getHours() < 12) d.setDate(d.getDate() - 1);
-            return localDateKey(d);
+            const p = belarusTimeParts(now);
+            const d = new Date(Date.UTC(p.year, p.month - 1, p.day));
+            if (p.hour < 12) d.setUTCDate(d.getUTCDate() - 1);
+            return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
         }
 
         function dateKeysAfter(lastKey, throughKey) {
@@ -3088,8 +3112,10 @@ out body;
 
             const now = new Date();
             const badge = document.getElementById('gameClockBadge');
-            badge.textContent = now.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) +
-                (now.getHours() >= 12 ? ' • начисление сегодня выполнено/ожидается' : ' • следующее начисление в 12:00');
+            const bp = belarusTimeParts(now);
+            const hhmm = `${String(bp.hour).padStart(2,'0')}:${String(bp.minute).padStart(2,'0')}`;
+            badge.textContent = `🇧🇾 ${hhmm}` +
+                (bp.hour >= 12 ? ' • выплата сегодня выполнена/ожидается' : ' • выплата в 12:00');
 
             updateGameModelSelect();
             initStopRegionSelect();
@@ -3227,7 +3253,20 @@ out body;
         }
 
         if (document.getElementById('gameModel')) {
-            Promise.resolve(window.bpCloudReady).then(() => initInteractiveGame());
+            // Не ждём Supabase/Render: интерактив запускается сразу из localStorage.
+            // Облачное состояние подтянется в фоне и обновит экран событием.
+            initInteractiveGame();
+            window.addEventListener('bpcloudhydrated', () => {
+                try {
+                    loadGameState();
+                    processAllOfflineEarnings();
+                    processServiceCardPayouts(new Date());
+                    renderInteractive();
+                    if (typeof renderDepartureCards === 'function') renderDepartureCards();
+                } catch (e) {
+                    console.warn('Cloud refresh failed', e);
+                }
+            });
         }
 
 
