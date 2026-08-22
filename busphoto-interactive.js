@@ -2494,18 +2494,31 @@ out body;
             renderRoutes();
         }
 
+        function scheduleIdleWork(fn, timeout = 1200) {
+            if ('requestIdleCallback' in window) {
+                window.requestIdleCallback(() => fn(), { timeout });
+            } else {
+                setTimeout(fn, 80);
+            }
+        }
+
         function initInteractiveGame() {
             loadGameState();
-            updateGameModelSelect();
-            processAllOfflineEarnings();
-            renderInteractive();
             scheduleNoonPayout();
 
-            // Карту и её анимацию инициализируем лениво — только когда пользователь её открыл.
+            // Критический путь главного экрана: только быстрые значения.
+            // Тяжёлый рендер таблиц/маршрутов/карточек переносим после первого кадра.
+            renderInteractiveHeaderAndLightViews();
+            updateGameModelSelect();
 
-            // Часы обновляем каждую секунду, но тяжёлую проверку офлайн-доходов
-            // выполняем редко. Раньше processAllOfflineEarnings() запускался каждую
-            // секунду и на телефоне создавал ощущение бесконечной проверки времени.
+            // Первый расчёт доходов делаем после отображения интерфейса, чтобы
+            // пользователь сразу увидел главный экран, а не ждал проверку времени.
+            scheduleIdleWork(() => {
+                processAllOfflineEarnings();
+                scheduleIdleWork(() => renderInteractive(), 1500);
+            }, 1000);
+
+            // Карту и её анимацию инициализируем лениво — только когда пользователь её открыл.
             if (!window.gameClockTimer) {
                 window.gameClockTimer = setInterval(() => {
                     renderInteractiveHeaderAndLightViews();

@@ -7,13 +7,9 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <script>
-// Удаляем старый Service Worker/кэш, который мог отдавать старую версию сайта.
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister())).catch(() => {});
-}
-if (window.caches) {
-  caches.keys().then(keys => keys.forEach(key => caches.delete(key))).catch(() => {});
-}
+// Кэш и Service Worker больше не удаляем при каждом открытии главного экрана.
+// Принудительная очистка здесь заставляла браузер заново загружать все ресурсы.
+// Очистку кэша выполняй только при обновлении версии приложения.
 </script>
 <title>BUSPHOTO — Интерактивный транспортный бизнес</title>
 <script defer="" src="busphoto-common.js?v=20260822-v62"></script>
