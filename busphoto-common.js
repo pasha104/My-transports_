@@ -30,10 +30,8 @@ function escapeHtml(value) {
 function getVehiclePhotoKey(index) {
     const v = vehicleDB[index];
     if (!v) return '';
-    // Стабильный ключ конкретного ТС. Госномер + борт/гар. номер предпочтительнее индекса.
     return `${String(v.gov || '—')}|${String(v.num || '—')}|${String(v.model || '')}|${String(v.park || '')}`;
 }
-
 function getVehiclePhotoMap() {
     try { return JSON.parse(localStorage.getItem('busphoto_vehicle_photos') || '{}'); }
     catch(e) { return {}; }
@@ -41,13 +39,28 @@ function getVehiclePhotoMap() {
 function saveVehiclePhotoMap(map) {
     localStorage.setItem('busphoto_vehicle_photos', JSON.stringify(map));
 }
-function getVehiclePhoto(index) {
+function getVehiclePhotos(index) {
     const key = getVehiclePhotoKey(index);
-    return key ? (getVehiclePhotoMap()[key] || '') : '';
+    if (!key) return [];
+    const value = getVehiclePhotoMap()[key];
+    if (Array.isArray(value)) return value.filter(Boolean);
+    return value ? [value] : [];
 }
+function getVehiclePhoto(index) { return getVehiclePhotos(index)[0] || ''; }
 function openVehicleView(index) {
     if (!vehicleDB[index]) return;
     window.location.href = `vehicle_view.html?i=${encodeURIComponent(index)}`;
+}
+function renderStoredPhotoGallery() {
+    const select = document.getElementById('photoVehicleSelect');
+    const gallery = document.getElementById('photoStoredGallery');
+    if (!select || !gallery) return;
+    const photos = getVehiclePhotos(Number(select.value));
+    gallery.innerHTML = photos.length ? photos.map((src,i) => `
+      <div style="position:relative;border:1px solid #bbb;border-radius:8px;overflow:hidden;background:#eee;">
+        <img src="${src}" alt="Фото ${i+1}" style="width:100%;height:120px;object-fit:cover;display:block;">
+        <button type="button" onclick="removeVehiclePhotoAt(${i})" style="position:absolute;right:4px;top:4px;border:0;border-radius:50%;width:28px;height:28px;background:#8b0000;color:#fff;font-weight:bold;">×</button>
+      </div>`).join('') : '<div style="color:#555;padding:8px;">Сохранённых фотографий пока нет.</div>';
 }
 function openPhotoUploadModal() {
     const modal = document.getElementById('photoUploadModal');
@@ -60,15 +73,14 @@ function openPhotoUploadModal() {
         opt.textContent = `${v.model || 'ТС'} · ${v.gov && v.gov !== '—' ? v.gov : 'борт. ' + (v.num || '—')} · ${v.park || '—'}`;
         select.appendChild(opt);
     });
-    if (!vehicleDB.length) {
-        select.innerHTML = '<option value="">В базе нет ТС</option>';
-    }
-    select.onchange = () => updatePhotoPreviewFromStored();
-    document.getElementById('photoFileInput').value = '';
-    document.getElementById('photoPreviewWrap').style.display = 'none';
-    document.getElementById('photoUploadStatus').textContent = '';
+    if (!vehicleDB.length) select.innerHTML = '<option value="">В базе нет ТС</option>';
+    select.onchange = () => { updatePhotoPreviewFromStored(); renderStoredPhotoGallery(); };
+    const input=document.getElementById('photoFileInput'); if(input) input.value='';
+    const preview=document.getElementById('photoPreviewWrap'); if(preview) preview.style.display='none';
+    const status=document.getElementById('photoUploadStatus'); if(status) status.textContent='';
     modal.style.display = 'flex';
     updatePhotoPreviewFromStored();
+    renderStoredPhotoGallery();
 }
 function closePhotoUploadModal() {
     const modal = document.getElementById('photoUploadModal');
@@ -82,51 +94,85 @@ function updatePhotoPreviewFromStored() {
     const photo = getVehiclePhoto(Number(select.value));
     if (photo) { img.src = photo; wrap.style.display = 'block'; }
     else { img.removeAttribute('src'); wrap.style.display = 'none'; }
+    renderStoredPhotoGallery();
 }
 function previewVehiclePhoto(event) {
-    const file = event.target.files?.[0];
-    const img = document.getElementById('photoPreview');
+    const files = Array.from(event.target.files || []);
     const wrap = document.getElementById('photoPreviewWrap');
-    if (!file || !img || !wrap) return;
-    if (!file.type.startsWith('image/')) { alert('Выберите изображение.'); event.target.value=''; return; }
+    const img = document.getElementById('photoPreview');
+    if (!files.length || !wrap || !img) return;
+    const first = files[0];
+    if (!first.type.startsWith('image/')) { alert('Выберите изображения.'); event.target.value=''; return; }
     const reader = new FileReader();
     reader.onload = e => { img.src = e.target.result; wrap.style.display='block'; };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(first);
+    const status=document.getElementById('photoUploadStatus');
+    if(status) status.textContent=`Выбрано новых фотографий: ${files.filter(f=>f.type.startsWith('image/')).length}`;
 }
-function saveVehiclePhoto() {
+function compressVehiclePhoto(file) {
+    return new Promise((resolve,reject)=>{
+        const reader=new FileReader();
+        reader.onerror=reject;
+        reader.onload=e=>{
+            const img=new Image();
+            img.onerror=reject;
+            img.onload=()=>{
+                const max=1100;
+                const scale=Math.min(1,max/Math.max(img.width,img.height));
+                const canvas=document.createElement('canvas');
+                canvas.width=Math.max(1,Math.round(img.width*scale));
+                canvas.height=Math.max(1,Math.round(img.height*scale));
+                const ctx=canvas.getContext('2d');
+                ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+                ctx.drawImage(img,0,0,canvas.width,canvas.height);
+                resolve(canvas.toDataURL('image/jpeg',0.68));
+            };
+            img.src=e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+async function saveVehiclePhoto() {
     const select = document.getElementById('photoVehicleSelect');
     const fileInput = document.getElementById('photoFileInput');
     const status = document.getElementById('photoUploadStatus');
     const index = Number(select?.value);
     if (!vehicleDB[index]) { alert('Сначала выберите ТС из базы данных.'); return; }
-    const file = fileInput?.files?.[0];
-    if (!file) { alert('Выберите фотографию.'); return; }
-    const reader = new FileReader();
-    reader.onload = e => {
-        const img = new Image();
-        img.onload = () => {
-            const max = 1280;
-            const scale = Math.min(1, max / Math.max(img.width, img.height));
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.max(1, Math.round(img.width * scale));
-            canvas.height = Math.max(1, Math.round(img.height * scale));
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            const data = canvas.toDataURL('image/jpeg', 0.78);
-            const map = getVehiclePhotoMap();
-            map[getVehiclePhotoKey(index)] = data;
-            try {
-                saveVehiclePhotoMap(map);
-                status.textContent = '✅ Фото сохранено для выбранного ТС в базе этого браузера.';
-                updatePhotoPreviewFromStored();
-                renderTable();
-            } catch(err) {
-                status.textContent = '❌ Не удалось сохранить фото: хранилище браузера переполнено.';
-            }
-        };
-        img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
+    const files = Array.from(fileInput?.files || []).filter(f=>f.type.startsWith('image/'));
+    if (!files.length) { alert('Выберите одну или несколько фотографий.'); return; }
+    if(status) status.textContent='⏳ Обработка фотографий…';
+    try {
+        const map=getVehiclePhotoMap();
+        const key=getVehiclePhotoKey(index);
+        const current=getVehiclePhotos(index);
+        const added=[];
+        for(const file of files.slice(0,8)) added.push(await compressVehiclePhoto(file));
+        const combined=current.concat(added).slice(-8);
+        map[key]=combined;
+        saveVehiclePhotoMap(map);
+        if(status) status.textContent=`✅ Сохранено фотографий: ${combined.length}. Можно добавить ещё.`;
+        fileInput.value='';
+        updatePhotoPreviewFromStored();
+        renderStoredPhotoGallery();
+        renderTable();
+    } catch(err) {
+        console.error(err);
+        if(status) status.textContent='❌ Не удалось сохранить фотографии. Возможно, переполнено хранилище браузера.';
+    }
+}
+function removeVehiclePhotoAt(photoIndex) {
+    const select=document.getElementById('photoVehicleSelect');
+    const index=Number(select?.value);
+    if(!vehicleDB[index]) return;
+    const map=getVehiclePhotoMap();
+    const key=getVehiclePhotoKey(index);
+    const photos=getVehiclePhotos(index);
+    photos.splice(photoIndex,1);
+    if(photos.length) map[key]=photos; else delete map[key];
+    saveVehiclePhotoMap(map);
+    updatePhotoPreviewFromStored();
+    renderStoredPhotoGallery();
+    renderTable();
 }
 function removeVehiclePhoto() {
     const select = document.getElementById('photoVehicleSelect');
@@ -137,7 +183,8 @@ function removeVehiclePhoto() {
     saveVehiclePhotoMap(map);
     document.getElementById('photoFileInput').value = '';
     document.getElementById('photoPreviewWrap').style.display = 'none';
-    document.getElementById('photoUploadStatus').textContent = '🗑 Фото удалено.';
+    document.getElementById('photoUploadStatus').textContent = '🗑 Все фотографии удалены.';
+    renderStoredPhotoGallery();
     renderTable();
 }
 

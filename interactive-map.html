@@ -74,6 +74,17 @@
 <button class="btn-primary" onclick="createRouteFromMapDraft()" style="width:100%; margin-top:6px;">➕ Создать маршрут из карты</button>
 <button class="btn-secondary" onclick="startNewMapRoute()" style="width:100%; margin-top:6px;">🆕 Новый маршрут</button>
 <button class="btn-primary" onclick="buildSelectedRoute()" style="width:100%; margin-top:6px;">🛣️ Построить по дорогам</button>
+<div class="map-panel" style="margin-top:7px;border:1px solid var(--bp-border);padding:8px;border-radius:8px;">
+<div style="font-weight:700;margin-bottom:6px;">📡 GPX маршруты</div>
+<input id="gpxFileInput" type="file" accept=".gpx,application/gpx+xml,text/xml" style="width:100%;font-size:11px;" onchange="importGPXFile(event)">
+<div id="gpxStatus" class="map-help" style="margin-top:5px;">Выбери GPX-трек — он появится на карте. Затем его можно привязать к выбранному маршруту.</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
+<button class="btn-primary" type="button" onclick="applyGPXToSelectedRoute()">📥 Применить к маршруту</button>
+<button class="btn-secondary" type="button" onclick="createRouteFromGPX()">➕ Создать из GPX</button>
+</div>
+<button class="btn-secondary" type="button" onclick="exportSelectedRouteGPX()" style="width:100%;margin-top:6px;">📤 Скачать выбранный маршрут как GPX</button>
+</div>
+
 <button class="btn-primary" onclick="buildSelectedRoute()" style="width:100%; margin-top:6px;">🔄 Перестроить выбранный маршрут</button>
 <button class="btn-secondary" onclick="saveMapRouteGeometry()" style="width:100%; margin-top:6px;">💾 Сохранить маршрут</button>
 </input></div>

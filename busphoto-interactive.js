@@ -177,7 +177,9 @@ function rebuildMapStopsIndex(stops) {
             depotMarkers: new Map(),
             controlMarkers: new Map(),
             trackingVehicleId: null,
-            lastTrackPanAt: 0
+            lastTrackPanAt: 0,
+            gpxTrack: null,
+            gpxLayer: null
         };
 
         let trackerState = { map:null, marker:null, routeLayer:null, initialized:false, vehicleId:null, lastPoint:null, lastPanAt:0 };
@@ -2127,6 +2129,8 @@ out body;
             mapState.creatingNewRoute = true;
             mapState.draftStopIds = [];
             mapState.draftPath = [];
+            clearGPXLayer();
+            mapState.gpxTrack = null;
             const num = document.getElementById('mapNewRouteNumber');
             const name = document.getElementById('mapNewRouteName');
             if (num) { num.value = ''; num.focus(); }
@@ -2297,6 +2301,92 @@ out body;
                 mapSetStatus('❌ Ошибка сохранения маршрута.');
                 alert('Дорога была найдена, но не удалось сохранить её в маршрут.');
             }
+        }
+
+        function setGPXStatus(text){ const el=document.getElementById('gpxStatus'); if(el) el.textContent=text; }
+        function gpxDistanceMeters(coords){ let d=0; for(let i=1;i<coords.length;i++){ d+=distanceMeters(coords[i-1][1],coords[i-1][0],coords[i][1],coords[i][0]); } return d; }
+        function clearGPXLayer(){ if(mapState.gpxLayer && mapState.map){ mapState.map.removeLayer(mapState.gpxLayer); } mapState.gpxLayer=null; }
+        function drawGPXLayer(){
+            if(!mapState.map || !mapState.gpxTrack?.coords?.length) return;
+            clearGPXLayer();
+            mapState.gpxLayer=L.polyline(mapState.gpxTrack.coords.map(c=>[c[1],c[0]]),{color:'#ff6d00',weight:6,opacity:.9,dashArray:'10 7'}).addTo(mapState.map);
+            try{ mapState.map.fitBounds(mapState.gpxLayer.getBounds(),{padding:[25,25],maxZoom:15}); }catch(e){}
+        }
+        function parseGPXText(text){
+            const xml=new DOMParser().parseFromString(text,'application/xml');
+            if(xml.querySelector('parsererror')) throw new Error('Файл GPX повреждён или имеет неверный формат.');
+            const points=[];
+            xml.querySelectorAll('trkpt,rtept').forEach((el)=>{
+                const lat=Number(el.getAttribute('lat')),lon=Number(el.getAttribute('lon'));
+                if(Number.isFinite(lat)&&Number.isFinite(lon)) points.push([lon,lat]);
+            });
+            if(!points.length) xml.querySelectorAll('wpt').forEach((el)=>{ const lat=Number(el.getAttribute('lat')),lon=Number(el.getAttribute('lon')); if(Number.isFinite(lat)&&Number.isFinite(lon)) points.push([lon,lat]); });
+            if(points.length<2) throw new Error('В GPX найдено меньше двух координат.');
+            const name=xml.querySelector('trk > name, rte > name, metadata > name, name')?.textContent?.trim() || 'GPX маршрут';
+            const waypoints=[...xml.querySelectorAll('wpt')].map(el=>({lat:Number(el.getAttribute('lat')),lon:Number(el.getAttribute('lon')),name:el.querySelector('name')?.textContent?.trim()||''})).filter(x=>Number.isFinite(x.lat)&&Number.isFinite(x.lon));
+            return {coords:points,name,waypoints,distance:gpxDistanceMeters(points)};
+        }
+        async function importGPXFile(event){
+            const file=event.target.files?.[0]; if(!file)return;
+            try{
+                const text=await file.text();
+                mapState.gpxTrack=parseGPXText(text); drawGPXLayer();
+                const km=(mapState.gpxTrack.distance/1000).toFixed(2);
+                setGPXStatus(`✅ GPX загружен: ${mapState.gpxTrack.name} · ${km} км · ${mapState.gpxTrack.coords.length.toLocaleString('ru-RU')} точек.`);
+                mapSetStatus('📡 GPX-трек показан оранжевой линией.');
+            }catch(e){ console.error(e); mapState.gpxTrack=null; clearGPXLayer(); setGPXStatus('❌ '+(e.message||'Не удалось прочитать GPX.')); alert(e.message||'Не удалось прочитать GPX.'); }
+        }
+        function applyGPXToSelectedRoute(){
+            const route=gameState.routes.find(r=>String(r.id)===String(mapState.selectedRouteId));
+            if(!route){ alert('Сначала выбери маршрут или создай его.'); return; }
+            if(!mapState.gpxTrack){ alert('Сначала выбери GPX-файл.'); return; }
+            const t=mapState.gpxTrack;
+            route.geometry={type:'LineString',coordinates:t.coords.slice()};
+            route.calculatedDistance=t.distance;
+            const speed=route.routeServiceType==='intercity'?70:route.routeServiceType==='suburban'?55:35;
+            route.calculatedDuration=(t.distance/1000)/speed*3600;
+            route.gpxName=t.name; route.gpxImportedAt=new Date().toISOString(); route.source='gpx';
+            saveGameState(); renderMapRouteLayers(); renderMapRouteList(); renderRoutes();
+            mapSetStatus(`✅ GPX применён к маршруту №${route.number}: ${(t.distance/1000).toFixed(2)} км.`);
+            setGPXStatus(`Готово: GPX привязан к маршруту №${route.number}.`);
+        }
+        function createRouteFromGPX(){
+            if(!mapState.gpxTrack){ alert('Сначала выбери GPX-файл.'); return; }
+            const number=document.getElementById('mapNewRouteNumber')?.value.trim();
+            if(!number){ alert('Укажи номер нового маршрута.'); return; }
+            const type=document.getElementById('mapRouteType')?.value||'bus';
+            const service=type==='bus'?(document.getElementById('mapBusRouteClass')?.value||'city'):'city';
+            const t=mapState.gpxTrack;
+            let stopIds=mapState.draftStopIds.slice();
+            const stops=getMapStops();
+            if(stopIds.length<2 && t.waypoints.length>=2){
+                t.waypoints.slice(0,30).forEach((w,i)=>{
+                    const id='gpx-stop-'+Date.now()+'-'+i;
+                    stops.push({id,name:w.name||`GPX точка ${i+1}`,lat:w.lat,lon:w.lon,source:'gpx',stopType:'classic',tags:{gpx:true}}); stopIds.push(id);
+                });
+                saveMapStops(dedupeMapStops(stops));
+            }
+            if(stopIds.length<2){
+                const first=t.coords[0], last=t.coords[t.coords.length-1];
+                const now=Date.now();
+                const a={id:'gpx-stop-'+now+'-a',name:'GPX — начало',lat:first[1],lon:first[0],source:'gpx',stopType:'classic',tags:{gpx:true}};
+                const b={id:'gpx-stop-'+now+'-b',name:'GPX — конец',lat:last[1],lon:last[0],source:'gpx',stopType:'classic',tags:{gpx:true}};
+                saveMapStops(dedupeMapStops(stops.concat([a,b]))); stopIds=[a.id,b.id];
+            }
+            const stopObjs=stopIds.map(id=>getMapStops().find(x=>String(x.id)===String(id))).filter(Boolean);
+            const route={id:Date.now()+Math.random(),number,name:t.name||`GPX ${number}`,start:stopObjs[0]?.name||'GPX — начало',end:stopObjs[stopObjs.length-1]?.name||'GPX — конец',distance:t.distance,stopCount:stopObjs.length,stops:stopObjs.map(x=>x.name),stopIds,terminalStopIds:[stopObjs[0]?.id,stopObjs[stopObjs.length-1]?.id].filter(Boolean),turnbackStopIds:[],turnaroundMinutes:2,color:type==='trolleybus'?'#1565c0':(type==='electrobus'?'#00897b':'#1e88e5'),note:'Создано из GPX',routeType:type,routeServiceType:service,vehicleId:null,vehicleIds:[],geometry:{type:'LineString',coordinates:t.coords.slice()},outboundGeometry:null,returnGeometry:null,reverseStopIds:stopIds.slice().reverse(),calculatedDistance:t.distance,calculatedDuration:(t.distance/1000)/(service==='intercity'?70:service==='suburban'?55:35)*3600,createdAt:localDateKey(),source:'gpx',gpxName:t.name,pathNodes:stopIds.map(id=>({kind:'stop',stopId:id}))};
+            gameState.routes.push(route); mapState.selectedRouteId=route.id; mapState.creatingNewRoute=false; saveGameState();
+            document.getElementById('mapNewRouteNumber').value=''; document.getElementById('mapNewRouteName').value='';
+            renderInteractive(); renderMapRouteControls(); renderMapRouteLayers(); renderMapRouteList(); renderMapStops();
+            mapSetStatus(`✅ Создан маршрут №${number} из GPX.`); setGPXStatus(`Маршрут №${number} создан из GPX.`);
+        }
+        function exportSelectedRouteGPX(){
+            const route=gameState.routes.find(r=>String(r.id)===String(mapState.selectedRouteId));
+            if(!route?.geometry?.coordinates?.length){ alert('Сначала выбери маршрут с сохранённой геометрией.'); return; }
+            const coords=route.geometry.coordinates;
+            const trkpts=coords.map(c=>`<trkpt lat="${Number(c[1]).toFixed(7)}" lon="${Number(c[0]).toFixed(7)}"></trkpt>`).join('');
+            const xml=`<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="BUSPHOTO" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>№${escapeHtml(route.number||'маршрут')}</name><trkseg>${trkpts}</trkseg></trk></gpx>`;
+            const blob=new Blob([xml],{type:'application/gpx+xml'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`BUSPHOTO_маршрут_${String(route.number||'route').replace(/[^\wа-яА-ЯёЁ.-]+/g,'_')}.gpx`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
         }
 
         function saveMapRouteGeometry() {
@@ -3577,6 +3667,50 @@ out body;
             return direct ? '🛣️ №'+escapeHtml(direct.number||'—') : '<span class=\"interactive-muted\">В парке</span>';
         }
 
+        function getInteractiveAIImage(v){
+            if(v?.aiImage) return v.aiImage;
+            const model=encodeURIComponent(`${v?.model||'транспорт'} ${v?.submodel||''}`.trim());
+            const kind=v?.category==='trolleybus'?'trolleybus':v?.category==='electrobus'?'electric bus':'city bus';
+            return `https://image.pollinations.ai/prompt/${encodeURIComponent(`photorealistic ${kind} ${v?.model||''} Belarus public transport, side three quarter view, clean neutral background, realistic vehicle, no people, no text`)}`;
+        }
+        function vehicleGameStatus(v){
+            if(Number(v.repairUntil)>Date.now()) return '⏳ На ремонте';
+            if(v.maintenanceDue) return '🔧 Требуется обслуживание';
+            const route=getVehicleRoute(v.id); return route ? `🟢 В рейсе · №${route.number}` : '🏠 В парке';
+        }
+        window.showInteractiveVehicleDetails=function(id){
+            const v=gameState.owned.find(x=>String(x.id)===String(id)); if(!v)return;
+            if(typeof ensureVehicleStatsV43==='function') ensureVehicleStatsV43(v);
+            const route=getVehicleRoute(v.id); const st=v.stats||{}; const health=Math.max(0,Math.min(100,Number(v.health??100)));
+            const old=document.getElementById('interactiveVehicleDetailModal'); if(old) old.remove();
+            const overlay=document.createElement('div'); overlay.id='interactiveVehicleDetailModal'; overlay.className='modal-overlay'; overlay.style.display='flex';
+            overlay.innerHTML=`<div class="modal-card" style="max-width:760px;max-height:92vh;overflow:auto;">
+              <span class="modal-close" onclick="document.getElementById('interactiveVehicleDetailModal')?.remove()">×</span>
+              <div class="vehicle-title">${vehicleCategoryIcon(v.category)} ${escapeHtml(v.model||'ТС')}</div>
+              <div class="vehicle-subtitle">${escapeHtml(v.submodel||'Базовая модификация')} · ${escapeHtml(v.plate||v.num||'Без номера')}</div>
+              <div style="display:grid;grid-template-columns:minmax(0,1.2fr) minmax(260px,1fr);gap:12px;margin-top:10px;">
+                <div style="background:#111;border-radius:10px;overflow:hidden;min-height:240px;display:flex;align-items:center;justify-content:center;"><img src="${getInteractiveAIImage(v)}" alt="ИИ-визуализация ${escapeHtml(v.model||'ТС')}" style="width:100%;height:300px;object-fit:cover;display:block;" onerror="this.style.display='none';this.parentElement.innerHTML='<div style=&quot;color:#fff;font-size:56px&quot;>${vehicleCategoryIcon(v.category)}</div>'"></div>
+                <div class="info-grid" style="margin-top:0;grid-template-columns:1fr;">
+                  <div class="info-item"><b>Состояние</b>${health.toFixed(0)}%</div>
+                  <div class="info-item"><b>Статус</b>${vehicleGameStatus(v)}</div>
+                  <div class="info-item"><b>Маршрут</b>${route?`№${escapeHtml(route.number)} · ${escapeHtml(route.start||'—')} → ${escapeHtml(route.end||'—')}`:'Не назначен'}</div>
+                  <div class="info-item"><b>Зарплата</b>${v.currentSalary?money(v.currentSalary):'—'}</div>
+                  <div class="info-item"><b>Стоимость</b>${money(v.price||0)}</div>
+                  <div class="info-item"><b>Рейсов</b>${Number(st.trips||0)} · конечных: ${Number(st.arrivals||0)}</div>
+                  <div class="info-item"><b>Пробег</b>${Number(st.distanceKm||0).toFixed(1)} км</div>
+                  <div class="info-item"><b>Заработано ТС</b>${money(st.earned||0)}</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:12px;">
+                <button class="btn-secondary" onclick="showGameSection('maintenance',document.querySelector('.game-menu-btn[onclick*=\"maintenance\"]'));document.getElementById('interactiveVehicleDetailModal')?.remove()">🔧 Состояние и ремонт</button>
+                <button class="btn-secondary" onclick="showInteractiveVehicleDetails('${v.id}')">🔄 Обновить информацию</button>
+                <button class="btn-secondary" onclick="document.getElementById('interactiveVehicleDetailModal')?.remove()">← Закрыть</button>
+              </div>
+              <div class="map-help" style="margin-top:8px;">🧠 ИИ-визуализация загружается только при открытии карточки. Если сервис недоступен, показывается резервная иконка ТС.</div>
+            </div>`;
+            document.body.appendChild(overlay);
+        };
+
         function renderInteractive() {
             const balance = document.getElementById('gameBalance');
             if (!balance) return;
@@ -3630,7 +3764,7 @@ out body;
                             <td><b>${escapeHtml(v.category === 'trolleybus' ? ('борт. №' + v.num) : (v.plate || (v.plate = generateRandomPlate())))}</b>${v.category !== 'trolleybus' ? `<br><button class="btn-secondary" onclick="changeVehiclePlate('${v.id}')" style="margin-top:3px;">№ изменить · 5 000 р.</button>` : ''}</td>
                             <td>${v.currentSalary ? money(v.currentSalary) : '—'}</td>
                             <td>${renderGarageVehicleRouteStatus(v)}</td>
-                            <td><button class="btn-secondary" onclick="sellGameVehicle('${v.id}')">Продать</button></td>
+                            <td><button class="btn-primary" onclick="showInteractiveVehicleDetails('${v.id}')">👁 ТС</button> <button class="btn-secondary" onclick="sellGameVehicle('${v.id}')">Продать</button></td>
                         </tr>
                     `).join('');
                 }
