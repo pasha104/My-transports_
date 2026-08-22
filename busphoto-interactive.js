@@ -1200,9 +1200,19 @@ function rebuildMapStopsIndex(stops) {
             const normalizedStops = dedupeMapStops(storedStops);
             if (normalizedStops.length !== storedStops.length) saveMapStops(normalizedStops);
             renderMapStops();
+            renderMapStopList();
             renderMapRouteLayers();
             renderMapRouteControls();
             initStopRegionSelect();
+
+            // Автовосстановление: если список остановок пуст, не оставляем
+            // пользователя с пустой картой. Загружаем Минск автоматически.
+            if (!getMapStops().length) {
+                const regionSelect = document.getElementById('stopRegionSelect');
+                if (regionSelect) regionSelect.value = 'by-minsk-city';
+                showSelectedStopRegionInfo();
+                loadSelectedStopRegion().catch(err => console.warn('Автозагрузка остановок не удалась', err));
+            }
 
             setTimeout(() => mapState.map.invalidateSize({pan:false}), 100);
             startMapBusAnimation();
@@ -1263,7 +1273,9 @@ function rebuildMapStopsIndex(stops) {
         }
 
         function clearMapStopsCache() {
-            mapStopsCache = [];
+            // null означает «кэш не инициализирован». Пустой массив здесь опасен:
+            // после очистки/обновления он блокировал повторное чтение остановок из localStorage.
+            mapStopsCache = null;
             mapStopsSpatialIndex = new Map();
         }
 
@@ -1448,6 +1460,16 @@ function rebuildMapStopsIndex(stops) {
                     }
                 }
             }
+            // Если индекс ещё не успел построиться после загрузки/восстановления,
+            // не скрываем остановки: делаем безопасный прямой отбор по bounds.
+            if (!candidates.length && stops.length) {
+                for (const stop of stops) {
+                    const lat = Number(stop.lat), lon = Number(stop.lon);
+                    if (Number.isFinite(lat) && Number.isFinite(lon) && lat >= minLat && lat <= maxLat && lon >= minLon && lon <= maxLon) {
+                        candidates.push(stop);
+                    }
+                }
+            }
             return candidates;
         }
 
@@ -1574,21 +1596,52 @@ function rebuildMapStopsIndex(stops) {
             const el = document.getElementById('mapStopList');
             if (!el) return;
 
-            // Список остановок больше не фильтруется по названию: поле поиска убрано,
-            // чтобы не создавать лишний DOM и не перегружать интерфейс на ТВ/ПК.
             const allStops = getMapStops();
             const selectedRegion = getSelectedStopRegion();
             const regionCount = selectedRegion ? Number(stopRegionCache[selectedRegion.id]?.count || 0) : 0;
-            const stops = allStops.slice(0, 80);
-            const summary = `<div class="map-stop-count" style="padding:7px 8px;margin-bottom:6px;border-radius:8px;background:rgba(23,105,170,.12);font-weight:700;">📍 Загружено: ${allStops.length.toLocaleString('ru-RU')} остановок${regionCount ? ` · ${selectedRegion.name}: ${regionCount.toLocaleString('ru-RU')}` : ''}</div>`;
+            const query = String(document.getElementById('stopSearchV46')?.value || '').trim().toLowerCase();
+            let stops = query
+                ? allStops.filter(s => String(s.name || '').toLowerCase().includes(query)).slice(0, 120)
+                : allStops.slice(0, 120);
 
-            el.innerHTML = summary + (stops.length ? stops.map((s, i) => `
-                <div class="map-stop-item" style="display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;" onclick="focusMapStop('${String(s.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">
-                    <span class="map-stop-num">${i + 1}</span>
-                    <span>${escapeHtml(s.name)}${s.source === 'custom' ? (s.stopType === 'turnback' ? ' 🔄' : ' 📍') : ''}</span>
-                    ${s.source === 'custom' ? `<button type="button" class="btn-secondary" style="padding:4px 7px;font-size:11px;" onclick="event.stopPropagation();deleteCustomMapStop('${String(s.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">🗑️</button>` : ''}
-                </div>
-            `).join('') : `<div class="map-help" style="padding:8px;">Остановки не найдены. Нажми «Загрузить остановки OSM» или создай свою.</div>`);
+            const summary = `<div class="map-stop-count" style="padding:7px 8px;margin-bottom:6px;border-radius:8px;background:rgba(23,105,170,.12);font-weight:700;">📍 Загружено: ${allStops.length.toLocaleString('ru-RU')} остановок${regionCount ? ` · ${selectedRegion.name}: ${regionCount.toLocaleString('ru-RU')}` : ''}</div>`;
+            if (!allStops.length) {
+                el.innerHTML = summary + `<div class="map-help" style="padding:8px;">Остановки не загружены. Выбери регион выше — Минск загрузится автоматически при открытии карты.</div>`;
+                return;
+            }
+
+            const routeMode = mapState.mode === 'route';
+            el.innerHTML = summary + (query && !stops.length
+                ? `<div class="map-help" style="padding:8px;">По запросу «${escapeHtml(query)}» ничего не найдено.</div>`
+                : stops.map((s, i) => {
+                    const sid = String(s.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+                    const selected = mapState.draftStopIds.some(x => String(x) === String(s.id));
+                    const active = selected && Number(mapState.routeEditCursor) === mapState.draftStopIds.findIndex(x => String(x) === String(s.id));
+                    const action = routeMode
+                        ? `<button type="button" class="btn-secondary" style="padding:4px 7px;font-size:11px;" onclick="event.stopPropagation();mapSelectStop('${sid}')">${active ? '🔴 Выбрана' : (selected ? '📍 Выбрать' : '➕ В маршрут')}</button>`
+                        : `<button type="button" class="btn-secondary" style="padding:4px 7px;font-size:11px;" onclick="event.stopPropagation();focusMapStop('${sid}')">🗺️ На карте</button>`;
+                    return `<div class="map-stop-item" style="display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;" onclick="focusMapStop('${sid}')">
+                        <span class="map-stop-num">${i + 1}</span>
+                        <span>${escapeHtml(s.name)}${s.source === 'custom' ? (s.stopType === 'turnback' ? ' 🔄' : ' 📍') : ''}</span>
+                        ${action}
+                    </div>`;
+                }).join(''));
+        }
+
+        // Поиск был указан в разметке карты, но в одной из сборок функция потерялась.
+        // Возвращаем её и сразу обновляем список без тяжёлой перерисовки карты.
+        function searchStopsV46(value) {
+            const el = document.getElementById('stopSearchResultsV46');
+            const q = String(value || '').trim().toLowerCase();
+            const all = getMapStops();
+            if (el) {
+                if (!q) el.textContent = `Загружено ${all.length.toLocaleString('ru-RU')} остановок. Введи название для поиска.`;
+                else {
+                    const count = all.filter(s => String(s.name || '').toLowerCase().includes(q)).length;
+                    el.textContent = count ? `Найдено: ${count.toLocaleString('ru-RU')}.` : 'Ничего не найдено.';
+                }
+            }
+            renderMapStopList();
         }
 
         function focusMapStop(id) {
@@ -1944,10 +1997,15 @@ function rebuildMapStopsIndex(stops) {
         async function loadSelectedStopRegion(force = false) {
             const region = getSelectedStopRegion();
             if (!region) { alert('Сначала выбери область или район.'); return; }
-            if (!force && stopRegionCache[region.id]?.count) {
+            const storedForRegion = getMapStops().filter(s => s.source === 'osm' && String(s.regionId) === String(region.id));
+            // Одного счётчика в кэше недостаточно: данные localStorage могли быть
+            // очищены/потеряны, а запись о регионе осталась. В таком случае регион
+            // обязательно скачиваем заново.
+            if (!force && stopRegionCache[region.id]?.count && storedForRegion.length) {
                 mapSetStatus(`${region.name}: уже загружен. Использую сохранённые данные.`);
                 showSelectedStopRegionInfo();
                 renderMapStops();
+                renderMapStopList();
                 return;
             }
             mapSetStatus(`Загружаю остановки: ${region.name}…`);
