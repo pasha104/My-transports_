@@ -37,7 +37,7 @@
     <section class="card">
       <h2>2. ТС</h2>
       <label class="field">Выбрать ТС<select id="vehicle" required></select></label>
-      <div id="vehicleInfo" class="summary" style="margin-top:9px">Выбери автобус из гаража.</div>
+      <div id="vehicleInfo" class="summary" style="margin-top:9px">Выбери ТС из гаража.</div>
     </section>
 
     <section class="card">
@@ -91,6 +91,8 @@ function stopDB(){try{const x=JSON.parse(localStorage.getItem(STOPS_KEY)||'[]');
 function terminals(r){if(!r)return[];const ids=Array.isArray(r.terminalStopIds)&&r.terminalStopIds.length>=2?r.terminalStopIds:(Array.isArray(r.stopIds)&&r.stopIds.length>=2?[r.stopIds[0],r.stopIds[r.stopIds.length-1]]:[]);const db=stopDB();const got=ids.map(id=>db.find(s=>String(s.id)===String(id))).filter(Boolean);return got.length>=2?got:[{id:ids[0]||'start',name:r.start||'Первая конечная'},{id:ids[ids.length-1]||'end',name:r.end||'Конечная'}]}
 function termName(r,id){return terminals(r).find(t=>String(t.id)===String(id))?.name||'Конечная'}
 function compatible(v,r){return !v||!r||v.category===r.routeType||(v.category==='bus'&&r.routeType==='bus')}
+function vehicleIcon(category){return category==='trolleybus'?'🚎':category==='electrobus'?'⚡':'🚌'}
+function vehicleLabel(category){return category==='trolleybus'?'Троллейбус':category==='electrobus'?'Электробус':'Автобус'}
 function routesFor(v){return state.routes.filter(r=>compatible(v,r))}
 function routeBy(id){return state.routes.find(r=>String(r.id)===String(id))}
 function reverseRoute(r){if(!r)return null;if(r.pairedRouteId){const p=routeBy(r.pairedRouteId);if(p&&p.geometry&&p.routeType===r.routeType)return p}const same=state.routes.filter(x=>String(x.id)!==String(r.id)&&x.geometry&&x.routeType===r.routeType&&String(x.start||'').trim()===String(r.end||'').trim()&&String(x.end||'').trim()===String(r.start||'').trim());return same.sort((a,b)=>{const aa=a.pairedRouteId&&String(a.pairedRouteId)===String(r.id)?0:1,bb=b.pairedRouteId&&String(b.pairedRouteId)===String(r.id)?0:1;return aa-bb})[0]||null}
@@ -145,9 +147,9 @@ window.addEventListener('storage',e=>{
   if(e.key===CARDS_KEY){loadCardsFromStorage();}
   if(e.key===GAME_KEY){load();}
 });
-function renderVehicles(){const s=$('vehicle'),old=s.value;const buses=state.owned.filter(v=>String(v.category||'').toLowerCase()!=='trolleybus'&&!String(v.type||'').toLowerCase().includes('trolley'));s.innerHTML=buses.length?buses.map(v=>`<option value="${esc(v.id)}">🚌 ${esc(v.model)} · ${esc(v.submodel||'')} · ${esc(v.plate||v.num||'без номера')}</option>`).join(''):'<option value="">В гараже нет автобусов</option>';if(buses.some(v=>String(v.id)===String(old)))s.value=old;updateVehicleInfo()}
+function renderVehicles(){const s=$('vehicle'),old=s.value;const vehicles=state.owned.filter(v=>['bus','trolleybus','electrobus'].includes(String(v.category||'').toLowerCase()));s.innerHTML=vehicles.length?vehicles.map(v=>`<option value="${esc(v.id)}">${vehicleIcon(v.category)} ${vehicleLabel(v.category)} · ${esc(v.model)} · ${esc(v.submodel||'')} · ${esc(v.category==='trolleybus' ? ('борт. №'+(v.num||'—')) : (v.plate||v.num||'без номера'))}</option>`).join(''):'<option value="">В гараже нет подходящего ТС</option>';if(vehicles.some(v=>String(v.id)===String(old)))s.value=old;updateVehicleInfo()}
 function vehicle(){return state.owned.find(v=>String(v.id)===String($('vehicle').value))}
-function updateVehicleInfo(){const v=vehicle();$('vehicleInfo').innerHTML=v?`<b>${esc(v.model)}</b> · ${esc(v.submodel||'Базовая модификация')}<br>Гос. номер: <b>${esc(v.plate||v.num||'—')}</b><br>Гаражный номер: <b>${esc(v.garageNumber||v.garage||'Автоматически')}</b><br>Подходящих маршрутов: <b>${routesFor(v).length}</b>`:'Выбери автобус из гаража.';renderStages()}
+function updateVehicleInfo(){const v=vehicle();$('vehicleInfo').innerHTML=v?`<b>${esc(v.model)}</b> · ${esc(v.submodel||'Базовая модификация')}<br>Гос. номер: <b>${esc(v.plate||v.num||'—')}</b><br>Гаражный номер: <b>${esc(v.garageNumber||v.garage||'Автоматически')}</b><br>Подходящих маршрутов: <b>${routesFor(v).length}</b>`:'Выбери ТС из гаража.';renderStages()}
 function multi(){return document.querySelector('input[name=mode]:checked')?.value==='multi'}
 function addStage(data={}){const wrap=$('stages'),i=wrap.children.length;const d=document.createElement('div');d.className='stage';d.dataset.index=i;d.innerHTML=`<div class="stage-head"><h3>Этап ${i+1}</h3><button type="button" class="btn danger remove" ${i===0?'style="display:none"':''}>🗑️ Удалить</button></div><div class="grid3"><label class="field">Маршрут<select class="route"></select></label><label class="field">С какой конечной<select class="from"></select></label><label class="field">До какой конечной<select class="to"></select></label></div><div class="grid3" style="margin-top:9px"><label class="field">Ехать обратно?<select class="back"><option value="yes">Да</option><option value="no">Нет</option></select></label><label class="field round-box">Количество кругов<input class="rounds" type="number" min="1" max="50" value="2"></label><div class="field"><span>Время до конечной</span><input class="duration" readonly value="—"></div></div><div class="grid3" style="margin-top:9px"><label class="field">Авто: отправление с конечной<input class="start" type="time" readonly></label><label class="field">Последнее прибытие<input class="arrival" type="time" readonly></label><label class="field">Заезд в парк<input class="return" type="time" readonly></label></div><div class="stage-summary"></div><div id="v45-terminal-park-help" class="muted" style="margin-top:6px;">💡 Выбранная конечная — это точка, на которой заканчивается работа на линии. После прибытия туда ТС завершает карточку и следует в парк. В режиме нескольких маршрутов это также конечная текущего этапа.</div>`;wrap.appendChild(d);d.querySelector('.remove').onclick=()=>{d.remove();renumber();recalc()};d.querySelector('.route').onchange=()=>{fillStops(d);recalc()};d.querySelector('.from').onchange=()=>{recalc()};d.querySelector('.to').onchange=()=>{recalc()};d.querySelector('.back').onchange=()=>{d.querySelector('.round-box').classList.toggle('show',multi()&&d.querySelector('.back').value==='yes');recalc()};d.querySelector('.rounds').oninput=recalc;fillRoutes(d,data.routeId);fillStops(d,data.startStopId,data.endStopId);if(data.back)d.querySelector('.back').value=data.back;if(data.rounds)d.querySelector('.rounds').value=data.rounds;d.querySelector('.round-box').classList.toggle('show',multi()&&d.querySelector('.back').value==='yes');recalc()}
 function renumber(){[...document.querySelectorAll('.stage')].forEach((d,i)=>{d.querySelector('h3').textContent=`Этап ${i+1}`;d.querySelector('.remove').style.display=i?'':'none';d.dataset.index=i})}
@@ -166,6 +168,23 @@ function cardDayLabel(card){
   const names=['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
   return days.length?days.map(d=>names[Number(d)]||'').filter(Boolean).join(', '):'—';
 }
+function cardDetailsHtml(c,v){
+  const ss=Array.isArray(c.schedules)?c.schedules:[];
+  const dayNames=['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+  const rows=ss.map((s,i)=>{
+    const r=routeBy(s.routeId);
+    const days=(s.days||[]).map(d=>dayNames[Number(d)]||'').join(', ')||cardDayLabel(c)||'—';
+    const trips=Number(s.estimatedTrips||0);
+    return `<div style="border:1px solid #bbb;border-radius:10px;padding:10px;margin:8px 0;background:#fafafa">
+      <b>${i+1}. 🛣️ Маршрут №${esc(r?.number||'—')}</b><br>
+      🚏 ${esc(s.startStopName||termName(r,s.startStopId)||'—')} → ${esc(s.endStopName||termName(r,s.endStopId)||'—')}<br>
+      📅 ${esc(days)}<br>
+      🏠 Парк: ${esc(s.depotTime||'—')} → 🚏 ${esc(s.startTime||'—')} → 🏁 последнее прибытие: ${esc(s.lastArrivalTime||s.endTime||'—')} → 🏠 парк: ${esc(s.returnTime||'—')}<br>
+      🔢 Рейсов: <b>${trips||'—'}</b>
+    </div>`;
+  }).join('');
+  return `<div class="card-details" style="margin-top:10px;border-top:1px solid #bbb;padding-top:10px">${rows||'<div class="muted">Расписание не задано.</div>'}<div class="actions"><button class="btn primary" type="button" data-edit-card="${esc(c.id)}">✏️ Изменить карточку</button><button class="btn" type="button" data-close-card="${esc(c.id)}">Свернуть</button></div></div>`;
+}
 function renderCards(){
   const el=$('cards'),cs=Array.isArray(state.serviceCards)?state.serviceCards:[];
   if(!cs.length){el.innerHTML='<div class="muted">Созданных карточек пока нет. Создай карточку выше — она появится здесь сразу.</div>';return}
@@ -174,47 +193,27 @@ function renderCards(){
     const ss=Array.isArray(c.schedules)?c.schedules:[];
     const nums=[...new Set(ss.map(s=>routeBy(s.routeId)?.number).filter(x=>x!=null))];
     const trips=ss.reduce((n,s)=>n+Number(s.estimatedTrips||0),0);
-    return `<div class="saved">
-      <div style="font-size:17px"><b>🚌 ${esc(v?.model||'ТС')}</b> · ${esc(v?.plate||v?.num||'без номера')}</div>
-      <div class="small" style="margin-top:5px">🛣️ Маршруты: <b>${nums.map(esc).join(' → ')||'—'}</b> · 🚍 выездов по расписанию: <b>${trips||ss.length||0}</b></div>
+    const details=cardDetailsHtml(c,v);
+    return `<div class="saved" data-card="${esc(c.id)}">
+      <div style="font-size:17px"><b>${vehicleIcon(v?.category)} ${esc(v?.model||'ТС')}</b> · ${esc(v?.category==='trolleybus'?('борт. №'+(v?.num||'—')):(v?.plate||v?.num||'без номера'))}</div>
+      <div class="small" style="margin-top:5px">${vehicleLabel(v?.category)} · 🛣️ Маршруты: <b>${nums.map(esc).join(' → ')||'—'}</b> · 🚍 выездов: <b>${trips||ss.length||0}</b></div>
       <div class="small">📅 Дни: <b>${esc(cardDayLabel(c))}</b> · ${c.multiRouteMode?'🔗 несколько этапов':'один маршрут'} · ${c.active===false?'⏸ остановлена':'🟢 активна'}</div>
       <div class="actions">
-        <button class="btn primary" onclick="viewCard('${esc(c.id)}')">👁️ Проверить карточку</button>
-        <button class="btn" onclick="editCard('${esc(c.id)}')">✏️ Изменить</button>
-        <button class="btn" onclick="toggleCard('${esc(c.id)}')">${c.active===false?'▶ Запустить':'⏸ Остановить'}</button>
-        <button class="btn danger" onclick="deleteCard('${esc(c.id)}')">🗑️ Удалить</button>
+        <button class="btn primary" type="button" data-view-card="${esc(c.id)}">👁️ Проверить карточку</button>
+        <button class="btn" type="button" data-edit-card="${esc(c.id)}">✏️ Изменить</button>
+        <button class="btn" type="button" data-toggle-card="${esc(c.id)}">${c.active===false?'▶ Запустить':'⏸ Остановить'}</button>
+        <button class="btn danger" type="button" data-delete-card="${esc(c.id)}">🗑️ Удалить</button>
       </div>
-    </div>`
-  }).join('')
-}
-function viewCard(id){
-  const c=state.serviceCards.find(x=>String(x.id)===String(id));if(!c)return;
-  const v=state.owned.find(x=>String(x.id)===String(c.vehicleId));
-  const ss=Array.isArray(c.schedules)?c.schedules:[];
-  const dayNames=['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
-  let rows=ss.map((s,i)=>{
-    const r=routeBy(s.routeId);
-    const days=(s.days||[]).map(d=>dayNames[Number(d)]||'').join(', ')||'—';
-    const trips=Number(s.estimatedTrips||0);
-    return `<div style="border:1px solid #bbb;border-radius:10px;padding:10px;margin:8px 0">
-      <b>${i+1}. 🛣️ Маршрут №${esc(r?.number||'—')}</b><br>
-      🚏 ${esc(s.startStopName||termName(r,s.startStopId)||'—')} → ${esc(s.endStopName||termName(r,s.endStopId)||'—')}<br>
-      📅 ${esc(days)}<br>
-      🏠 Парк: ${esc(s.depotTime||'—')} → 🚏 отправление: ${esc(s.startTime||'—')} → 🏁 последнее прибытие: ${esc(s.lastArrivalTime||s.endTime||'—')} → 🏠 парк: ${esc(s.returnTime||'—')}<br>
-      🔢 Выездов/рейсов: <b>${trips||'—'}</b>
+      ${details.replace('card-details" style="','card-details" hidden style="')}
     </div>`;
   }).join('');
-  const html=`<div id="cardViewModal" style="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:12px">
-    <div style="background:#fff;color:#000;max-width:700px;width:100%;max-height:92vh;overflow:auto;border-radius:16px;padding:18px">
-      <h2 style="margin-top:0">📋 Проверка карточки выезда</h2>
-      <p><b>ТС:</b> ${esc(v?.model||'ТС')} · ${esc(v?.plate||v?.num||'без номера')}</p>
-      <p><b>Дни:</b> ${esc(cardDayLabel(c))}</p>
-      <p><b>Режим:</b> ${c.multiRouteMode?'несколько маршрутов/этапов':'один маршрут'} · <b>Состояние:</b> ${c.active===false?'⏸ остановлена':'🟢 активна'}</p>
-      <h3>Расписание и выезды</h3>${rows||'<div>Расписание не задано.</div>'}
-      <div class="actions"><button class="btn primary" onclick="editCard('${esc(c.id)}');document.getElementById('cardViewModal')?.remove()">✏️ Изменить карточку</button><button class="btn" onclick="document.getElementById('cardViewModal')?.remove()">Закрыть</button></div>
-    </div></div>`;
-  document.body.insertAdjacentHTML('beforeend',html)
+  el.querySelectorAll('[data-view-card]').forEach(b=>b.onclick=()=>{const box=b.closest('.saved')?.querySelector('.card-details');if(box){box.hidden=false;box.scrollIntoView({behavior:'smooth',block:'nearest'});}});
+  el.querySelectorAll('[data-close-card]').forEach(b=>b.onclick=()=>{const box=b.closest('.card-details');if(box)box.hidden=true;});
+  el.querySelectorAll('[data-edit-card]').forEach(b=>b.onclick=()=>editCard(b.dataset.editCard));
+  el.querySelectorAll('[data-toggle-card]').forEach(b=>b.onclick=()=>toggleCard(b.dataset.toggleCard));
+  el.querySelectorAll('[data-delete-card]').forEach(b=>b.onclick=()=>deleteCard(b.dataset.deleteCard));
 }
+function viewCard(id){const box=document.querySelector(`.saved[data-card=\"${CSS.escape(String(id))}\"] .card-details`);if(box){box.hidden=false;box.scrollIntoView({behavior:'smooth',block:'nearest'});}}
 function editCard(id){
   const c=state.serviceCards.find(x=>String(x.id)===String(id));if(!c)return;
   const v=state.owned.find(x=>String(x.id)===String(c.vehicleId));
