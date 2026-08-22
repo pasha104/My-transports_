@@ -75,7 +75,7 @@
     </section>
   </form>
 
-  <section id="cardsSection" class="card cards"><h2>📋 Созданные карточки</h2><div id="cards"></div></section>
+  <section id="cardsSection" class="card cards"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap"><h2 style="margin:0">📋 Созданные карточки (0)</h2><button type="button" class="btn" onclick="loadCardsFromStorage();document.getElementById('cardsSection')?.scrollIntoView({behavior:'smooth',block:'start'})">🔄 Обновить карточки</button></div><div id="cards"></div></section>
 </div>
 <script>
 const GAME_KEY='busphoto_interactive_game', CARDS_KEY='busphoto_service_cards_v1', STOPS_KEY='minsk_custom_osm_stops_v1';
@@ -96,7 +96,33 @@ function vehicleLabel(category){return category==='trolleybus'?'Троллейб
 function routesFor(v){return state.routes.filter(r=>compatible(v,r))}
 function routeBy(id){return state.routes.find(r=>String(r.id)===String(id))}
 function reverseRoute(r){if(!r)return null;if(r.pairedRouteId){const p=routeBy(r.pairedRouteId);if(p&&p.geometry&&p.routeType===r.routeType)return p}const same=state.routes.filter(x=>String(x.id)!==String(r.id)&&x.geometry&&x.routeType===r.routeType&&String(x.start||'').trim()===String(r.end||'').trim()&&String(x.end||'').trim()===String(r.start||'').trim());return same.sort((a,b)=>{const aa=a.pairedRouteId&&String(a.pairedRouteId)===String(r.id)?0:1,bb=b.pairedRouteId&&String(b.pairedRouteId)===String(r.id)?0:1;return aa-bb})[0]||null}
-function durationFor(r,startId){const first=(r.terminalStopIds||r.stopIds||[])[0];const forward=!startId||String(startId)===String(first);const sec=forward?Number(r.outboundDuration||0):Number(r.returnDuration||0);return Math.max(1,Math.round((sec||Number(r.calculatedDuration||900))/60))}
+function durationFor(r,startId){
+  if(!r)return 1;
+  const first=(r.terminalStopIds||r.stopIds||[])[0];
+  const forward=!startId||String(startId)===String(first);
+  const direct=forward?Number(r.outboundDuration||0):Number(r.returnDuration||0);
+  const router=Number(r.calculatedDuration||0);
+  // Старые версии могли записать 900 секунд (15 мин.) в outboundDuration
+  // даже для длинного маршрута. Сохранённое реальное время маршрута важнее
+  // такого значения, поэтому при наличии обоих берём большее.
+  if(Number.isFinite(direct)&&direct>=60 && Number.isFinite(router)&&router>=60)
+    return Math.max(1,Math.round(Math.max(direct,router)/60));
+  if(Number.isFinite(direct)&&direct>=60)return Math.max(1,Math.round(direct/60));
+  if(Number.isFinite(router)&&router>=60){
+    const km=dist/1000;
+    const speed=km>0?km/(router/3600):0;
+    if(!speed||speed<=120)return Math.max(1,Math.round(router/60));
+  }
+  if(Number.isFinite(dist)&&dist>0){
+    const type=String(r.routeServiceType||r.serviceType||'').toLowerCase();
+    const name=String((r.name||'')+' '+(r.note||'')).toLowerCase();
+    let speed=35;
+    if(type.includes('intercity')||name.includes('межгород')||name.includes('междугород'))speed=70;
+    else if(type.includes('suburban')||name.includes('пригород'))speed=55;
+    return Math.max(1,Math.ceil((dist/(speed/3.6))/60));
+  }
+  return 15;
+}
 function transferFor(r,startId){return durationFor(r,startId)}
 function returnTransfer(r,endId){return durationFor(r,endId)}
 function cardFingerprint(c){
@@ -105,14 +131,23 @@ function cardFingerprint(c){
   return JSON.stringify({vehicleId:c.vehicleId,dayGroup:c.dayGroup,multiRouteMode:!!c.multiRouteMode,active:c.active!==false,schedules});
 }
 function mergeUniqueCards(...lists){
-  const byKey=new Map();
-  lists.flat().filter(Boolean).forEach(c=>{
-    if(c.id==null) return;
-    const key=cardFingerprint(c)||('id:'+String(c.id));
-    const old=byKey.get(key);
-    if(!old || String(c.createdAt||'')>String(old.createdAt||'')) byKey.set(key,c);
+  // Карточки считаем уникальными по ID. Нельзя объединять их по содержимому:
+  // две разные карточки одного ТС могут иметь одинаковый маршрут, но разные дни/время.
+  const byId=new Map();
+  lists.flat().filter(c=>c && c.id!=null).forEach(c=>{
+    const id=String(c.id);
+    const old=byId.get(id);
+    if(!old || String(c.createdAt||'')>=String(old.createdAt||'')) byId.set(id,c);
   });
-  return [...byKey.values()].sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  return [...byId.values()].sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+}
+function recoverCardsFromStorage(){
+  const sources=[];
+  try{ const g=JSON.parse(localStorage.getItem(GAME_KEY)||'null'); if(g&&Array.isArray(g.serviceCards)) sources.push(g.serviceCards); }catch{}
+  for(const key of [CARDS_KEY,'busphoto_service_cards','busphoto_departure_cards']){
+    try{ const x=JSON.parse(localStorage.getItem(key)||'null'); if(Array.isArray(x)) sources.push(x); }catch{}
+  }
+  return mergeUniqueCards(...sources);
 }
 function load(){
   try{state=Object.assign(state,JSON.parse(localStorage.getItem(GAME_KEY)||'{}'))}catch{}
@@ -122,9 +157,7 @@ function load(){
   // Карточки могут находиться как в общем состоянии, так и в отдельном ключе.
   // Объединяем оба источника, чтобы старые карточки никогда не пропадали.
   let gameCards=Array.isArray(state.serviceCards)?state.serviceCards:[];
-  let savedCards=[];
-  try{ const x=JSON.parse(localStorage.getItem(CARDS_KEY)||'null'); if(Array.isArray(x)) savedCards=x; }catch{}
-  state.serviceCards=mergeUniqueCards(gameCards,savedCards);
+  state.serviceCards=mergeUniqueCards(gameCards,recoverCardsFromStorage());
   // Один раз очищаем старые дубли в обоих ключах. Существующие уникальные карточки сохраняются.
   try{localStorage.setItem(GAME_KEY,JSON.stringify(state));localStorage.setItem(CARDS_KEY,JSON.stringify(state.serviceCards));}catch{}
   renderVehicles();renderStages();renderCards()
@@ -135,10 +168,11 @@ function save(){
 }
 function loadCardsFromStorage(){
   try{
-    const saved=JSON.parse(localStorage.getItem(CARDS_KEY)||'null');
-    if(Array.isArray(saved)){
-      state.serviceCards=mergeUniqueCards(state.serviceCards,saved);
-      try{localStorage.setItem(GAME_KEY,JSON.stringify(state));localStorage.setItem(CARDS_KEY,JSON.stringify(state.serviceCards));}catch{}
+    const recovered=recoverCardsFromStorage();
+    if(recovered.length){
+      state.serviceCards=mergeUniqueCards(state.serviceCards,recovered);
+      localStorage.setItem(GAME_KEY,JSON.stringify(state));
+      localStorage.setItem(CARDS_KEY,JSON.stringify(state.serviceCards));
       renderCards();
     }
   }catch{}
@@ -187,15 +221,21 @@ function cardDetailsHtml(c,v){
 }
 function renderCards(){
   const el=$('cards'),cs=Array.isArray(state.serviceCards)?state.serviceCards:[];
-  if(!cs.length){el.innerHTML='<div class="muted">Созданных карточек пока нет. Создай карточку выше — она появится здесь сразу.</div>';return}
+  const section=$('cardsSection');
+  const heading=section?.querySelector('h2');
+  if(heading) heading.textContent=`📋 Созданные карточки (${cs.length})`;
+  if(!el)return;
+  el.style.display='block';
+  if(!cs.length){el.innerHTML='<div class="muted" style="padding:12px 0">Созданных карточек пока нет. Создай карточку выше — она появится здесь сразу.</div>';return}
   el.innerHTML=cs.map(c=>{
     const v=state.owned.find(x=>String(x.id)===String(c.vehicleId));
     const ss=Array.isArray(c.schedules)?c.schedules:[];
     const nums=[...new Set(ss.map(s=>routeBy(s.routeId)?.number).filter(x=>x!=null))];
     const trips=ss.reduce((n,s)=>n+Number(s.estimatedTrips||0),0);
     const details=cardDetailsHtml(c,v);
-    return `<div class="saved" data-card="${esc(c.id)}">
-      <div style="font-size:17px"><b>${vehicleIcon(v?.category)} ${esc(v?.model||'ТС')}</b> · ${esc(v?.category==='trolleybus'?('борт. №'+(v?.num||'—')):(v?.plate||v?.num||'без номера'))}</div>
+    const vehicleText=v?`${vehicleIcon(v.category)} ${esc(v.model)} · ${esc(v.category==='trolleybus'?('борт. №'+(v.num||'—')):(v.plate||v.num||'без номера'))}`:`⚠️ ТС не найдено в гараже · ID ${esc(c.vehicleId)}`;
+    return `<div class="saved" data-card="${esc(c.id)}" style="display:block!important;visibility:visible!important;opacity:1!important">
+      <div style="font-size:17px"><b>${vehicleText}</b></div>
       <div class="small" style="margin-top:5px">${vehicleLabel(v?.category)} · 🛣️ Маршруты: <b>${nums.map(esc).join(' → ')||'—'}</b> · 🚍 выездов: <b>${trips||ss.length||0}</b></div>
       <div class="small">📅 Дни: <b>${esc(cardDayLabel(c))}</b> · ${c.multiRouteMode?'🔗 несколько этапов':'один маршрут'} · ${c.active===false?'⏸ остановлена':'🟢 активна'}</div>
       <div class="actions">
@@ -204,7 +244,7 @@ function renderCards(){
         <button class="btn" type="button" data-toggle-card="${esc(c.id)}">${c.active===false?'▶ Запустить':'⏸ Остановить'}</button>
         <button class="btn danger" type="button" data-delete-card="${esc(c.id)}">🗑️ Удалить</button>
       </div>
-      ${details.replace('card-details" style="','card-details" hidden style="')}
+      ${details.replace('card-details" style=','card-details" hidden style=')}
     </div>`;
   }).join('');
   el.querySelectorAll('[data-view-card]').forEach(b=>b.onclick=()=>{const box=b.closest('.saved')?.querySelector('.card-details');if(box){box.hidden=false;box.scrollIntoView({behavior:'smooth',block:'nearest'});}});
@@ -213,6 +253,7 @@ function renderCards(){
   el.querySelectorAll('[data-toggle-card]').forEach(b=>b.onclick=()=>toggleCard(b.dataset.toggleCard));
   el.querySelectorAll('[data-delete-card]').forEach(b=>b.onclick=()=>deleteCard(b.dataset.deleteCard));
 }
+
 function viewCard(id){const box=document.querySelector(`.saved[data-card=\"${CSS.escape(String(id))}\"] .card-details`);if(box){box.hidden=false;box.scrollIntoView({behavior:'smooth',block:'nearest'});}}
 function editCard(id){
   const c=state.serviceCards.find(x=>String(x.id)===String(id));if(!c)return;
@@ -243,6 +284,6 @@ load();
 loadCardsFromStorage();
 const editParam=new URLSearchParams(location.search).get('edit');
 if(editParam){setTimeout(()=>editCard(editParam),80);}
-setTimeout(loadCardsFromStorage,50);
+setTimeout(loadCardsFromStorage,50);setTimeout(loadCardsFromStorage,300);window.addEventListener('pageshow',()=>setTimeout(loadCardsFromStorage,50));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(loadCardsFromStorage,50)});if(location.hash==='#cardsSection'){setTimeout(()=>document.getElementById('cardsSection')?.scrollIntoView({behavior:'smooth',block:'start'}),350);}
 </script>
 </body></html>
