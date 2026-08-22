@@ -1,4 +1,4 @@
-/* BUSPHOTO Interactive modular loader v75
+/* BUSPHOTO Interactive modular loader v77
  * Fixes: repeated section loading, map-section race, stale cached fragments.
  */
 (function(){
@@ -6,10 +6,10 @@
 
   // The loader can be encountered more than once after GitHub Pages/browser cache
   // updates. Only the first instance is allowed to own the hosts.
-  if (window.__BUSPHOTO_INTERACTIVE_LOADER_V75__) return;
-  window.__BUSPHOTO_INTERACTIVE_LOADER_V75__ = true;
+  if (window.__BUSPHOTO_INTERACTIVE_LOADER_V77__) return;
+  window.__BUSPHOTO_INTERACTIVE_LOADER_V77__ = true;
 
-  const VERSION = '20260822-v75';
+  const VERSION = '20260822-v77';
   const sections = [
     ['menu','interactive-menu.html','interactive-menu-host'],
     ['map','interactive-map.html','interactive-section-host-map'],
@@ -129,8 +129,8 @@
   }
 
   function boot(){
-    if (window.__BUSPHOTO_INTERACTIVE_STARTED_V75__) return;
-    window.__BUSPHOTO_INTERACTIVE_STARTED_V75__ = true;
+    if (window.__BUSPHOTO_INTERACTIVE_STARTED_V77__) return;
+    window.__BUSPHOTO_INTERACTIVE_STARTED_V77__ = true;
     start();
   }
 
