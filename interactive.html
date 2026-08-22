@@ -6,15 +6,6 @@
 <link href="busphoto-interactive.css?v=20260822-v77" rel="stylesheet"/>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<script>
-// Удаляем старый Service Worker/кэш, который мог отдавать старую версию сайта.
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister())).catch(() => {});
-}
-if (window.caches) {
-  caches.keys().then(keys => keys.forEach(key => caches.delete(key))).catch(() => {});
-}
-</script>
 <title>BUSPHOTO — Интерактивный транспортный бизнес</title>
 <script defer="" src="busphoto-common.js?v=20260822-v77"></script>
 
@@ -25,7 +16,7 @@ if (window.caches) {
 }
 @media(max-width:600px){#dispatcherPanel .interactive-log-row,#vehicleStatsPanel .interactive-log-row,#maintenancePanel .interactive-log-row{flex-direction:column;align-items:stretch}}
 </style>
-<script defer="True" src="interactive-loader.js?v=20260822-v75"></script></head>
+<script defer="True" src="interactive-loader.js?v=20260822-v78"></script></head>
 <body class="light-theme">
 <header>
 <div>
@@ -47,7 +38,7 @@ if (window.caches) {
 </header><nav><a class="nav-btn" href="index.html" style="display:block; color:#e2f0d9; padding:9px 12px; font-size:11px; font-weight:bold; border-bottom:3px solid transparent; flex-shrink:0;">📋 База данных + поиск</a><a class="nav-btn" href="models.html" style="display:block; color:#e2f0d9; padding:9px 12px; font-size:11px; font-weight:bold; border-bottom:3px solid transparent; flex-shrink:0;">🚍 Список моделей</a><a class="nav-btn active" href="interactive.html" style="display:block; color:#e2f0d9; padding:9px 12px; font-size:11px; font-weight:bold; border-bottom:3px solid transparent; flex-shrink:0;">🎮 Интерактив</a></nav><div class="main-wrapper"><div class="tab-content active" id="interactive-tab">
 <div class="page-header">
 <span>🎮 Транспортный бизнес — интерактив</span>
-<span class="interactive-badge" id="gameClockBadge">--:--:-- (UTC+3)</span>
+<span class="interactive-badge" id="gameClockBadge">Проверка времени…</span>
 </div>
 <div class="interactive-stats">
 <div class="interactive-stat">
