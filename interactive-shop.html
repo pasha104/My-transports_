@@ -1,0 +1,66 @@
+<div class="game-section active" id="game-section-shop">
+<div class="interactive-dashboard">
+<div class="interactive-card">
+<h3>🛒 Купить транспорт</h3>
+<div class="interactive-controls" style="grid-template-columns:1fr;">
+<label>Категория</label>
+<div aria-label="Категория транспорта" class="game-category-picker" id="gameCategoryPicker" role="group">
+<button class="game-category-btn active" data-category="bus" onclick="selectGameCategory('bus', this)" type="button">🚌 Автобусы</button>
+<button class="game-category-btn" data-category="trolleybus" onclick="selectGameCategory('trolleybus', this)" type="button">🚎 Троллейбусы</button>
+<button class="game-category-btn" data-category="electrobus" onclick="selectGameCategory('electrobus', this)" type="button">⚡ Электробусы</button>
+</div>
+<select aria-hidden="true" id="gameCategory" style="position:absolute;left:-99999px;width:1px;height:1px;opacity:0;" tabindex="-1"><option value="bus">Автобусы</option><option value="trolleybus">Троллейбусы</option><option value="electrobus">Электробусы</option></select>
+<label>Назначение автобуса</label>
+<div aria-label="Назначение автобуса" class="game-service-picker" id="gameServiceTypePicker" role="group">
+<button class="game-service-btn active" data-service="all" onclick="selectGameServiceType('all', this)" type="button">🚍 Все</button>
+<button class="game-service-btn" data-service="city" onclick="selectGameServiceType('city', this)" type="button">🏙️ Городские</button>
+<button class="game-service-btn" data-service="suburban" onclick="selectGameServiceType('suburban', this)" type="button">🏘️ Пригородные</button>
+<button class="game-service-btn" data-service="intercity" onclick="selectGameServiceType('intercity', this)" type="button">🛣️ Межгородние</button>
+</div>
+<select aria-hidden="true" id="gameServiceType" style="position:absolute;left:-99999px;width:1px;height:1px;opacity:0;" tabindex="-1"><option value="all">Все</option><option value="city">Городские</option><option value="suburban">Пригородные</option><option value="intercity">Межгородние</option></select>
+<label>
+                            Модель
+                            <select id="gameModel" onchange="updateGameModelSelect()"></select>
+</label>
+<label>
+                            Подмодель автобуса
+                            <select id="gameSubmodel"></select>
+<span class="interactive-muted">Для автобусов доступны реальные коды подмоделей выбранной модели.</span>
+</label>
+<div class="interactive-muted" id="gameModelClassInfo" style="margin-top:-4px;"></div>
+</div>
+<div class="interactive-card" style="padding:10px; margin:8px 0;">
+<div><b>Стоимость:</b> <span id="gamePrice">—</span></div>
+<div><b>Средняя ЗП:</b> <span id="gameSalaryRange">—</span></div>
+<div class="interactive-muted" style="margin-top:5px;">
+                            Зарплата начисляется ежедневно в полном размере, указанном для машины.
+                        </div>
+</div>
+<button class="btn-primary" onclick="buyGameVehicle()">➕ Купить ТС</button>
+</div>
+<div class="interactive-card">
+<h3>🚍 Мой транспорт</h3>
+<div class="table-container">
+<table class="interactive-table">
+<thead>
+<tr>
+<th>Модель</th>
+<th>Цена</th>
+<th>Текущая ЗП</th>
+<th></th>
+</tr>
+</thead>
+<tbody id="ownedVehiclesBody"></tbody>
+</table>
+</div>
+</div>
+<div class="interactive-card">
+<h3>💰 Последние начисления</h3>
+<div class="interactive-log" id="gameLog"></div>
+</div>
+</div>
+<div class="interactive-card shop-owned-panel">
+<h3>🚍 Мои ТС</h3>
+<div class="owned-mini-list" id="shopOwnedVehicles"></div>
+</div>
+</div>

@@ -1871,109 +1871,152 @@ out body;
             }
 
             const stops = getMapStops();
-            const path = (mapState.draftPath && mapState.draftPath.length) ? mapState.draftPath : mapState.draftStopIds.map(id=>({kind:'stop',stopId:id}));
-            const points = path.map(x=> x.kind==='control' ? ({id:x.point.id, name:x.point.name||'Контрольная точка', lat:x.point.lat, lon:x.point.lon, stopType:'control'}) : stops.find(s=>String(s.id)===String(x.stopId))).filter(Boolean);
-            const routeStops = points.filter(p=>p.stopType!=='control');
+            const path = (mapState.draftPath && mapState.draftPath.length)
+                ? mapState.draftPath
+                : mapState.draftStopIds.map(id => ({kind:'stop', stopId:id}));
+            const points = path.map(x => x.kind === 'control'
+                ? ({id:x.point.id, name:x.point.name || 'Контрольная точка', lat:Number(x.point.lat), lon:Number(x.point.lon), stopType:'control'})
+                : stops.find(st => String(st.id) === String(x.stopId)))
+                .filter(p => p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon)));
+            const routeStops = points.filter(p => p.stopType !== 'control');
 
             if (routeStops.length < 2) {
                 alert('Для построения маршрута нужно минимум 2 остановки.');
                 return;
             }
 
-            mapSetStatus('Строю маршрут по дорожной сети… Сайт можно продолжать использовать.');
-
-            // Отдаём браузеру кадр перед сетевым запросом, чтобы карта/кнопки не
-            // ощущались зависшими на телефоне.
+            mapSetStatus('🛣️ Ищу дорогу между остановками… Сайт можно продолжать использовать.');
             await new Promise(resolve => requestAnimationFrame(resolve));
 
-            const coordinates = points.map(s => `${s.lon},${s.lat}`).join(';');
-            // simplified заметно уменьшает размер GeoJSON и синхронную запись localStorage,
-            // при этом для игровой симуляции точности более чем достаточно.
-            const url = `https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=simplified&geometries=geojson&steps=false`;
+            // ВАЖНО: остановки/контрольные точки часто стоят не ровно на линии дороги.
+            // Если отправить такие координаты в OSRM без radiuses, он может вернуть NoRoute,
+            // после чего карта рисует только прямые красные отрезки между остановками.
+            // radiuses заставляет маршрутизатор привязать каждую точку к ближайшей дороге.
+            const coordinates = points.map(p => `${p.lon},${p.lat}`).join(';');
+            const radiuses = points.map(p => '800').join(';');
 
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
+            const endpoints = [
+                'https://router.project-osrm.org/route/v1/driving/',
+                'https://routing.openstreetmap.de/routed-car/route/v1/driving/'
+            ];
+
+            async function requestRoadRoute(base, coordString, radiusString, timeoutMs = 18000) {
+                const url = `${base}${coordString}?overview=full&geometries=geojson&steps=false&alternatives=false&radiuses=${radiusString}`;
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), timeoutMs);
+                try {
+                    const response = await fetch(url, {
+                        signal: controller.signal,
+                        cache: 'no-store',
+                        headers: {'Accept':'application/json'}
+                    });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const data = await response.json();
+                    if (data.code !== 'Ok' || !data.routes?.length) {
+                        throw new Error(data.message || data.code || 'Маршрут не найден');
+                    }
+                    const result = data.routes[0];
+                    if (!result.geometry?.coordinates?.length) throw new Error('Сервер не вернул геометрию дороги');
+                    return result;
+                } finally {
+                    clearTimeout(timer);
+                }
+            }
+
+            let result = null;
+            let lastError = null;
+            for (const endpoint of endpoints) {
+                try {
+                    result = await requestRoadRoute(endpoint, coordinates, radiuses);
+                    break;
+                } catch (err) {
+                    lastError = err;
+                    console.warn('Маршрутизатор не ответил:', endpoint, err);
+                }
+            }
+
+            if (!result) {
+                mapSetStatus('❌ Не удалось получить дорожную геометрию.');
+                alert(lastError?.name === 'AbortError'
+                    ? 'Сервер маршрутизации слишком долго отвечает. Попробуй ещё раз через несколько секунд.'
+                    : 'Маршрут по дорогам не найден. Попробуй немного изменить порядок остановок или контрольные точки.');
+                return;
+            }
 
             try {
-                const response = await fetch(url, {signal: controller.signal});
-                if (!response.ok) throw new Error('HTTP ' + response.status);
-                const data = await response.json();
-
-                if (data.code !== 'Ok' || !data.routes?.length) {
-                    throw new Error(data.message || data.code || 'Маршрут не найден');
-                }
-
-                const result = data.routes[0];
                 route.geometry = result.geometry;
                 route.outboundGeometry = null;
                 route.returnGeometry = null;
-                route.reverseStopIds = points.map(s => s.id).reverse();
-                const classicStops = routeStops.filter(s => s.stopType !== 'turnback');
-                const terminalStops = classicStops.length >= 2 ? classicStops : points;
-                route.terminalStopIds = terminalStops.map(s => s.id);
-                route.turnbackStopIds = points.filter(s => s.stopType === 'turnback').map(s => s.id);
+                route.reverseStopIds = points.map(p => p.id).reverse();
+
+                const classicStops = routeStops.filter(p => p.stopType !== 'turnback');
+                const terminalStops = classicStops.length >= 2 ? classicStops : routeStops;
+                route.terminalStopIds = terminalStops.map(p => p.id);
+                route.turnbackStopIds = points.filter(p => p.stopType === 'turnback').map(p => p.id);
                 route.start = terminalStops[0].name;
                 route.end = terminalStops[terminalStops.length - 1].name;
-                route.stops = points.map(s => s.name);
-                route.calculatedDistance = result.distance;
+                route.stops = points.map(p => p.name);
+                route.calculatedDistance = Number(result.distance || 0);
+                route.calculatedDuration = Number(result.duration || 0);
 
-                // Если последняя выбранная точка — пункт разворота, он не является конечной.
-                // Строим дополнительный путь от конечной до кольца и обратно к конечной,
-                // чтобы ТС физически «заезжало на разворот» и возвращалось к конечной.
+                // Если последняя выбранная точка — пункт разворота, строим маленькое
+                // дорожное кольцо: конечная → разворот → конечная.
                 const lastPoint = points[points.length - 1];
                 const terminalPoint = terminalStops[terminalStops.length - 1];
                 if (lastPoint?.stopType === 'turnback' && terminalPoint && String(lastPoint.id) !== String(terminalPoint.id)) {
                     try {
-                        const loopUrl = `https://router.project-osrm.org/route/v1/driving/${terminalPoint.lon},${terminalPoint.lat};${lastPoint.lon},${lastPoint.lat};${terminalPoint.lon},${terminalPoint.lat}?overview=full&geometries=geojson&steps=false`;
-                        const loopR = await fetch(loopUrl);
-                        if (loopR.ok) {
-                            const loopD = await loopR.json();
-                            const loop = loopD.routes?.[0];
-                            if (loop?.geometry?.coordinates?.length > 1) {
-                                const base = route.geometry.coordinates || [];
-                                const loopCoords = loop.geometry.coordinates;
-                                route.geometry = {type:'LineString', coordinates: base.concat(loopCoords.slice(1))};
-                                route.calculatedDistance = Number(result.distance) + Number(loop.distance || 0);
-                                route.calculatedDuration = Number(result.duration) + Number(loop.duration || 0);
-                            }
+                        const loop = await requestRoadRoute(
+                            endpoints[0],
+                            `${terminalPoint.lon},${terminalPoint.lat};${lastPoint.lon},${lastPoint.lat};${terminalPoint.lon},${terminalPoint.lat}`,
+                            '800;800;800',
+                            12000
+                        );
+                        const base = route.geometry.coordinates || [];
+                        const loopCoords = loop.geometry.coordinates || [];
+                        if (loopCoords.length > 1) {
+                            route.geometry = {type:'LineString', coordinates:base.concat(loopCoords.slice(1))};
+                            route.calculatedDistance += Number(loop.distance || 0);
+                            route.calculatedDuration += Number(loop.duration || 0);
                         }
-                    } catch(loopErr) { console.warn('Не удалось построить разворотное кольцо', loopErr); }
+                    } catch (loopErr) {
+                        console.warn('Не удалось построить разворотное кольцо:', loopErr);
+                    }
                 }
-                const depot = DEPOTS[route.routeType === 'trolleybus' ? 'trolleybus' : 'bus'];
-                const first = points[0], last = points[points.length-1];
-                try {
-                    const outUrl = `https://router.project-osrm.org/route/v1/driving/${depot.lon},${depot.lat};${first.lon},${first.lat}?overview=simplified&geometries=geojson`;
-                    const retUrl = `https://router.project-osrm.org/route/v1/driving/${last.lon},${last.lat};${depot.lon},${depot.lat}?overview=simplified&geometries=geojson`;
-                    const [outR, retR] = await Promise.all([fetch(outUrl), fetch(retUrl)]);
-                    if (outR.ok) { const od=await outR.json(); route.outboundGeometry=od.routes?.[0]?.geometry||null; route.outboundDuration=Number(od.routes?.[0]?.duration||0); }
-                    if (retR.ok) { const rd=await retR.json(); route.returnGeometry=rd.routes?.[0]?.geometry||null; route.returnDuration=Number(rd.routes?.[0]?.duration||0); }
-                } catch(e) { console.warn('Не удалось построить подъезд к парку',e); }
-                route.routeType = route.routeType || 'bus';
-                if (!route.calculatedDuration) route.calculatedDuration = result.duration;
-                route.stopIds = routeStops.map(s => s.id);
-                route.controlPoints = points.filter(s=>s.stopType==='control').map(s=>({id:s.id,name:s.name,lat:s.lat,lon:s.lon}));
-                route.pathNodes = path.map(x=>x.kind==='control'?{kind:'control',point:x.point}:{kind:'stop',stopId:x.stopId});
-                route.stopCount = points.length;
-                route.start = terminalStops[0].name;
-                route.end = terminalStops[terminalStops.length - 1].name;
 
-                // Save immediately so a reload does not lose the calculated geometry.
+                // Дорога парк → первая остановка и последняя остановка → парк.
+                const depot = DEPOTS[route.routeType === 'trolleybus' ? 'trolleybus' : 'bus'];
+                const first = points[0], last = points[points.length - 1];
+                try {
+                    const depotRadius = '800;800';
+                    const [outResult, retResult] = await Promise.all([
+                        requestRoadRoute(endpoints[0], `${depot.lon},${depot.lat};${first.lon},${first.lat}`, depotRadius, 12000),
+                        requestRoadRoute(endpoints[0], `${last.lon},${last.lat};${depot.lon},${depot.lat}`, depotRadius, 12000)
+                    ]);
+                    route.outboundGeometry = outResult.geometry || null;
+                    route.outboundDuration = Number(outResult.duration || 0);
+                    route.returnGeometry = retResult.geometry || null;
+                    route.returnDuration = Number(retResult.duration || 0);
+                } catch (e) {
+                    console.warn('Не удалось построить подъезд к парку:', e);
+                }
+
+                route.routeType = route.routeType || 'bus';
+                route.stopIds = routeStops.map(p => p.id);
+                route.controlPoints = points.filter(p => p.stopType === 'control').map(p => ({id:p.id,name:p.name,lat:p.lat,lon:p.lon}));
+                route.pathNodes = path.map(x => x.kind === 'control'
+                    ? {kind:'control',point:x.point}
+                    : {kind:'stop',stopId:x.stopId});
+                route.stopCount = points.length;
+
                 saveGameState();
                 renderMapRouteLayers();
                 renderMapRouteList();
                 renderRoutes();
-
-                mapSetStatus(`Готово: ${(result.distance / 1000).toFixed(2)} км · ${formatDuration(result.duration)}`);
+                mapSetStatus(`✅ Маршрут построен по дорогам: ${(route.calculatedDistance / 1000).toFixed(2)} км · ${formatDuration(route.calculatedDuration)}`);
             } catch (err) {
-                console.error(err);
-                mapSetStatus(err?.name === 'AbortError'
-                    ? 'Построение заняло слишком много времени. Приблизь карту/выбери меньше остановок и повтори.'
-                    : 'Не удалось построить маршрут.');
-                alert(err?.name === 'AbortError'
-                    ? 'Сервер маршрутизации не ответил за 30 секунд. Маршрут и сайт не заблокированы — попробуй ещё раз.'
-                    : 'Маршрут не построился. Проверь порядок остановок и попробуй снова.');
-            } finally {
-                clearTimeout(timeoutId);
+                console.error('Ошибка сохранения дорожного маршрута:', err);
+                mapSetStatus('❌ Ошибка сохранения маршрута.');
+                alert('Дорога была найдена, но не удалось сохранить её в маршрут.');
             }
         }
 
