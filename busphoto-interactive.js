@@ -193,45 +193,132 @@
             return Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
         }
 
+        // Игровое время всегда фиксировано: UTC+3 (МСК/Минск).
+        // Оно НЕ зависит от часового пояса телефона/браузера пользователя.
+        const DEFAULT_GAME_TIMEZONE_OFFSET_MINUTES = 180;
+        const GAME_TIMEZONE_STORAGE_KEY = 'busphoto_game_timezone_offset_minutes';
+
+        function getGameTimezoneOffsetMinutes() {
+            const raw = Number(localStorage.getItem(GAME_TIMEZONE_STORAGE_KEY));
+            return Number.isFinite(raw) && raw >= -720 && raw <= 840 ? raw : DEFAULT_GAME_TIMEZONE_OFFSET_MINUTES;
+        }
+
+        function gameTimezoneLabel(offset = getGameTimezoneOffsetMinutes()) {
+            const sign = offset >= 0 ? '+' : '-';
+            const abs = Math.abs(offset);
+            const hh = String(Math.floor(abs / 60)).padStart(2, '0');
+            const mm = String(abs % 60).padStart(2, '0');
+            return `UTC${sign}${hh}:${mm}`;
+        }
+
+        function setGameTimezoneOffsetMinutes(offset) {
+            const value = Number(offset);
+            if (!Number.isFinite(value) || value < -720 || value > 840) return false;
+            localStorage.setItem(GAME_TIMEZONE_STORAGE_KEY, String(Math.round(value)));
+            try { window.dispatchEvent(new CustomEvent('busphoto-game-timezone-changed', { detail: { offset: Math.round(value) } })); } catch(e) {}
+            if (typeof renderInteractiveHeaderAndLightViews === 'function') renderInteractiveHeaderAndLightViews();
+            return true;
+        }
+
+        function gameNowMs() {
+            return Date.now() + getGameTimezoneOffsetMinutes() * 60 * 1000;
+        }
+
+        function gameDateObject(date = new Date()) {
+            return new Date(date.getTime() + getGameTimezoneOffsetMinutes() * 60 * 1000);
+        }
+
+        function openGameTimezoneSettings() {
+            const current = getGameTimezoneOffsetMinutes();
+            const options = [];
+            for (let m = -720; m <= 840; m += 60) {
+                const label = gameTimezoneLabel(m);
+                options.push(`<option value="${m}" ${m === current ? 'selected' : ''}>${label}</option>`);
+            }
+            const html = `<div id="gameTimezoneModal" style="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px">
+              <div style="max-width:430px;width:100%;background:var(--bp-panel,#fff);color:var(--bp-text,#111);border-radius:16px;padding:18px;box-shadow:0 18px 50px rgba(0,0,0,.3)">
+                <h2 style="margin:0 0 8px">🕐 Игровой часовой пояс</h2>
+                <p class="interactive-muted" style="margin:0 0 14px">Игровые сутки, расписания и ежедневная выплата в 12:00 используют выбранный пояс независимо от часового пояса телефона.</p>
+                <label style="display:block;font-weight:700;margin-bottom:6px">Часовой пояс игры</label>
+                <select id="gameTimezoneSelect" style="width:100%;padding:10px;border-radius:10px">${options.join('')}</select>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+                  <button type="button" class="btn-secondary" onclick="document.getElementById('gameTimezoneModal')?.remove()">Отмена</button>
+                  <button type="button" class="btn-primary" onclick="saveGameTimezoneFromModal()">💾 Сохранить</button>
+                </div>
+              </div></div>`;
+            document.getElementById('gameTimezoneModal')?.remove();
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        function saveGameTimezoneFromModal() {
+            const select = document.getElementById('gameTimezoneSelect');
+            if (!select) return;
+            setGameTimezoneOffsetMinutes(Number(select.value));
+            document.getElementById('gameTimezoneModal')?.remove();
+            if (typeof renderInteractiveHeaderAndLightViews === 'function') renderInteractiveHeaderAndLightViews();
+        }
+
         function localDateKey(d = new Date()) {
-            const y = d.getFullYear();
-            const m = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
+            const gameDate = gameDateObject(d);
+            const y = gameDate.getUTCFullYear();
+            const m = String(gameDate.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(gameDate.getUTCDate()).padStart(2, '0');
             return `${y}-${m}-${day}`;
         }
 
-        function timeUntilNoonMs() {
-            const now = new Date();
-            const noon = new Date(now);
-            noon.setHours(12, 0, 0, 0);
-            if (now >= noon) return 0;
-            return noon.getTime() - now.getTime();
+        function gameHour(d = new Date()) {
+            return gameDateObject(d).getUTCHours();
         }
 
+        function gameMinute(d = new Date()) {
+            return gameDateObject(d).getUTCMinutes();
+        }
+
+        function timeUntilNoonMs() {
+            const shifted = gameDateObject(new Date());
+            const y = shifted.getUTCFullYear();
+            const m = shifted.getUTCMonth();
+            const day = shifted.getUTCDate();
+            const currentMinutes = shifted.getUTCHours() * 60 + shifted.getUTCMinutes();
+            const seconds = shifted.getUTCSeconds();
+            const millis = shifted.getUTCMilliseconds();
+            if (currentMinutes >= 12 * 60) return 0;
+            const noonGameMs = Date.UTC(y, m, day, 12, 0, 0, 0);
+            const currentGameMs = shifted.getTime();
+            return Math.max(0, noonGameMs - currentGameMs);
+        }
 
         function dateKeyFromDate(d) {
             return localDateKey(d);
         }
 
         function payoutEligibleDateKey(now = new Date()) {
-            const d = new Date(now);
-            if (d.getHours() < 12) d.setDate(d.getDate() - 1);
-            return localDateKey(d);
+            const d = gameDateObject(now);
+            if (d.getUTCHours() < 12) {
+                d.setUTCDate(d.getUTCDate() - 1);
+            }
+            const y = d.getUTCFullYear();
+            const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(d.getUTCDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
         }
 
         function dateKeysAfter(lastKey, throughKey) {
             const result = [];
             if (!throughKey) return result;
-            const end = new Date(`${throughKey}T12:00:00`);
-            let cur = lastKey ? new Date(`${lastKey}T12:00:00`) : null;
+            const end = new Date(`${throughKey}T12:00:00Z`);
+            let cur = lastKey ? new Date(`${lastKey}T12:00:00Z`) : null;
             if (!cur || Number.isNaN(cur.getTime())) {
                 result.push(throughKey);
                 return result;
             }
-            cur.setDate(cur.getDate() + 1);
+            cur.setUTCDate(cur.getUTCDate() + 1);
             while (cur <= end) {
-                result.push(localDateKey(cur));
-                cur.setDate(cur.getDate() + 1);
+                const y = cur.getUTCFullYear();
+                const m = String(cur.getUTCMonth() + 1).padStart(2, '0');
+                const day = String(cur.getUTCDate()).padStart(2, '0');
+                result.push(`${y}-${m}-${day}`);
+                cur.setUTCDate(cur.getUTCDate() + 1);
                 if (result.length > 3660) break; // защита от повреждённого сохранения
             }
             return result;
@@ -2304,9 +2391,11 @@ out body;
             document.getElementById('ownedCount').textContent = gameState.owned.length;
             const badge = document.getElementById('gameClockBadge');
             if (badge) {
-                const now = new Date();
-                badge.textContent = now.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) +
-                    (now.getHours() >= 12 ? ' • начисление сегодня выполнено/ожидается' : ' • следующее начисление в 12:00');
+                const gameDate = gameDateObject(new Date());
+                const hh = String(gameDate.getUTCHours()).padStart(2, '0');
+                const mm = String(gameDate.getUTCMinutes()).padStart(2, '0');
+                badge.textContent = `${hh}:${mm} • ${gameTimezoneLabel()}` +
+                    (gameDate.getUTCHours() >= 12 ? ' • начисление сегодня выполнено/ожидается' : ' • следующее начисление в 12:00');
             }
         }
 
@@ -2318,10 +2407,12 @@ out body;
             document.getElementById('gameMonth').textContent = gameState.month;
             document.getElementById('ownedCount').textContent = gameState.owned.length;
 
-            const now = new Date();
+            const gameDate = gameDateObject(new Date());
             const badge = document.getElementById('gameClockBadge');
-            badge.textContent = now.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) +
-                (now.getHours() >= 12 ? ' • начисление сегодня выполнено/ожидается' : ' • следующее начисление в 12:00');
+            const hh = String(gameDate.getUTCHours()).padStart(2, '0');
+            const mm = String(gameDate.getUTCMinutes()).padStart(2, '0');
+            badge.textContent = `${hh}:${mm} • ${gameTimezoneLabel()}` +
+                (gameDate.getUTCHours() >= 12 ? ' • начисление сегодня выполнено/ожидается' : ' • следующее начисление в 12:00');
 
             updateGameModelSelect();
 
