@@ -3426,8 +3426,9 @@ out body;
             const badge = document.getElementById('gameClockBadge');
             if (badge) {
                 const now = new Date();
-                badge.textContent = now.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) +
-                    (now.getHours() >= 12 ? ' • начисление сегодня выполнено/ожидается' : ' • следующее начисление в 12:00');
+                const gameNow = getGameClock();
+                badge.textContent = `${String(gameNow.hour).padStart(2,'0')}:${String(gameNow.minute).padStart(2,'0')}:${String(gameNow.second).padStart(2,'0')} (UTC+3)` +
+                    (gameNow.hour >= 12 ? ' • начисление сегодня выполнено/ожидается' : ' • следующее начисление в 12:00');
             }
         }
 
@@ -4036,11 +4037,17 @@ out body;
             updateGameModelSelect();
             initStopRegionSelect();
             renderTrackerVehicleSelect();
-            processAllOfflineEarnings();
-            processServiceCardPayouts(new Date());
+            // Сначала мгновенно показываем главный экран. Тяжёлые проверки не блокируют вход.
             renderInteractive();
-            checkAffordableVehicleNotifications();
-            scheduleNoonPayout();
+            const runDeferredGameChecks = () => {
+                try { processAllOfflineEarnings(); } catch (e) { console.warn('offline earnings:', e); }
+                try { processServiceCardPayouts(new Date()); } catch (e) { console.warn('service payouts:', e); }
+                try { checkAffordableVehicleNotifications(); } catch (e) { console.warn('notifications:', e); }
+                try { scheduleNoonPayout(); } catch (e) { console.warn('noon payout:', e); }
+                try { renderInteractiveHeaderAndLightViews(); } catch (e) { console.warn('header refresh:', e); }
+            };
+            if (typeof requestIdleCallback === 'function') requestIdleCallback(runDeferredGameChecks, {timeout: 1200});
+            else setTimeout(runDeferredGameChecks, 0);
 
             // Карту и её анимацию инициализируем лениво — только когда пользователь её открыл.
 
