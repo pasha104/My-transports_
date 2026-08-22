@@ -1455,6 +1455,7 @@ function rebuildMapStopsIndex(stops) {
 
         function renderMapStops() {
             if (!mapState.map) return;
+            const generation = ++mapState.stopRenderGeneration;
             if (mapState.mode === 'vehicles') {
                 mapState.stopMarkers.forEach(m => m.remove());
                 mapState.stopMarkers.clear();
@@ -1467,34 +1468,31 @@ function rebuildMapStopsIndex(stops) {
             const zoom = mapState.map.getZoom();
             const visible = getVisibleStopsForMap(stops);
 
-            // Экранная сетка: один круг = одна группа точек в ячейке.
-            // На телефоне это особенно важно: в режиме маршрута нельзя создавать
-            // сотни DOM-маркеров на каждом движении карты. До приближения показываем
-            // группы, а выбранные остановки ниже будут добавлены отдельно.
+            // До сильного приближения не создаём тысячи отдельных DOM-маркеров.
+            // Показываем только группы, а при приближении — ограниченное число
+            // ближайших остановок. Это особенно важно на телефонах.
             const clusterAtZoom = zoom < 14;
             if (clusterAtZoom) {
-                const cellPx = zoom <= 11 ? 150 : zoom <= 13 ? 130 : zoom <= 15 ? 105 : 90;
+                const cellPx = zoom <= 11 ? 170 : zoom <= 12 ? 145 : 125;
                 const cells = new Map();
                 visible.forEach(stop => {
                     const p = mapState.map.project([Number(stop.lat), Number(stop.lon)], zoom);
                     const key = `${Math.floor(p.x / cellPx)}:${Math.floor(p.y / cellPx)}`;
                     let c = cells.get(key);
-                    if (!c) c = {x:0,y:0,count:0,ids:[],types:new Set()};
+                    if (!c) c = {x:0,y:0,count:0};
                     c.x += p.x; c.y += p.y; c.count++;
-                    if (c.ids.length < 12) c.ids.push(stop.id);
-                    c.types.add('stop');
                     cells.set(key,c);
                 });
                 cells.forEach((c,key) => {
+                    if (generation !== mapState.stopRenderGeneration) return;
                     const p = mapState.map.unproject([c.x/c.count,c.y/c.count], zoom);
                     const size = Math.min(50, 28 + Math.log2(Math.max(1,c.count))*5);
                     const icon = L.divIcon({className:'',html:`<div class="map-stop-cluster" style="width:${size}px;height:${size}px">${c.count}</div>`,iconSize:[size,size],iconAnchor:[size/2,size/2]});
                     const m = L.marker(p,{icon, keyboard:false, zIndexOffset:500}).addTo(mapState.map);
-                    m.bindPopup(`<b>🚏 ${c.count} остановок</b><br><small>Приблизь карту, чтобы увидеть отдельные точки.</small>`);
+                    m.bindPopup(`<b>🚏 ${c.count.toLocaleString('ru-RU')} остановок</b><br><small>Приблизь карту, чтобы увидеть точки.</small>`);
                     m.on('click', (ev) => {
                         if (ev && ev.originalEvent) L.DomEvent.stopPropagation(ev.originalEvent);
-                        const nextZoom = Math.min(mapState.map.getMaxZoom ? mapState.map.getMaxZoom() : 19, mapState.map.getZoom() + 2);
-                        mapState.map.setView(p, nextZoom, {animate:true});
+                        mapState.map.setView(p, Math.min(17, mapState.map.getZoom() + 2), {animate:true});
                     });
                     mapState.stopMarkers.set('cluster-'+key,m);
                 });
@@ -1502,12 +1500,9 @@ function rebuildMapStopsIndex(stops) {
                 return;
             }
 
-            // Во время построения маршрута нельзя создавать тысячи DOM/SVG-объектов:
-            // после каждого клика это заметно тормозит телефон. Показываем только разумное
-            // число ближайших к центру карты остановок; при приближении можно увидеть остальные.
             const limit = mapState.mode === 'route'
-                ? (zoom >= 17 ? 320 : zoom >= 16 ? 260 : 180)
-                : (zoom >= 17 ? 1800 : 1100);
+                ? (zoom >= 17 ? 450 : zoom >= 16 ? 350 : 260)
+                : (zoom >= 17 ? 650 : zoom >= 16 ? 500 : 350);
             let draw = visible;
             if (mapState.mode === 'route') {
                 const center = mapState.map.getCenter();
@@ -1519,48 +1514,50 @@ function rebuildMapStopsIndex(stops) {
                     const db = Math.pow(Number(b.lat)-center.lat,2) + Math.pow(Number(b.lon)-center.lng,2);
                     return da-db;
                 });
-                // Выбранные остановки маршрута всегда остаются на карте, даже если
-                // их больше обычного лимита. Остальные точки ограничены, чтобы
-                // карта не превращалась в сотни тяжёлых DOM-элементов.
                 draw = selected.concat(rest.slice(0, Math.max(0, limit - selected.length)));
             } else {
                 draw = visible.slice(0, limit);
             }
-            for (const stop of draw) {
-                const color = stop.stopType === 'turnback' ? '#f39c12' : (stop.source === 'custom' ? '#8e44ad' : '#1769aa');
-                // В режиме сборки маршрута используем обычный DOM-маркер, а не Canvas-circleMarker.
-                // На некоторых мобильных браузерах Canvas-маркеры после перерисовки карты
-                // перестают стабильно принимать touch/click. DOM-маркер надёжно выбирается пальцем.
-                let marker;
-                if (mapState.mode === 'route') {
-                    const size = 26;
-                    const icon = L.divIcon({
-                        className: 'route-stop-dom-icon',
-                        html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;box-sizing:border-box;"></div>`,
-                        iconSize: [size, size],
-                        iconAnchor: [size/2, size/2]
-                    });
-                    marker = L.marker([stop.lat, stop.lon], {icon, keyboard:false, zIndexOffset:700}).addTo(mapState.map);
-                } else {
-                    marker = L.circleMarker([stop.lat, stop.lon], {radius:11, weight:4, color:'#fff', fillColor:color, fillOpacity:.95, bubblingMouseEvents:false, className:'map-stop-hit'}).addTo(mapState.map);
-                }
-                const stopKind = stop.stopType === 'turnback' ? '🔄 Пункт разворота · не конечная' : '🚏 Остановочный пункт';
-                const deleteButton = stop.source === 'custom'
-                    ? `<br><button class="btn-secondary" style="margin-top:5px;width:100%;" onclick="deleteCustomMapStop('${String(stop.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">🗑️ Удалить остановку</button>`
-                    : '';
-                marker.bindPopup(`<b>${escapeHtml(stop.name)}</b><br>${stopKind}<br><small>${Number(stop.lat).toFixed(6)}, ${Number(stop.lon).toFixed(6)}</small><br>${routeChooseButtonHtml(stop)}${deleteButton}`);
-                marker.on('click',(ev)=>{
-                    if (ev && ev.originalEvent) L.DomEvent.stopPropagation(ev.originalEvent);
-                    if(mapState.mode==='route') {
-                        mapSelectStop(stop.id);
+
+            // Рисуем порциями, чтобы прокрутка и нажатия на телефоне не зависали.
+            const batchSize = 40;
+            let index = 0;
+            const drawBatch = () => {
+                if (generation !== mapState.stopRenderGeneration || !mapState.map) return;
+                const until = Math.min(draw.length, index + batchSize);
+                for (; index < until; index++) {
+                    const stop = draw[index];
+                    const color = stop.stopType === 'turnback' ? '#f39c12' : (stop.source === 'custom' ? '#8e44ad' : '#1769aa');
+                    let marker;
+                    if (mapState.mode === 'route') {
+                        const size = 26;
+                        const icon = L.divIcon({
+                            className: 'route-stop-dom-icon',
+                            html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;box-sizing:border-box;"></div>`,
+                            iconSize: [size, size], iconAnchor: [size/2, size/2]
+                        });
+                        marker = L.marker([stop.lat, stop.lon], {icon, keyboard:false, zIndexOffset:700}).addTo(mapState.map);
                     } else {
-                        marker.openPopup();
+                        marker = L.circleMarker([stop.lat, stop.lon], {radius:9, weight:3, color:'#fff', fillColor:color, fillOpacity:.95, bubblingMouseEvents:false, className:'map-stop-hit'}).addTo(mapState.map);
                     }
-                });
-                mapState.stopMarkers.set(String(stop.id),marker);
-            }
-            if (visible.length > draw.length) mapSetStatus(`Показано ${draw.length} из ${visible.length} видимых остановок — приблизь карту.`);
-            renderMapStopList();
+                    const stopKind = stop.stopType === 'turnback' ? '🔄 Пункт разворота · не конечная' : '🚏 Остановочный пункт';
+                    const deleteButton = stop.source === 'custom'
+                        ? `<br><button class="btn-secondary" style="margin-top:5px;width:100%;" onclick="deleteCustomMapStop('${String(stop.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">🗑️ Удалить остановку</button>` : '';
+                    marker.bindPopup(`<b>${escapeHtml(stop.name)}</b><br>${stopKind}<br><small>${Number(stop.lat).toFixed(6)}, ${Number(stop.lon).toFixed(6)}</small><br>${routeChooseButtonHtml(stop)}${deleteButton}`);
+                    marker.on('click',(ev)=>{
+                        if (ev && ev.originalEvent) L.DomEvent.stopPropagation(ev.originalEvent);
+                        if(mapState.mode==='route') mapSelectStop(stop.id); else marker.openPopup();
+                    });
+                    mapState.stopMarkers.set(String(stop.id),marker);
+                }
+                if (index < draw.length) {
+                    requestAnimationFrame(drawBatch);
+                } else {
+                    if (visible.length > draw.length) mapSetStatus(`Показано ${draw.length} из ${visible.length} видимых остановок — приблизь карту.`);
+                    renderMapStopList();
+                }
+            };
+            requestAnimationFrame(drawBatch);
         }
 
         function renderMapStopList() {
@@ -1572,7 +1569,7 @@ function rebuildMapStopsIndex(stops) {
             const allStops = getMapStops();
             const selectedRegion = getSelectedStopRegion();
             const regionCount = selectedRegion ? Number(stopRegionCache[selectedRegion.id]?.count || 0) : 0;
-            const stops = allStops.slice(0, 120);
+            const stops = allStops.slice(0, 80);
             const summary = `<div class="map-stop-count" style="padding:7px 8px;margin-bottom:6px;border-radius:8px;background:rgba(23,105,170,.12);font-weight:700;">📍 Загружено: ${allStops.length.toLocaleString('ru-RU')} остановок${regionCount ? ` · ${selectedRegion.name}: ${regionCount.toLocaleString('ru-RU')}` : ''}</div>`;
 
             el.innerHTML = summary + (stops.length ? stops.map((s, i) => `
