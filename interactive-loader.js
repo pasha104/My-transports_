@@ -36,7 +36,10 @@
       host.replaceChildren();
       const r=await fetchWithTimeout(file+'?v='+VERSION,opts.timeout||8000);
       if(!r.ok)throw new Error(file+' HTTP '+r.status);
-      host.innerHTML=await r.text(); loaded.add(name); return true;
+      host.innerHTML=await r.text(); loaded.add(name);
+      if(name==='garage' && typeof renderGarageSection==='function') renderGarageSection();
+      if(name==='history' && typeof renderHistorySection==='function') renderHistorySection();
+      return true;
     })();
     loading.set(name,promise);
     try{return await promise;} finally{loading.delete(name);}
@@ -55,9 +58,9 @@
           if(last) last.textContent=gameState.lastPayoutDate||'ещё не было';
         }
       } else if(section==='garage'){
-        if(typeof renderInteractive==='function') renderInteractive();
+        if(typeof renderGarageSection==='function') renderGarageSection();
       } else if(section==='history'){
-        if(typeof renderInteractive==='function') renderInteractive();
+        if(typeof renderHistorySection==='function') renderHistorySection();
       } else if(section==='routes'){
         if(typeof renderRoutes==='function') renderRoutes();
       } else if(section==='dispatch'||section==='stats'||section==='maintenance'){

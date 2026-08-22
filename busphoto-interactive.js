@@ -3436,19 +3436,36 @@ out body;
         }
 
         function showGameSection(section, btn) {
-            document.querySelectorAll('.game-section').forEach(el => el.classList.remove('active'));
+            const sections = document.querySelectorAll('.game-section');
+            sections.forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.game-menu-btn').forEach(el => el.classList.remove('active'));
+
             const target = document.getElementById('game-section-' + section);
-            if (target) target.classList.add('active');
+            if (!target) {
+                console.warn('[BUSPHOTO] Раздел ещё не вставлен:', section);
+                if (typeof window.BUSPHOTOEnsureInteractiveSection === 'function') {
+                    window.BUSPHOTOEnsureInteractiveSection(section).then(() => {
+                        const retry = document.getElementById('game-section-' + section);
+                        if (retry) {
+                            retry.classList.add('active');
+                            if (btn) btn.classList.add('active');
+                            if (section === 'garage' && typeof renderGarageSection === 'function') renderGarageSection();
+                            if (section === 'history' && typeof renderHistorySection === 'function') renderHistorySection();
+                        }
+                    }).catch(err => console.warn('[BUSPHOTO] Не удалось догрузить раздел', section, err));
+                }
+                return;
+            }
+            target.classList.add('active');
             if (btn) btn.classList.add('active');
 
-            // Не перерисовываем весь интерактив при каждом переключении раздела.
-            // Это было одной из главных причин задержек на телефонах и ПК.
             if (section === 'map') {
                 setTimeout(renderMapIfReady, 60);
             } else {
                 stopMapBusAnimation();
-                if (section === 'routes') renderRoutes();
+                if (section === 'garage') renderGarageSection();
+                else if (section === 'history') renderHistorySection();
+                else if (section === 'routes') renderRoutes();
                 else renderInteractiveHeaderAndLightViews();
             }
         }
@@ -3971,6 +3988,43 @@ out body;
             </div>`;
             document.body.appendChild(overlay);
         };
+
+        function renderGarageSection() {
+            const garage = document.getElementById('garageBody');
+            if (!garage) return;
+            const owned = Array.isArray(gameState.owned) ? gameState.owned : [];
+            if (!owned.length) {
+                garage.innerHTML = `<tr><td colspan="8" class="interactive-muted">Гараж пуст. Откройте «Магазин» и купите первое ТС.</td></tr>`;
+                return;
+            }
+            garage.innerHTML = owned.map((v, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td>${({bus:'🚌 Автобус', trolleybus:'🚎 Троллейбус', electrobus:'⚡ Электробус'})[v.category] || escapeHtml(v.category || '—')}</td>
+                    <td><b>${escapeHtml(v.model || 'ТС')}</b><br><span class="interactive-muted">${escapeHtml(v.submodel || 'Базовая модификация')} · ${escapeHtml(gameServiceLabel(v.serviceType))}</span></td>
+                    <td>${money(v.price || 0)}</td>
+                    <td><b>${escapeHtml(v.category === 'trolleybus' ? ('борт. №' + (v.num || '—')) : (v.plate || v.num || '—'))}</b>${v.category !== 'trolleybus' ? `<br><button class="btn-secondary" onclick="changeVehiclePlate('${escapeHtml(v.id)}')" style="margin-top:3px;">№ изменить · 5 000 р.</button>` : ''}</td>
+                    <td>${v.currentSalary ? money(v.currentSalary) : '—'}</td>
+                    <td>${renderGarageVehicleRouteStatus(v)}</td>
+                    <td><button class="btn-primary" onclick="showInteractiveVehicleDetails('${escapeHtml(v.id)}')">👁 ТС</button> <button class="btn-secondary" onclick="sellGameVehicle('${escapeHtml(v.id)}')">Продать</button></td>
+                </tr>`).join('');
+        }
+
+        function renderHistorySection() {
+            const history = document.getElementById('historyLog');
+            if (!history) return;
+            const log = Array.isArray(gameState.log) ? gameState.log : [];
+            history.innerHTML = log.length ? log.map(item => {
+                const detail = Array.isArray(item.details) ? item.details.join(' • ') : '';
+                const extra = item.type === 'route-arrival'
+                    ? `<div class="interactive-muted">🕐 Время прибытия: <b>${escapeHtml(item.arrivalTime || item.time || '—')}</b> · маршрут №${escapeHtml(item.routeNumber || '—')} · оплата <b>+100 р.</b></div>`
+                    : (item.offline ? `<div class="interactive-muted">Оффлайн: сумма за период отсутствия включена в эту операцию.</div>` : '');
+                return `<div class="interactive-log-row"><div><b>${escapeHtml(item.date || '')}${item.time ? ' · ' + escapeHtml(item.time) : ''}</b><br><span class="interactive-muted">${escapeHtml(detail)}</span>${extra}</div><div class="${Number(item.total) >= 0 ? 'interactive-positive' : 'interactive-negative'}">${Number(item.total) >= 0 ? '+' : ''}${money(item.total || 0)}</div></div>`;
+            }).join('') : `<div class="interactive-muted">История пока пуста.</div>`;
+        }
+
+        window.renderGarageSection = renderGarageSection;
+        window.renderHistorySection = renderHistorySection;
 
         function renderInteractive() {
             const balance = document.getElementById('gameBalance');
