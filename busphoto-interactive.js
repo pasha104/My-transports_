@@ -117,6 +117,8 @@
                 if (!Object.prototype.hasOwnProperty.call(r, 'terminalStopIds')) r.terminalStopIds = Array.isArray(r.stopIds) ? r.stopIds.slice() : [];
                 if (!Object.prototype.hasOwnProperty.call(r, 'turnbackStopIds')) r.turnbackStopIds = [];
                 if (!Object.prototype.hasOwnProperty.call(r, 'turnaroundMinutes')) r.turnaroundMinutes = 2;
+                if (!Array.isArray(r.stopLegDurations)) r.stopLegDurations = [];
+                if (!Array.isArray(r.stopCumulativeDurations)) r.stopCumulativeDurations = [];
             });
             // Исправляем старые сохранения: если время маршрута отсутствует
             // или явно нереалистично относительно расстояния, не используем
@@ -1203,16 +1205,30 @@
             }
         }
 
-        function getMapStops() {
+        let mapStopsCache = null;
+let mapStopsCacheKey = '';
+function getMapStops() {
+            const key = localStorage.getItem('minsk_custom_osm_stops_v1') || '[]';
+            if (mapStopsCache && mapStopsCacheKey === key) return mapStopsCache;
             let raw = [];
-            try { raw = JSON.parse(localStorage.getItem('minsk_custom_osm_stops_v1') || '[]'); } catch(e) { raw = []; }
+            try { raw = JSON.parse(key); } catch(e) { raw = []; }
+            // Дедупликация выполняется только при чтении нового содержимого.
+            // Раньше она запускалась при каждом перерисовывании карты и сильно
+            // тормозила карту при сотнях/тысячах остановок.
             const cleaned = dedupeMapStops(raw);
-            if (cleaned.length !== raw.length) localStorage.setItem('minsk_custom_osm_stops_v1', JSON.stringify(cleaned));
-            return cleaned;
+            if (cleaned.length !== raw.length) {
+                localStorage.setItem('minsk_custom_osm_stops_v1', JSON.stringify(cleaned));
+            }
+            mapStopsCache = cleaned;
+            mapStopsCacheKey = JSON.stringify(cleaned);
+            return mapStopsCache;
         }
 
         function saveMapStops(stops) {
-            localStorage.setItem('minsk_custom_osm_stops_v1', JSON.stringify(stops));
+            const payload = JSON.stringify(stops);
+            localStorage.setItem('minsk_custom_osm_stops_v1', payload);
+            mapStopsCache = Array.isArray(stops) ? stops : [];
+            mapStopsCacheKey = payload;
         }
 
         function addMapStop(stop) {
@@ -1273,7 +1289,7 @@
 
             // На малом масштабе не создаём тысячи DOM-маркеров: используем сетку-кластеры.
             if (zoom < 14) return visible;
-            return visible.slice(0, 900);
+            return visible.slice(0, 600);
         }
 
         function renderStopCluster(lat, lon, count) {
@@ -1571,6 +1587,8 @@ out center tags;`;
             if (!count) { mapSetStatus('Остановок для удаления нет.'); return; }
             if (!confirm(`Удалить ВСЕ ${count} остановок с карты?\n\nЭто удалит и остановки OSM, и созданные вручную. Маршруты не удаляются автоматически.`)) return;
             localStorage.removeItem('minsk_custom_osm_stops_v1');
+            mapStopsCache = [];
+            mapStopsCacheKey = '[]';
             mapState.stopMarkers.forEach(m => m.remove());
             mapState.stopMarkers.clear();
             mapState.draftStopIds = [];
@@ -1742,6 +1760,18 @@ out body;
                 route.end = terminalStops[terminalStops.length - 1].name;
                 route.stops = points.map(s => s.name);
                 route.calculatedDistance = result.distance;
+                // OSRM возвращает отдельный leg для каждой пары соседних остановок.
+                // Сохраняем эти времена, чтобы карточка могла мгновенно вычислять
+                // поездку не только до конечной, но и до любой остановки маршрута.
+                const legs = Array.isArray(result.legs) ? result.legs : [];
+                route.stopLegDurations = legs.map(l => Math.max(0, Number(l.duration) || 0));
+                route.stopLegDistances = legs.map(l => Math.max(0, Number(l.distance) || 0));
+                route.stopCumulativeDurations = [0];
+                route.stopCumulativeDistances = [0];
+                for (let li = 0; li < legs.length; li++) {
+                    route.stopCumulativeDurations.push(route.stopCumulativeDurations[li] + route.stopLegDurations[li]);
+                    route.stopCumulativeDistances.push(route.stopCumulativeDistances[li] + route.stopLegDistances[li]);
+                }
 
                 // Если последняя выбранная точка — пункт разворота, он не является конечной.
                 // Строим дополнительный путь от конечной до кольца и обратно к конечной,
