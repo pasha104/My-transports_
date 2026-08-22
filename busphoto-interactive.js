@@ -1466,8 +1466,10 @@ function rebuildMapStopsIndex(stops) {
             const visible = getVisibleStopsForMap(stops);
 
             // Экранная сетка: один круг = одна группа точек в ячейке.
-            // Чем меньше масштаб, тем крупнее ячейка — поэтому кругов на карте значительно меньше.
-            const clusterAtZoom = zoom < 16 && mapState.mode !== 'route';
+            // На телефоне это особенно важно: в режиме маршрута нельзя создавать
+            // сотни DOM-маркеров на каждом движении карты. До приближения показываем
+            // группы, а выбранные остановки ниже будут добавлены отдельно.
+            const clusterAtZoom = zoom < 14;
             if (clusterAtZoom) {
                 const cellPx = zoom <= 11 ? 150 : zoom <= 13 ? 130 : zoom <= 15 ? 105 : 90;
                 const cells = new Map();
@@ -1502,16 +1504,23 @@ function rebuildMapStopsIndex(stops) {
             // после каждого клика это заметно тормозит телефон. Показываем только разумное
             // число ближайших к центру карты остановок; при приближении можно увидеть остальные.
             const limit = mapState.mode === 'route'
-                ? (zoom >= 17 ? 650 : 450)
+                ? (zoom >= 17 ? 320 : zoom >= 16 ? 260 : 180)
                 : (zoom >= 17 ? 1800 : 1100);
             let draw = visible;
-            if (mapState.mode === 'route' && visible.length > limit) {
+            if (mapState.mode === 'route') {
                 const center = mapState.map.getCenter();
-                draw = visible.slice().sort((a,b) => {
+                const selectedIds = new Set((mapState.draftStopIds || []).map(x => String(x)));
+                const selected = visible.filter(s => selectedIds.has(String(s.id)));
+                const rest = visible.filter(s => !selectedIds.has(String(s.id)));
+                rest.sort((a,b) => {
                     const da = Math.pow(Number(a.lat)-center.lat,2) + Math.pow(Number(a.lon)-center.lng,2);
                     const db = Math.pow(Number(b.lat)-center.lat,2) + Math.pow(Number(b.lon)-center.lng,2);
                     return da-db;
-                }).slice(0, limit);
+                });
+                // Выбранные остановки маршрута всегда остаются на карте, даже если
+                // их больше обычного лимита. Остальные точки ограничены, чтобы
+                // карта не превращалась в сотни тяжёлых DOM-элементов.
+                draw = selected.concat(rest.slice(0, Math.max(0, limit - selected.length)));
             } else {
                 draw = visible.slice(0, limit);
             }
@@ -1522,7 +1531,7 @@ function rebuildMapStopsIndex(stops) {
                 // перестают стабильно принимать touch/click. DOM-маркер надёжно выбирается пальцем.
                 let marker;
                 if (mapState.mode === 'route') {
-                    const size = 30;
+                    const size = 26;
                     const icon = L.divIcon({
                         className: 'route-stop-dom-icon',
                         html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;box-sizing:border-box;"></div>`,
