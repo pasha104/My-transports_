@@ -12,6 +12,22 @@
 // Очистку кэша выполняй только при обновлении версии приложения.
 </script>
 <title>BUSPHOTO — Интерактивный транспортный бизнес</title>
+<script>
+// Мгновенное отображение игрового времени: не ждём загрузки интерактива/данных.
+(function(){
+  const KEY='busphoto_game_timezone_offset_minutes';
+  function draw(){
+    const el=document.getElementById('gameClockBadge'); if(!el) return;
+    let off=Number(localStorage.getItem(KEY)); if(!Number.isFinite(off)||off<-720||off>840) off=180;
+    const d=new Date(Date.now()+off*60000);
+    const hh=String(d.getUTCHours()).padStart(2,'0'); const mm=String(d.getUTCMinutes()).padStart(2,'0');
+    const sign=off>=0?'+':'-'; const a=Math.abs(off); const oh=String(Math.floor(a/60)).padStart(2,'0'); const om=String(a%60).padStart(2,'0');
+    el.textContent=hh+':'+mm+' • UTC'+sign+oh+':'+om;
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',draw,{once:true}); else draw();
+  window.setInterval(draw,1000);
+})();
+</script>
 <script defer="" src="busphoto-common.js?v=20260822-v62"></script>
 
 <style id="v43-features">
@@ -43,7 +59,7 @@
 </header><nav><a class="nav-btn" href="index.html" style="display:block; color:#e2f0d9; padding:9px 12px; font-size:11px; font-weight:bold; border-bottom:3px solid transparent; flex-shrink:0;">📋 База данных + поиск</a><a class="nav-btn" href="models.html" style="display:block; color:#e2f0d9; padding:9px 12px; font-size:11px; font-weight:bold; border-bottom:3px solid transparent; flex-shrink:0;">🚍 Список моделей</a><a class="nav-btn active" href="interactive.html" style="display:block; color:#e2f0d9; padding:9px 12px; font-size:11px; font-weight:bold; border-bottom:3px solid transparent; flex-shrink:0;">🎮 Интерактив</a></nav><div class="main-wrapper"><div class="tab-content active" id="interactive-tab">
 <div class="page-header">
 <span>🎮 Транспортный бизнес — интерактив</span>
-<span class="interactive-badge" id="gameClockBadge">Проверка времени…</span>
+<span class="interactive-badge" id="gameClockBadge">12:00 • UTC+3:00</span>
 </div>
 <div class="interactive-stats">
 <div class="interactive-stat">

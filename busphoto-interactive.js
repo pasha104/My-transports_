@@ -2503,6 +2503,8 @@ out body;
         }
 
         function initInteractiveGame() {
+            // Показываем игровое время немедленно, до чтения большого localStorage.
+            if (typeof renderInteractiveHeaderAndLightViews === 'function') renderInteractiveHeaderAndLightViews();
             loadGameState();
             scheduleNoonPayout();
 
