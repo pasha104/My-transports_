@@ -2503,12 +2503,18 @@ out body;
 
             // Карту и её анимацию инициализируем лениво — только когда пользователь её открыл.
 
-            // Если вкладка была открыта всю ночь, обновляем часы/состояние каждую минуту.
-            if (!window.gameMinuteTimer) {
-                window.gameMinuteTimer = setInterval(() => {
-                    processAllOfflineEarnings();
+            // Часы обновляем каждую секунду, но тяжёлую проверку офлайн-доходов
+            // выполняем редко. Раньше processAllOfflineEarnings() запускался каждую
+            // секунду и на телефоне создавал ощущение бесконечной проверки времени.
+            if (!window.gameClockTimer) {
+                window.gameClockTimer = setInterval(() => {
                     renderInteractiveHeaderAndLightViews();
                 }, 1000);
+            }
+            if (!window.gameEarningsTimer) {
+                window.gameEarningsTimer = setInterval(() => {
+                    processAllOfflineEarnings();
+                }, 30000);
             }
         }
 
