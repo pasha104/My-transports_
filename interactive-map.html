@@ -56,10 +56,15 @@
 <select class="map-mini-input" id="mapRouteSelect" onchange="selectRouteForMap(this.value)">
 <option value="">— Выбери маршрут —</option>
 </select>
-<select class="map-mini-input" id="mapRouteType" style="margin-top:6px;">
+<select class="map-mini-input" id="mapRouteType" onchange="updateBusRouteClassVisibility()" style="margin-top:6px;">
 <option value="bus">🚌 Автобус</option>
 <option value="electrobus">⚡ Электробус</option>
 <option value="trolleybus">🚎 Троллейбус</option>
+</select>
+<select class="map-mini-input" id="mapBusRouteClass" style="margin-top:6px;display:block;">
+<option value="city">🏙️ Городской</option>
+<option value="suburban">🏘️ Пригородный</option>
+<option value="intercity">🛣️ Междугородний</option>
 </select>
 <input class="map-mini-input" id="mapNewRouteNumber" placeholder="Номер нового маршрута" style="margin-top:6px;">
 <input class="map-mini-input" id="mapNewRouteName" placeholder="Название нового маршрута" style="margin-top:6px;"/>

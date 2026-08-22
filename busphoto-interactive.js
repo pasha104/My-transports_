@@ -33,6 +33,23 @@
         let stopRegionCache = {};
         try { stopRegionCache = JSON.parse(localStorage.getItem(STOP_REGION_CACHE_KEY) || '{}') || {}; } catch(e) { stopRegionCache = {}; }
 
+// Быстрый кэш и пространственный индекс остановок. Большая база больше не разбирается из localStorage при каждом движении карты.
+let mapStopsCache = null;
+let mapStopsSpatialIndex = new Map();
+const STOP_INDEX_CELL = 0.02;
+function rebuildMapStopsIndex(stops) {
+    mapStopsSpatialIndex = new Map();
+    for (const stop of (stops || [])) {
+        const lat = Number(stop.lat), lon = Number(stop.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+        const key = `${Math.floor(lat / STOP_INDEX_CELL)}:${Math.floor(lon / STOP_INDEX_CELL)}`;
+        let bucket = mapStopsSpatialIndex.get(key);
+        if (!bucket) { bucket = []; mapStopsSpatialIndex.set(key, bucket); }
+        bucket.push(stop);
+    }
+}
+
+
         // v19: классификация автобусов и их подмоделей для интерактива.
         // serviceType: городские / пригородные / межгородние.
         const GAME_SERVICE_TYPES = {
@@ -224,6 +241,8 @@
                 if (!Object.prototype.hasOwnProperty.call(r, 'terminalStopIds')) r.terminalStopIds = Array.isArray(r.stopIds) ? r.stopIds.slice() : [];
                 if (!Object.prototype.hasOwnProperty.call(r, 'turnbackStopIds')) r.turnbackStopIds = [];
                 if (!Object.prototype.hasOwnProperty.call(r, 'turnaroundMinutes')) r.turnaroundMinutes = 2;
+                if (!r.routeServiceType && r.serviceType) r.routeServiceType = r.serviceType;
+                if (!GAME_SERVICE_TYPES[r.routeServiceType]) r.routeServiceType = 'city';
             });
             if (!Array.isArray(gameState.log)) gameState.log = [];
             if (!Array.isArray(gameState.serviceCards)) gameState.serviceCards = [];
@@ -293,6 +312,14 @@
             } catch (err) {}
         });
 
+        window.addEventListener('storage', function(e) {
+            if (e.key !== STOP_DATA_KEY) return;
+            mapStopsCache = null;
+            if (typeof rebuildMapStopsIndex === 'function') rebuildMapStopsIndex(getMapStops());
+            if (mapState?.map && typeof renderMapStops === 'function') renderMapStops();
+            if (typeof renderMapStopList === 'function') renderMapStopList();
+        });
+
         function startNewGame() {
             const confirmed = confirm(
                 'Начать новую игру?\n\n' +
@@ -306,6 +333,7 @@
             localStorage.removeItem(STOP_DATA_KEY);
             localStorage.removeItem(STOP_REGION_CACHE_KEY);
             stopRegionCache = {};
+            clearMapStopsCache();
 
             gameState = {
                 balance: 50000,
@@ -422,18 +450,25 @@
             }
 
             if (missedDates.length) {
+                // Каждый игровой месяц = один реальный день. Для каждой пропущенной
+                // даты выбираем новую случайную сумму из диапазона конкретной модели.
+                // Раньше currentSalary выбирался один раз и поэтому повторялся каждый день.
                 gameState.owned.forEach(vehicle => {
                     const catalogItem = gameCatalog[vehicle.category]?.[vehicle.model];
                     const range = catalogItem?.salary || [0, 0];
-                    if (!Number(vehicle.currentSalary) || Number(vehicle.currentSalary) < range[0] || Number(vehicle.currentSalary) > range[1]) {
-                        vehicle.currentSalary = randomSalary(range);
-                    }
+                    let vehicleTotal = 0;
+                    const dailyDetails = [];
 
-                    const daily = Math.max(0, Math.round(Number(vehicle.currentSalary) || 0));
-                    const vehicleTotal = daily * missedDates.length;
+                    missedDates.forEach(payoutDate => {
+                        const daily = Math.max(0, Math.round(randomSalary(range)));
+                        vehicle.currentSalary = daily;
+                        vehicle.salaryDate = payoutDate;
+                        vehicleTotal += daily;
+                        dailyDetails.push(`${payoutDate}: ${money(daily)}`);
+                    });
+
                     total += vehicleTotal;
-
-                    details.push(`${vehicle.model}: ${money(daily)} × ${missedDates.length} дн. = ${money(vehicleTotal)}`);
+                    details.push(`${vehicle.model}: ${dailyDetails.join(' · ')} = ${money(vehicleTotal)}`);
                     vehicle.lastPaidDate = missedDates[missedDates.length - 1];
                 });
 
@@ -614,6 +649,7 @@
                 serviceType,
                 price: item.price,
                 currentSalary: randomSalary(item.salary),
+                    salaryDate: localDateKey(),
                 lastPaidDate: null,
                 plate: generateRandomPlate(),
                 num: category === 'trolleybus' ? generateTrolleybusBoardNumber() : '',
@@ -697,6 +733,12 @@
         function routeTypeLabel(type) {
             return type === 'trolleybus' ? 'троллейбусный маршрут' : type === 'electrobus' ? 'электробусный маршрут' : 'автобусный маршрут';
         }
+        function routeServiceLabel(type){ return GAME_SERVICE_TYPES[type]?.label || '🏙️ Городские'; }
+        function updateBusRouteClassVisibility(){
+            const type=document.getElementById('mapRouteType')?.value || 'bus';
+            const el=document.getElementById('mapBusRouteClass');
+            if(el) el.style.display=type==='bus'?'block':'none';
+        }
         function vehicleCompatibleWithRoute(vehicle, route) {
             if (!vehicle || !route) return false;
             if (route.routeType === 'trolleybus') return vehicle.category === 'trolleybus';
@@ -724,9 +766,10 @@
             const number = document.getElementById('mapNewRouteNumber')?.value.trim();
             if (!number) return alert('Укажи номер нового маршрута.');
             const type = document.getElementById('mapRouteType')?.value || 'bus';
+            const routeServiceType = type==='bus' ? (document.getElementById('mapBusRouteClass')?.value || 'city') : 'city';
             const name = document.getElementById('mapNewRouteName')?.value.trim() || `${stops[0].name} — ${stops[stops.length-1].name}`;
             const classicStops = stops.filter(s => s.stopType !== 'turnback');
-            const route = { id:Date.now()+Math.random(), number, name, start:(classicStops[0]||stops[0]).name, end:(classicStops[classicStops.length-1]||stops[stops.length-1]).name, distance:0, stopCount:stops.length, stops:stops.map(s=>s.name), stopIds:ids, terminalStopIds:classicStops.map(s=>s.id), turnbackStopIds:stops.filter(s=>s.stopType==='turnback').map(s=>s.id), turnaroundMinutes:2, color:type==='trolleybus'?'#1565c0':(type==='electrobus'?'#00897b':'#1e88e5'), note:'Создано через карту', routeType:type, vehicleId:null, vehicleIds:[], geometry:null, outboundGeometry:null, returnGeometry:null, reverseStopIds:ids.slice().reverse(), calculatedDistance:null, calculatedDuration:null, createdAt:localDateKey(), source:'map', controlPoints:mapState.draftPath.filter(x=>x.kind==='control').map(x=>x.point), pathNodes:mapState.draftPath.map(x=>x.kind==='control'?{kind:'control',point:x.point}:{kind:'stop',stopId:x.stopId}) };
+            const route = { id:Date.now()+Math.random(), number, name, start:(classicStops[0]||stops[0]).name, end:(classicStops[classicStops.length-1]||stops[stops.length-1]).name, distance:0, stopCount:stops.length, stops:stops.map(s=>s.name), stopIds:ids, terminalStopIds:classicStops.map(s=>s.id), turnbackStopIds:stops.filter(s=>s.stopType==='turnback').map(s=>s.id), turnaroundMinutes:2, color:type==='trolleybus'?'#1565c0':(type==='electrobus'?'#00897b':'#1e88e5'), note:'Создано через карту', routeType:type, routeServiceType, vehicleId:null, vehicleIds:[], geometry:null, outboundGeometry:null, returnGeometry:null, reverseStopIds:ids.slice().reverse(), calculatedDistance:null, calculatedDuration:null, createdAt:localDateKey(), source:'map', controlPoints:mapState.draftPath.filter(x=>x.kind==='control').map(x=>x.point), pathNodes:mapState.draftPath.map(x=>x.kind==='control'?{kind:'control',point:x.point}:{kind:'stop',stopId:x.stopId}) };
             gameState.routes.push(route);
             mapState.selectedRouteId = route.id;
             mapState.creatingNewRoute = false;
@@ -1007,7 +1050,7 @@
                 return `
                     <div class="route-card">
                         <div class="route-card-title">
-                            <span>🛣️ №${route.number} — ${escapeHtml(route.start || "—")} → ${escapeHtml(route.end || "—")} <span class="route-type-badge">${routeTypeLabel(route.routeType)}</span></span>
+                            <span>🛣️ №${route.number} — ${escapeHtml(route.start || "—")} → ${escapeHtml(route.end || "—")} <span class="route-type-badge">${routeTypeLabel(route.routeType)}${route.routeType==='bus'?' · '+escapeHtml(routeServiceLabel(route.routeServiceType)):''}</span></span>
                             <span class="route-badge ${assignedVehicles.length ? 'route-running' : 'route-idle'}">
                                 ${assignedVehicles.length ? `${assignedVehicles.map(v=>vehicleCategoryIcon(v.category)).join('')} ${assignedVehicles.length} ТС на линии` : '⏸ Без ТС'}
                             </span>
@@ -1193,13 +1236,23 @@
         }
 
         function getMapStops() {
+            if (Array.isArray(mapStopsCache)) return mapStopsCache;
             let raw = [];
             try { raw = JSON.parse(localStorage.getItem(STOP_DATA_KEY) || '[]'); } catch(e) { raw = []; }
-            return Array.isArray(raw) ? raw : [];
+            mapStopsCache = Array.isArray(raw) ? raw : [];
+            rebuildMapStopsIndex(mapStopsCache);
+            return mapStopsCache;
         }
 
         function saveMapStops(stops) {
-            localStorage.setItem(STOP_DATA_KEY, JSON.stringify(stops));
+            mapStopsCache = Array.isArray(stops) ? stops : [];
+            rebuildMapStopsIndex(mapStopsCache);
+            localStorage.setItem(STOP_DATA_KEY, JSON.stringify(mapStopsCache));
+        }
+
+        function clearMapStopsCache() {
+            mapStopsCache = [];
+            mapStopsSpatialIndex = new Map();
         }
 
         function addMapStop(stop) {
@@ -1361,13 +1414,29 @@
 
         function getVisibleStopsForMap(stops) {
             if (!mapState.map) return [];
-            const zoom = mapState.map.getZoom();
             const bounds = mapState.map.getBounds().pad(0.25);
-            const visible = stops.filter(s => bounds.contains([Number(s.lat), Number(s.lon)]));
-
-            // На малом масштабе не создаём тысячи DOM-маркеров: используем сетку-кластеры.
-            if (zoom < 14) return visible;
-            return visible.slice(0, 900);
+            const minLat = bounds.getSouth(), maxLat = bounds.getNorth();
+            const minLon = bounds.getWest(), maxLon = bounds.getEast();
+            const minY = Math.floor(minLat / STOP_INDEX_CELL), maxY = Math.floor(maxLat / STOP_INDEX_CELL);
+            const minX = Math.floor(minLon / STOP_INDEX_CELL), maxX = Math.floor(maxLon / STOP_INDEX_CELL);
+            const candidates = [];
+            const seen = new Set();
+            for (let y = minY; y <= maxY; y++) {
+                for (let x = minX; x <= maxX; x++) {
+                    const bucket = mapStopsSpatialIndex.get(`${y}:${x}`);
+                    if (!bucket) continue;
+                    for (const stop of bucket) {
+                        const id = String(stop.id);
+                        if (seen.has(id)) continue;
+                        const lat = Number(stop.lat), lon = Number(stop.lon);
+                        if (lat >= minLat && lat <= maxLat && lon >= minLon && lon <= maxLon) {
+                            seen.add(id);
+                            candidates.push(stop);
+                        }
+                    }
+                }
+            }
+            return candidates;
         }
 
         function renderStopCluster(lat, lon, count) {
@@ -1394,8 +1463,7 @@
 
             const stops = getMapStops();
             const zoom = mapState.map.getZoom();
-            const bounds = mapState.map.getBounds().pad(0.12);
-            const visible = stops.filter(s => bounds.contains([Number(s.lat), Number(s.lon)]));
+            const visible = getVisibleStopsForMap(stops);
 
             // Экранная сетка: один круг = одна группа точек в ячейке.
             // Чем меньше масштаб, тем крупнее ячейка — поэтому кругов на карте значительно меньше.
@@ -1490,15 +1558,19 @@
 
             // Список остановок больше не фильтруется по названию: поле поиска убрано,
             // чтобы не создавать лишний DOM и не перегружать интерфейс на ТВ/ПК.
-            const stops = getMapStops().slice(0, 150);
+            const allStops = getMapStops();
+            const selectedRegion = getSelectedStopRegion();
+            const regionCount = selectedRegion ? Number(stopRegionCache[selectedRegion.id]?.count || 0) : 0;
+            const stops = allStops.slice(0, 120);
+            const summary = `<div class="map-stop-count" style="padding:7px 8px;margin-bottom:6px;border-radius:8px;background:rgba(23,105,170,.12);font-weight:700;">📍 Загружено: ${allStops.length.toLocaleString('ru-RU')} остановок${regionCount ? ` · ${selectedRegion.name}: ${regionCount.toLocaleString('ru-RU')}` : ''}</div>`;
 
-            el.innerHTML = stops.length ? stops.map((s, i) => `
+            el.innerHTML = summary + (stops.length ? stops.map((s, i) => `
                 <div class="map-stop-item" style="display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;" onclick="focusMapStop('${String(s.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">
                     <span class="map-stop-num">${i + 1}</span>
                     <span>${escapeHtml(s.name)}${s.source === 'custom' ? (s.stopType === 'turnback' ? ' 🔄' : ' 📍') : ''}</span>
                     ${s.source === 'custom' ? `<button type="button" class="btn-secondary" style="padding:4px 7px;font-size:11px;" onclick="event.stopPropagation();deleteCustomMapStop('${String(s.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">🗑️</button>` : ''}
                 </div>
-            `).join('') : `<div class="map-help" style="padding:8px;">Остановки не найдены. Нажми «Загрузить остановки OSM» или создай свою.</div>`;
+            `).join('') : `<div class="map-help" style="padding:8px;">Остановки не найдены. Нажми «Загрузить остановки OSM» или создай свою.</div>`);
         }
 
         function focusMapStop(id) {
@@ -1825,7 +1897,7 @@
             const oblastOrder = ['Минск','Брестская область','Витебская область','Гомельская область','Гродненская область','Минская область','Могилёвская область','Россия — Смоленская область','Россия — Московская область','Россия — Москва','Россия — Санкт-Петербург'];
             select.innerHTML = '<option value="">— Выбери область или район —</option>' + oblastOrder.map(ob => {
                 const list = grouped[ob] || [];
-                return `<optgroup label="${escapeHtml(ob)}">${list.map(r => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}${stopRegionCache[r.id] ? ' ✓' : ''}</option>`).join('')}</optgroup>`;
+                return `<optgroup label="${escapeHtml(ob)}">${list.map(r => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}${stopRegionCache[r.id]?.count ? ` · ${Number(stopRegionCache[r.id].count).toLocaleString('ru-RU')} остановок` : ''}</option>`).join('')}</optgroup>`;
             }).join('');
             if (current && BELARUS_STOP_REGIONS.some(r => r.id === current)) select.value = current;
             showSelectedStopRegionInfo();
@@ -1927,6 +1999,7 @@
             localStorage.removeItem(STOP_DATA_KEY);
             localStorage.removeItem(STOP_REGION_CACHE_KEY);
             stopRegionCache = {};
+            clearMapStopsCache();
             mapState.stopMarkers.forEach(m => m.remove());
             mapState.stopMarkers.clear();
             mapState.draftStopIds = [];
@@ -2008,6 +2081,10 @@ out body;
         }
 
         function selectRouteForMap(routeId) {
+            const selectedForClass=gameState.routes.find(r=>String(r.id)===String(routeId));
+            const classSelect=document.getElementById('mapBusRouteClass');
+            const typeSelect=document.getElementById('mapRouteType');
+            if(selectedForClass){ if(typeSelect) typeSelect.value=selectedForClass.routeType||'bus'; if(classSelect) classSelect.value=selectedForClass.routeServiceType||'city'; updateBusRouteClassVisibility(); }
             mapState.selectedRouteId = routeId || null;
             mapState.creatingNewRoute = false;
             mapState.routeEditCursor = null;
@@ -2057,6 +2134,7 @@ out body;
 
         async function buildSelectedRoute() {
             const route = gameState.routes.find(r => String(r.id) === String(mapState.selectedRouteId));
+            if (route && route.routeType === 'bus') { const cls=document.getElementById('mapBusRouteClass')?.value; if (GAME_SERVICE_TYPES[cls]) route.routeServiceType=cls; }
             if (!route) {
                 alert('Сначала выбери маршрут.');
                 return;
@@ -2218,6 +2296,7 @@ out body;
                 alert('Сначала выбери маршрут.');
                 return;
             }
+            if (route.routeType === 'bus') { const cls=document.getElementById('mapBusRouteClass')?.value; if (GAME_SERVICE_TYPES[cls]) route.routeServiceType=cls; }
             saveGameState();
             renderMapRouteList();
             mapSetStatus('Маршрут сохранён.');
@@ -2709,7 +2788,7 @@ out body;
                         <b>№${escapeHtml(route.number)}</b> — ${escapeHtml(route.start || "—")} → ${escapeHtml(route.end || "—")} <span class="route-type-badge">${routeTypeLabel(route.routeType)}</span>
                     </div>
                     <div class="map-help">
-                        ${routeTypeLabel(route.routeType)}
+                        ${routeTypeLabel(route.routeType)}${route.routeType==='bus'?' · '+escapeHtml(routeServiceLabel(route.routeServiceType)):''}
                         · ${escapeHtml(route.start || '—')} → ${escapeHtml(route.end || '—')}
                         · ${(Array.isArray(route.vehicleIds) ? route.vehicleIds.length : (route.vehicleId ? 1 : 0))} ТС
                     </div>
@@ -3404,8 +3483,24 @@ out body;
                     const r = getScheduleRoute(s);
                     return (s.days || []).map(day => `<div class="departure-schedule-view"><b>${DAY_FULL_RU[Number(day)] || 'День'}</b><span>🛣️ №${escapeHtml(r?.number || '—')}</span><span>🚏 ${escapeHtml(s.startStopName || getRouteTerminalName(r,s.startStopId))} → ${escapeHtml(s.endStopName || getRouteTerminalName(r,s.endStopId))}</span><span>🏠 ${escapeHtml(s.depotTime)}</span><span>🚏 ${escapeHtml(s.startTime)}</span><span>⏳ до ${escapeHtml(s.workUntil || s.endTime)}</span><span>🏁 ${escapeHtml(s.lastArrivalTime || s.endTime)}</span><span>🏠 ${escapeHtml(s.returnTime)}</span></div>`).join('');
                 }).join('');
-                return `<div class="departure-card"><div class="departure-card-head"><div><b>🗓️ Карточка выезда · ${vehicleCategoryIcon(v.category)} ${escapeHtml(v.model)}</b><div class="interactive-muted">${escapeHtml(v.category === 'trolleybus' ? ('борт. №' + v.num) : (v.plate || v.num || 'без номера'))} · ${uniqueSchedules.length} маршрута/этапа${card.multiRouteMode ? ' · 🔗 последовательная смена' : ''} · ≈${avgTrips.toFixed(1)} рейса/день</div></div><button class="btn-secondary" onclick="toggleDepartureCard('${escapeHtml(card.id)}')">${card.active !== false ? '⏸ Остановить' : '▶ Запустить'}</button><button class="btn-secondary" onclick="deleteDepartureCard('${escapeHtml(card.id)}')">Удалить</button></div><div class="departure-schedule-list">${rows || '<div class="interactive-muted">Расписание не задано.</div>'}</div></div>`;
+                return `<div class="departure-card"><div class="departure-card-head"><div><b>🗓️ Карточка выезда · ${vehicleCategoryIcon(v.category)} ${escapeHtml(v.model)}</b><div class="interactive-muted">${escapeHtml(v.category === 'trolleybus' ? ('борт. №' + v.num) : (v.plate || v.num || 'без номера'))} · ${uniqueSchedules.length} маршрут(а/этапа)${card.multiRouteMode ? ' · 🔗 последовательная смена' : ''} · ≈${avgTrips.toFixed(1)} рейса/день</div></div><div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end"><button class="btn-secondary" onclick="showServiceCardDetails('${escapeHtml(card.id)}')">👁️ Проверить</button><button class="btn-secondary" onclick="location.href='creating_card.html?edit=${encodeURIComponent(card.id)}'">✏️ Изменить</button><button class="btn-secondary" onclick="toggleDepartureCard('${escapeHtml(card.id)}')">${card.active !== false ? '⏸ Остановить' : '▶ Запустить'}</button><button class="btn-secondary" onclick="deleteDepartureCard('${escapeHtml(card.id)}')">Удалить</button></div></div><div class="departure-schedule-list">${rows || '<div class="interactive-muted">Расписание не задано.</div>'}</div></div>`;
             }).join('') || '<div class="interactive-muted">Карточек выезда пока нет.</div>';
+        }
+
+        function showServiceCardDetails(id){
+            const card=(gameState.serviceCards||[]).find(c=>String(c.id)===String(id));
+            if(!card) return;
+            const v=gameState.owned.find(x=>String(x.id)===String(card.vehicleId));
+            const dayNames=['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+            const rows=(card.schedules||[]).map((s,i)=>{
+                const r=getScheduleRoute(s);
+                const days=(s.days||[]).map(d=>dayNames[Number(d)]||'').join(', ')||'—';
+                return `<div style="border:1px solid var(--bp-border);border-radius:8px;padding:8px;margin:6px 0"><b>${i+1}. 🛣️ №${escapeHtml(r?.number||'—')}</b><br>🚏 ${escapeHtml(s.startStopName||getRouteTerminalName(r,s.startStopId)||'—')} → ${escapeHtml(s.endStopName||getRouteTerminalName(r,s.endStopId)||'—')}<br>📅 ${escapeHtml(days)} · 🏠 ${escapeHtml(s.depotTime||'—')} → 🚏 ${escapeHtml(s.startTime||'—')} → 🏁 ${escapeHtml(s.lastArrivalTime||s.endTime||'—')} → 🏠 ${escapeHtml(s.returnTime||'—')}<br>🔢 Рейсов: <b>${Number(s.estimatedTrips||0)||'—'}</b></div>`;
+            }).join('');
+            const modal=document.createElement('div');
+            modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100000;display:flex;align-items:center;justify-content:center;padding:12px';
+            modal.innerHTML=`<div style="background:var(--bp-card-bg,#fff);color:var(--bp-text,#111);max-width:700px;width:100%;max-height:90vh;overflow:auto;border-radius:14px;padding:16px"><h3 style="margin-top:0">📋 Проверка карточки выезда</h3><div>🚌 <b>${escapeHtml(v?.model||'ТС')}</b> · ${escapeHtml(v?.plate||v?.num||'без номера')}</div><div style="margin-top:5px">Состояние: <b>${card.active===false?'⏸ остановлена':'🟢 активна'}</b></div><hr>${rows||'Расписание не задано.'}<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><button class="btn-primary" onclick="location.href='creating_card.html?edit=${encodeURIComponent(card.id)}'">✏️ Изменить</button><button class="btn-secondary" id="closeServiceCardDetails">Закрыть</button></div></div>`;
+            document.body.appendChild(modal); modal.querySelector('#closeServiceCardDetails').onclick=()=>modal.remove();
         }
 
         function saveDepartureCard(event) {
