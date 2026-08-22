@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BUSPHOTO — Игровое время</title>
+<link rel="stylesheet" href="busphoto-common.css?v=20260822-v62">
+<link rel="stylesheet" href="busphoto-interactive.css?v=20260822-v62">
+<style>
+.time-page{max-width:620px;margin:28px auto;padding:16px}
+.time-card{background:var(--bp-panel,#fff);border:1px solid var(--bp-border,#ddd);border-radius:18px;padding:22px;box-shadow:0 8px 28px rgba(0,0,0,.12)}
+.time-card h1{margin:0 0 8px}.muted{opacity:.75;line-height:1.5}
+.time-clock{font-size:42px;font-weight:800;text-align:center;margin:22px 0 4px}
+.time-date{text-align:center;opacity:.75;margin-bottom:22px}
+.time-row{display:flex;flex-direction:column;gap:8px;margin:16px 0}
+.time-row label{font-weight:700}.time-row select{width:100%;padding:13px;border-radius:12px;border:1px solid var(--bp-border,#ccc);font-size:16px;background:var(--bp-panel,#fff);color:var(--bp-text,#111)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}.actions a,.actions button{flex:1;min-width:180px}
+.status{margin-top:14px;padding:12px;border-radius:12px;background:rgba(76,175,80,.12);display:none}
+</style>
+</head>
+<body class="light-theme">
+<header>
+<div><span class="logo-box">BUSPHOTO</span><span style="font-size:15px;font-weight:bold;margin-left:8px">Игровое время</span></div>
+<div class="header-controls"><button class="theme-toggle-btn" onclick="toggleTheme()">🌓 Сменить тему</button></div>
+</header>
+<main class="time-page">
+<section class="time-card">
+<h1>🕐 Игровой часовой пояс</h1>
+<p class="muted">Это отдельное меню настройки игрового времени. Оно не использует часовой пояс телефона. Выплата и игровые сутки наступают в <b>12:00 выбранного игрового пояса</b>.</p>
+<div class="time-clock" id="gameClock">00:00:00</div>
+<div class="time-date" id="gameDate">—</div>
+<div class="time-row">
+<label for="timezoneSelect">Часовой пояс игры</label>
+<select id="timezoneSelect"></select>
+</div>
+<div class="actions">
+<button class="btn-primary" id="saveBtn">💾 Сохранить</button>
+<a class="btn-secondary" href="interactive.html" style="text-decoration:none;display:flex;align-items:center;justify-content:center">← Вернуться в интерактив</a>
+</div>
+<div class="status" id="status">Настройка сохранена.</div>
+</section>
+</main>
+<script src="busphoto-common.js?v=20260822-v62" defer></script>
+<script>
+(function(){
+ const KEY='busphoto_game_timezone_offset_minutes', DEFAULT=180;
+ const select=document.getElementById('timezoneSelect'), clock=document.getElementById('gameClock'), date=document.getElementById('gameDate'), status=document.getElementById('status');
+ function get(){const n=Number(localStorage.getItem(KEY));return Number.isFinite(n)&&n>=-720&&n<=840?n:DEFAULT}
+ function label(m){const sign=m>=0?'+':'-',a=Math.abs(m),h=String(Math.floor(a/60)).padStart(2,'0'),min=String(a%60).padStart(2,'0');return 'UTC'+sign+h+':'+min}
+ for(let m=-720;m<=840;m+=60){const o=document.createElement('option');o.value=m;o.textContent=label(m);select.appendChild(o)}
+ select.value=get();
+ function tick(){const off=get(), d=new Date(Date.now()+off*60000); const hh=String(d.getUTCHours()).padStart(2,'0'), mm=String(d.getUTCMinutes()).padStart(2,'0'), ss=String(d.getUTCSeconds()).padStart(2,'0'); clock.textContent=hh+':'+mm+':'+ss+' • '+label(off); date.textContent=d.getUTCFullYear()+'.'+String(d.getUTCMonth()+1).padStart(2,'0')+'.'+String(d.getUTCDate()).padStart(2,'0');}
+ document.getElementById('saveBtn').addEventListener('click',()=>{localStorage.setItem(KEY,String(Number(select.value))); status.style.display='block'; status.textContent='✓ Игровой часовой пояс сохранён: '+label(Number(select.value)); window.dispatchEvent(new CustomEvent('busphoto-game-timezone-changed',{detail:{offset:Number(select.value)}})); setTimeout(()=>status.style.display='none',2500);});
+ tick();setInterval(tick,1000);
+})();
+</script>
+</body></html>
