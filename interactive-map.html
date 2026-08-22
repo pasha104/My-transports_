@@ -65,10 +65,11 @@
 <input class="map-mini-input" id="mapNewRouteName" placeholder="Название нового маршрута" style="margin-top:6px;"/>
 <div class="map-help" id="mapDraftInfo">Точек маршрута: 0</div>
 <div class="map-panel" style="margin-top:6px;"><b>🎯 Контрольные точки</b><div class="map-route-list" id="mapControlPointList" style="margin-top:5px;"></div><button class="btn-secondary" onclick="clearControlPoints()" style="width:100%;margin-top:5px;">🗑️ Очистить контрольные точки</button></div>
-<div class="map-help" style="margin-top:5px;">Кликай остановки по порядку от первой конечной до второй. Для сложных участков включи «🎯 Контрольная точка» и расставь точки на дороге в нужном порядке — построение будет проходить через них. После создания маршрут автоматически получает первую и последнюю остановку как конечные, а обратное направление строится по той же линии в обратную сторону.</div>
+<div class="map-help" style="margin-top:5px;">Кликай остановки по порядку от первой конечной до второй. Если маршрут уже существует, сначала выбери его: все его остановки загрузятся автоматически. Повторный клик по уже выбранной остановке задаёт точку продолжения, а новые остановки добавляются после неё — маршрут удалять не нужно. Для сложных участков включи «🎯 Контрольная точка» и расставь точки на дороге в нужном порядке — построение будет проходить через них. После создания маршрут автоматически получает первую и последнюю остановку как конечные, а обратное направление строится по той же линии в обратную сторону.</div>
 <button class="btn-primary" onclick="createRouteFromMapDraft()" style="width:100%; margin-top:6px;">➕ Создать маршрут из карты</button>
 <button class="btn-secondary" onclick="startNewMapRoute()" style="width:100%; margin-top:6px;">🆕 Новый маршрут</button>
 <button class="btn-primary" onclick="buildSelectedRoute()" style="width:100%; margin-top:6px;">🛣️ Построить по дорогам</button>
+<button class="btn-primary" onclick="buildSelectedRoute()" style="width:100%; margin-top:6px;">🔄 Перестроить выбранный маршрут</button>
 <button class="btn-secondary" onclick="saveMapRouteGeometry()" style="width:100%; margin-top:6px;">💾 Сохранить маршрут</button>
 </input></div>
 <div class="map-panel" id="mapTrackerPanel">
