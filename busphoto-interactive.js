@@ -2533,22 +2533,18 @@ out body;
         function getScheduleDurationMinutes(schedule) {
             const route = getScheduleRoute(schedule);
             if (!route) return 1;
-            const direct = Number(route.outboundDuration || 0);
-            const directReturn = Number(route.returnDuration || 0);
-            const router = Number(route.calculatedDuration || 0);
+            const firstId = (route.terminalStopIds || route.stopIds || [])[0];
+            const startId = schedule?.startStopId;
+            const forward = !startId || String(startId) === String(firstId);
+            const direct = forward ? Number(route.outboundDuration || 0) : Number(route.returnDuration || 0);
+            const router = Number(route.calculatedDuration || route.durationSeconds || route.travelDurationSeconds || 0);
+            const explicitMin = Number(route.durationMinutes || route.travelDurationMinutes || route.travelTimeMinutes || 0);
+            const candidates = [];
+            if (Number.isFinite(direct) && direct >= 60) candidates.push(direct / 60);
+            if (Number.isFinite(router) && router >= 60) candidates.push(router / 60);
+            if (Number.isFinite(explicitMin) && explicitMin > 0) candidates.push(explicitMin);
+            if (candidates.length) return Math.max(1, Math.round(Math.max(...candidates)));
             const dist = Number(route.calculatedDistance || route.distance * 1000 || 0);
-            // Не используем старые 900 секунд как 15-минутную поездку,
-            // если у маршрута уже сохранено реальное рассчитанное время.
-            if (Number.isFinite(direct) && direct >= 60 && Number.isFinite(router) && router >= 60)
-                return Math.max(1, Math.round(Math.max(direct, router) / 60));
-            if (Number.isFinite(directReturn) && directReturn >= 60 && Number.isFinite(router) && router >= 60)
-                return Math.max(1, Math.round(Math.max(directReturn, router) / 60));
-            if (Number.isFinite(direct) && direct >= 60) return Math.max(1, Math.round(direct / 60));
-            if (Number.isFinite(router) && router >= 60) {
-                const km = dist / 1000;
-                const speed = km > 0 ? km / (router / 3600) : 0;
-                if (!speed || speed <= 120) return Math.max(1, Math.round(router / 60));
-            }
             if (Number.isFinite(dist) && dist > 0) {
                 const type = String(route.routeServiceType || route.serviceType || '').toLowerCase();
                 const name = String((route.name || '') + ' ' + (route.note || '')).toLowerCase();
@@ -2557,9 +2553,8 @@ out body;
                 else if (type.includes('suburban') || name.includes('пригород')) speed = 55;
                 return Math.max(1, Math.ceil((dist / (speed / 3.6)) / 60));
             }
-            return 15;
+            return 1;
         }
-
         function getScheduleStartDateForDay(date, schedule) {
             const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
             return d;
@@ -2584,11 +2579,8 @@ out body;
                 lastArrival = Math.max(firstArrival, manual);
             }
 
-            const endId = schedule?.endStopId;
-            const firstId = (route?.terminalStopIds || route?.stopIds || [])[0];
-            const endIsFirst = endId && firstId && String(endId) === String(firstId);
-            const returnSec = endIsFirst ? Number(route?.outboundDuration || 0) : Number(route?.returnDuration || 0);
-            const returnMin = Math.max(lastArrival, untilMin) + Math.max(1, Math.round((returnSec || 900) / 60));
+            const returnStartId = schedule?.endStopId || schedule?.startStopId;
+            const returnMin = Math.max(lastArrival, untilMin) + Math.max(1, getScheduleDurationMinutes({...schedule, startStopId:returnStartId}));
             let finalReturnMin = returnMin;
             if (schedule.autoFinish === false && schedule.returnTime) {
                 let manualReturn = timeToMinutes(schedule.returnTime);
@@ -2684,8 +2676,8 @@ out body;
                 inbound: paired || route,
                 outboundGeometry: route?.geometry || null,
                 inboundGeometry: paired?.geometry || reverseGeometry(route?.geometry),
-                outboundDuration: Math.max(1, Number(route?.calculatedDuration || 900)),
-                inboundDuration: Math.max(1, Number(paired?.calculatedDuration || route?.calculatedDuration || 900))
+                outboundDuration: Math.max(60, Number(route?.calculatedDuration || route?.outboundDuration || route?.durationSeconds || 0) || getRouteTerminalDurationMinutes(route, route?.terminalStopIds?.[0]) * 60),
+                inboundDuration: Math.max(60, Number(paired?.calculatedDuration || paired?.outboundDuration || paired?.durationSeconds || 0) || getRouteTerminalDurationMinutes(paired || route, (paired || route)?.terminalStopIds?.[0]) * 60)
             };
         }
 
@@ -3286,14 +3278,14 @@ out body;
             const firstId = (route.terminalStopIds || route.stopIds || [])[0];
             const forward = !startStopId || String(startStopId) === String(firstId);
             const direct = forward ? Number(route.outboundDuration || 0) : Number(route.returnDuration || 0);
-            if (Number.isFinite(direct) && direct >= 60) return Math.max(1, Math.round(direct / 60));
-            const router = Number(route.calculatedDuration || 0);
+            const router = Number(route.calculatedDuration || route.durationSeconds || route.travelDurationSeconds || 0);
+            const explicitMin = Number(route.durationMinutes || route.travelDurationMinutes || route.travelTimeMinutes || 0);
+            const candidates = [];
+            if (Number.isFinite(direct) && direct >= 60) candidates.push(direct / 60);
+            if (Number.isFinite(router) && router >= 60) candidates.push(router / 60);
+            if (Number.isFinite(explicitMin) && explicitMin > 0) candidates.push(explicitMin);
+            if (candidates.length) return Math.max(1, Math.round(Math.max(...candidates)));
             const dist = Number(route.calculatedDistance || route.distance * 1000 || 0);
-            if (Number.isFinite(router) && router >= 60) {
-                const km = dist / 1000;
-                const speed = km > 0 ? km / (router / 3600) : 0;
-                if (!speed || speed <= 120) return Math.max(1, Math.round(router / 60));
-            }
             if (Number.isFinite(dist) && dist > 0) {
                 const type = String(route.routeServiceType || route.serviceType || '').toLowerCase();
                 const name = String((route.name || '') + ' ' + (route.note || '')).toLowerCase();
@@ -3302,19 +3294,19 @@ out body;
                 else if (type.includes('suburban') || name.includes('пригород')) speed = 55;
                 return Math.max(1, Math.ceil((dist / (speed / 3.6)) / 60));
             }
-            return 15;
+            return 1;
         }
         function getDepotTransferMinutes(route, startStopId) {
             const firstId = (route.terminalStopIds || route.stopIds || [])[0];
             const forward = !startStopId || String(startStopId) === String(firstId);
             const sec = forward ? Number(route.outboundDuration || 0) : Number(route.returnDuration || 0);
-            return Math.max(1, Math.round((sec || 15*60) / 60));
+            return sec >= 60 ? Math.max(1, Math.round(sec / 60)) : getRouteTerminalDurationMinutes(route, startStopId);
         }
         function getReturnTransferMinutes(route, endStopId) {
             const firstId = (route.terminalStopIds || route.stopIds || [])[0];
             const endIsFirst = endStopId && firstId && String(endStopId) === String(firstId);
             const sec = endIsFirst ? Number(route.outboundDuration || 0) : Number(route.returnDuration || 0);
-            return Math.max(1, Math.round((sec || 15*60) / 60));
+            return sec >= 60 ? Math.max(1, Math.round(sec / 60)) : getRouteTerminalDurationMinutes(route, endStopId);
         }
         function updateDepartureRouteInfo() {
             const el = document.getElementById('departureRouteInfo');
