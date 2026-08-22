@@ -15,7 +15,7 @@
   ];
   async function loadOne(file,hostId){
     const host=document.getElementById(hostId); if(!host) return;
-    const r=await fetch(file+'?v=20260822-v52',{cache:'no-cache'});
+    const r=await fetch(file+'?v=20260822-v53',{cache:'no-cache'});
     if(!r.ok) throw new Error(file+' HTTP '+r.status);
     host.innerHTML=await r.text();
   }
@@ -29,7 +29,7 @@
       await Promise.all(sections.map(x=>loadOne(x[1],x[2])));
       status('Интерактив готов');
       const s=document.createElement('script');
-      s.src='busphoto-interactive.js?v=20260822-v52';
+      s.src='busphoto-interactive.js?v=20260822-v53';
       s.onload=()=>{const e=document.getElementById('interactiveLoadingStatus');if(e)e.style.display='none';};
       s.onerror=()=>status('Не удалось загрузить интерактивный модуль.',true);
       document.head.appendChild(s);

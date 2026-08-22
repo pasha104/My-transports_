@@ -1449,13 +1449,29 @@
             }
             for (const stop of draw) {
                 const color = stop.stopType === 'turnback' ? '#f39c12' : (stop.source === 'custom' ? '#8e44ad' : '#1769aa');
-                const marker = L.circleMarker([stop.lat, stop.lon], {radius:11, weight:4, color:'#fff', fillColor:color, fillOpacity:.95, bubblingMouseEvents:false, className:'map-stop-hit'}).addTo(mapState.map);
+                // В режиме сборки маршрута используем обычный DOM-маркер, а не Canvas-circleMarker.
+                // На некоторых мобильных браузерах Canvas-маркеры после перерисовки карты
+                // перестают стабильно принимать touch/click. DOM-маркер надёжно выбирается пальцем.
+                let marker;
+                if (mapState.mode === 'route') {
+                    const size = 30;
+                    const icon = L.divIcon({
+                        className: 'route-stop-dom-icon',
+                        html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;box-sizing:border-box;"></div>`,
+                        iconSize: [size, size],
+                        iconAnchor: [size/2, size/2]
+                    });
+                    marker = L.marker([stop.lat, stop.lon], {icon, keyboard:false, zIndexOffset:700}).addTo(mapState.map);
+                } else {
+                    marker = L.circleMarker([stop.lat, stop.lon], {radius:11, weight:4, color:'#fff', fillColor:color, fillOpacity:.95, bubblingMouseEvents:false, className:'map-stop-hit'}).addTo(mapState.map);
+                }
                 const stopKind = stop.stopType === 'turnback' ? '🔄 Пункт разворота · не конечная' : '🚏 Остановочный пункт';
                 const deleteButton = stop.source === 'custom'
                     ? `<br><button class="btn-secondary" style="margin-top:5px;width:100%;" onclick="deleteCustomMapStop('${String(stop.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">🗑️ Удалить остановку</button>`
                     : '';
                 marker.bindPopup(`<b>${escapeHtml(stop.name)}</b><br>${stopKind}<br><small>${Number(stop.lat).toFixed(6)}, ${Number(stop.lon).toFixed(6)}</small><br>${routeChooseButtonHtml(stop)}${deleteButton}`);
-                marker.on('click',()=>{
+                marker.on('click',(ev)=>{
+                    if (ev && ev.originalEvent) L.DomEvent.stopPropagation(ev.originalEvent);
                     if(mapState.mode==='route') {
                         mapSelectStop(stop.id);
                     } else {
@@ -1542,22 +1558,55 @@
 
             if (mapState.mode !== 'route') setMapMode('route');
 
-            // В режиме редактирования можно выбирать И обычные остановки, И контрольные точки.
-            // Повторное нажатие снимает точку с маршрута, поэтому маршрут не приходится удалять и создавать заново.
             const sid = String(stop.id);
             const existingIndex = mapState.draftStopIds.findIndex(x => String(x) === sid);
+
+            // ВАЖНО: повторный клик по уже выбранной остановке НЕ удаляет её.
+            // Он делает её точкой продолжения, как и кнопка «Выбрать» в карточке.
+            // Это позволяет редактировать маршрут без удаления всего маршрута.
             if (existingIndex >= 0) {
-                mapState.draftStopIds.splice(existingIndex, 1);
+                mapState.routeEditCursor = existingIndex;
+                if (!Array.isArray(mapState.draftPath) || !mapState.draftPath.length) {
+                    mapState.draftPath = mapState.draftStopIds.map(x => ({kind:'stop', stopId:x}));
+                }
+                const pathIndex = mapState.draftPath.findIndex(x => x.kind === 'stop' && String(x.stopId) === sid);
+                if (pathIndex >= 0) mapState.routeEditPathCursor = pathIndex;
                 renderMapDraftInfo();
+                renderControlPoints();
                 renderMapStops();
-                mapSetStatus(`${stop.stopType === 'turnback' ? 'Контрольная точка' : 'Остановка'} убрана из маршрута: ${stop.name}`);
+                refreshRouteChooseButtons();
+                mapSetStatus(`📍 Выбрана «${stop.name}». Следующая остановка или 🎯 путевая точка добавится после неё.`);
                 return;
             }
 
-            mapState.draftStopIds.push(stop.id);
+            // Всегда поддерживаем draftPath синхронным с draftStopIds.
+            // Иначе после добавления контрольной точки выбранные остановки могли
+            // оставаться только в draftStopIds и не попадать в построение маршрута.
+            if (!Array.isArray(mapState.draftPath) || !mapState.draftPath.length) {
+                mapState.draftPath = mapState.draftStopIds.map(x => ({kind:'stop', stopId:x}));
+            }
+
+            let insertAt = mapState.draftPath.length;
+            if (Number.isInteger(mapState.routeEditPathCursor) && mapState.routeEditPathCursor >= 0) {
+                insertAt = Math.min(mapState.routeEditPathCursor + 1, mapState.draftPath.length);
+            }
+            mapState.draftPath.splice(insertAt, 0, {kind:'stop', stopId:stop.id});
+
+            // Пересобираем список остановок в том же порядке, в котором они
+            // реально находятся в маршруте. Контрольные точки в него не входят.
+            mapState.draftStopIds = mapState.draftPath
+                .filter(x => x.kind === 'stop')
+                .map(x => x.stopId);
+
+            const newIndex = mapState.draftStopIds.findIndex(x => String(x) === sid);
+            mapState.routeEditCursor = newIndex >= 0 ? newIndex : null;
+            mapState.routeEditPathCursor = insertAt;
+
             renderMapDraftInfo();
+            renderControlPoints();
             renderMapStops();
-            mapSetStatus(`${stop.stopType === 'turnback' ? 'Добавлена контрольная точка' : 'Добавлена остановка'} №${mapState.draftStopIds.length}: ${stop.name}`);
+            refreshRouteChooseButtons();
+            mapSetStatus(`📍 Добавлена остановка №${newIndex + 1}: ${stop.name}. Следующая точка добавится после неё.`);
         }
 
         function removeDraftStop(index) {
