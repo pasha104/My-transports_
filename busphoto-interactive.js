@@ -1021,7 +1021,7 @@
                         <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px;font-size:10px;">
                             <span>🎨 Цвет:</span>
                             <input type="color" value="${routeColor(route)}" onchange="changeRouteColor('${route.id}', this.value)" style="width:42px;height:24px;padding:1px;">
-                            <button class="btn-secondary" onclick="openRouteOnMap('${route.id}')">🗺️ Открыть на карте</button> <button class="btn-secondary" onclick="showRouteVehicles('${route.id}')">🚍 ТС на маршруте</button> <button class="btn-secondary" onclick="showRouteDetails('${route.id}')">ℹ️ Подробнее</button>
+                            <button class="btn-secondary" onclick="openRouteOnMap('${route.id}')">🗺️ Открыть на карте</button> <button class="btn-secondary" onclick="editRouteOnMap('${route.id}')">✏️ Редактировать</button> <button class="btn-secondary" onclick="showRouteVehicles('${route.id}')">🚍 ТС на маршруте</button> <button class="btn-secondary" onclick="showRouteDetails('${route.id}')">ℹ️ Подробнее</button>
                         </div>
                         <div class="route-direction-panel">
                             <div>
@@ -1066,6 +1066,22 @@
                     const layer = mapState.routeLayers.get(String(routeId));
                     if (layer) mapState.map.fitBounds(layer.getBounds(), { padding: [20, 20] });
                 }
+            }, 120);
+        }
+
+        function editRouteOnMap(routeId) {
+            const route = gameState.routes.find(r => String(r.id) === String(routeId));
+            if (!route) return;
+            mapState.selectedRouteId = route.id;
+            mapState.creatingNewRoute = false;
+            mapState.draftStopIds = Array.isArray(route.stopIds) ? route.stopIds.slice() : [];
+            showGameSection('map', document.querySelector('.game-menu-btn[onclick*=\"map\"]'));
+            setTimeout(() => {
+                selectRouteForMap(routeId);
+                if (mapState.mode !== 'route') setMapMode('route');
+                renderMapStops();
+                renderMapDraftInfo();
+                mapSetStatus(`Редактирование №${route.number}: можно выбирать остановки и контрольные точки. Нажми зелёную кнопку для добавления, красную — для удаления.`);
             }, 120);
         }
 
@@ -1526,49 +1542,22 @@
 
             if (mapState.mode !== 'route') setMapMode('route');
 
+            // В режиме редактирования можно выбирать И обычные остановки, И контрольные точки.
+            // Повторное нажатие снимает точку с маршрута, поэтому маршрут не приходится удалять и создавать заново.
             const sid = String(stop.id);
             const existingIndex = mapState.draftStopIds.findIndex(x => String(x) === sid);
-
-            // Уже выбранная остановка становится новой точкой редактирования.
             if (existingIndex >= 0) {
-                mapState.routeEditCursor = existingIndex;
-                const pathIndex = mapState.draftPath.findIndex(x => x.kind === 'stop' && String(x.stopId) === sid);
-                if (pathIndex >= 0) mapState.routeEditPathCursor = pathIndex;
-                const route = gameState.routes.find(r => String(r.id) === String(mapState.selectedRouteId));
-                mapSetStatus(route
-                    ? `📍 Выбрана остановка «${stop.name}». Можно поставить 🎯 путевую точку, затем выбрать следующую остановку.`
-                    : `📍 Выбрана остановка №${existingIndex + 1}: ${stop.name}`);
+                mapState.draftStopIds.splice(existingIndex, 1);
                 renderMapDraftInfo();
-                refreshRouteChooseButtons();
+                renderMapStops();
+                mapSetStatus(`${stop.stopType === 'turnback' ? 'Контрольная точка' : 'Остановка'} убрана из маршрута: ${stop.name}`);
                 return;
             }
 
-            // Добавляем новую остановку строго после текущего path-курсора.
-            // Поэтому цепочка может выглядеть так: Остановка 5 → КП1 → КП2 → Остановка 6.
-            let insertIndex = mapState.draftStopIds.length;
-            if (Number.isInteger(mapState.routeEditCursor) && mapState.routeEditCursor >= 0) {
-                insertIndex = Math.min(mapState.routeEditCursor + 1, mapState.draftStopIds.length);
-            }
-            mapState.draftStopIds.splice(insertIndex, 0, stop.id);
-
-            let pathInsert = mapState.draftPath.length;
-            if (Number.isInteger(mapState.routeEditPathCursor) && mapState.routeEditPathCursor >= 0) {
-                pathInsert = Math.min(mapState.routeEditPathCursor + 1, mapState.draftPath.length);
-            } else {
-                const stopPositions = [];
-                mapState.draftPath.forEach((node, i) => {
-                    if (node.kind === 'stop') stopPositions.push({i, id:String(node.stopId)});
-                });
-                if (insertIndex < stopPositions.length) pathInsert = stopPositions[insertIndex].i;
-                else if (stopPositions.length) pathInsert = stopPositions[stopPositions.length - 1].i + 1;
-            }
-            mapState.draftPath.splice(pathInsert, 0, {kind:'stop', stopId:stop.id});
-
-            mapState.routeEditCursor = insertIndex;
-            mapState.routeEditPathCursor = pathInsert;
+            mapState.draftStopIds.push(stop.id);
             renderMapDraftInfo();
-            refreshRouteChooseButtons();
-            mapSetStatus(`➕ Остановка добавлена №${insertIndex + 1}: ${stop.name}. Следующую 🎯 путевую точку можно поставить прямо сейчас.`);
+            renderMapStops();
+            mapSetStatus(`${stop.stopType === 'turnback' ? 'Добавлена контрольная точка' : 'Добавлена остановка'} №${mapState.draftStopIds.length}: ${stop.name}`);
         }
 
         function removeDraftStop(index) {
@@ -1588,6 +1577,32 @@
             }
             renderMapDraftInfo(); renderControlPoints();
         }
+        function selectControlPointCursor(pointId) {
+            const sid = String(pointId);
+            const pathIndex = mapState.draftPath.findIndex(x => x.kind === 'control' && String(x.point?.id) === sid);
+            if (pathIndex < 0) return;
+
+            mapState.routeEditPathCursor = pathIndex;
+
+            // Для совместимости с выбором остановки запоминаем ближайшую
+            // остановку перед контрольной точкой. Новая остановка/точка
+            // будет добавляться уже ПОСЛЕ выбранной контрольной точки.
+            let precedingStop = -1;
+            for (let i = pathIndex - 1; i >= 0; i--) {
+                if (mapState.draftPath[i]?.kind === 'stop') {
+                    const stopId = String(mapState.draftPath[i].stopId);
+                    precedingStop = mapState.draftStopIds.findIndex(x => String(x) === stopId);
+                    break;
+                }
+            }
+            mapState.routeEditCursor = precedingStop >= 0 ? precedingStop : null;
+
+            renderControlPoints();
+            renderMapDraftInfo();
+            const cpNumber = mapState.draftPath.slice(0, pathIndex + 1).filter(x => x.kind === 'control').length;
+            mapSetStatus(`🎯 Выбрана контрольная точка ${cpNumber}. Теперь новые путевые точки и остановки будут добавляться после неё.`);
+        }
+
         function renderControlPoints(){
             const el=document.getElementById('mapControlPointList');
             const cps=mapState.draftPath.filter(x=>x.kind==='control');
@@ -1601,12 +1616,22 @@
                     const p=x.point;
                     const icon=L.divIcon({className:'control-point-icon',html:`<span style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#111;color:#fff;border:3px solid #fff;box-shadow:0 2px 7px rgba(0,0,0,.45);font-size:12px;font-weight:800;">${i+1}</span>`,iconSize:[28,28],iconAnchor:[14,14]});
                     const marker=L.marker([Number(p.lat),Number(p.lon)],{icon,zIndexOffset:900}).addTo(mapState.map);
-                    marker.bindPopup(`<b>🎯 Контрольная точка №${i+1}</b><br>${Number(p.lat).toFixed(5)}, ${Number(p.lon).toFixed(5)}`);
+                    const active = Number(mapState.routeEditPathCursor) === mapState.draftPath.indexOf(x);
+                    const cpBtnStyle = active ? 'background:#dc3545;color:#fff;border-color:#dc3545;' : 'background:#28a745;color:#fff;border-color:#28a745;';
+                    const cpLabel = active ? '🔴 Выбрано · продолжить отсюда' : '🟢 Выбрать для редактирования';
+                    const safeCpId = String(p.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+                    marker.bindPopup(`<b>🎯 Контрольная точка №${i+1}</b><br>${Number(p.lat).toFixed(5)}, ${Number(p.lon).toFixed(5)}<br><button type=\"button\" class=\"map-route-choose-btn\" style=\"${cpBtnStyle}\" onclick=\"selectControlPointCursor('${safeCpId}')\">${cpLabel}</button>`);
                     mapState.controlMarkers.set(String(p.id),marker);
                 });
             }
             if(!el)return;
-            el.innerHTML=cps.length?cps.map((x,i)=>`<div class="map-stop-item" style="display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;"><span class="map-stop-num">${i+1}</span><span><b>🎯 Контрольная точка ${i+1}</b><br><small>${Number(x.point.lat).toFixed(5)}, ${Number(x.point.lon).toFixed(5)}</small></span><button type="button" class="btn-secondary" style="padding:4px 7px;font-size:11px;" onclick="removeControlPoint('${String(x.point.id).replaceAll("\'", "\\\'")}')">🗑️ Удалить</button></div>`).join(''):'<div class="map-help">Контрольных точек пока нет. На карте они отмечаются чёрными кружками с номерами.</div>';
+            el.innerHTML=cps.length?cps.map((x,i)=>{
+                const pathIndex=mapState.draftPath.indexOf(x);
+                const active=Number(mapState.routeEditPathCursor)===pathIndex;
+                const safe=String(x.point.id).replaceAll("'", "\\'");
+                return `<div class="map-stop-item" style="display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;"><span class="map-stop-num">${i+1}</span><span><b>🎯 Контрольная точка ${i+1}</b><br><small>${Number(x.point.lat).toFixed(5)}, ${Number(x.point.lon).toFixed(5)}</small></span><span style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;"><button type="button" class="map-route-choose-btn mini ${active?'selected':''}" style="${active?'background:#dc3545;color:#fff;border-color:#dc3545;':'background:#28a745;color:#fff;border-color:#28a745;'}" onclick="selectControlPointCursor('${safe}')">${active?'🔴 Продолжить отсюда':'🟢 Выбрать'}</button><button type="button" class="btn-secondary" style="padding:4px 7px;font-size:11px;" onclick="removeControlPoint('${safe}')">🗑️ Удалить</button></span></div>`;
+            }).join(''):'<div class="map-help">Контрольных точек пока нет. На карте они отмечаются чёрными кружками с номерами.</div>';
+
         }
         function removeControlPoint(id){
             const before=mapState.draftPath.length;
