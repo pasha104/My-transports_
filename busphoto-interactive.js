@@ -1427,7 +1427,7 @@
                 const deleteButton = stop.source === 'custom'
                     ? `<br><button class="btn-secondary" style="margin-top:5px;width:100%;" onclick="deleteCustomMapStop('${String(stop.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">🗑️ Удалить остановку</button>`
                     : '';
-                marker.bindPopup(`<b>${escapeHtml(stop.name)}</b><br>${stopKind}<br><small>${Number(stop.lat).toFixed(6)}, ${Number(stop.lon).toFixed(6)}</small><br><button class="map-select-stop-btn" onclick="mapSelectStop('${String(stop.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">➕ Выбрать для маршрута</button>${deleteButton}`);
+                marker.bindPopup(`<b>${escapeHtml(stop.name)}</b><br>${stopKind}<br><small>${Number(stop.lat).toFixed(6)}, ${Number(stop.lon).toFixed(6)}</small><br>${routeChooseButtonHtml(stop)}${deleteButton}`);
                 marker.on('click',()=>{
                     if(mapState.mode==='route') {
                         mapSelectStop(stop.id);
@@ -1466,6 +1466,42 @@
             if (marker) marker.openPopup();
         }
 
+        function routeChooseButtonHtml(stop) {
+            const sid = String(stop?.id || '');
+            const selected = mapState.draftStopIds.some(x => String(x) === sid);
+            const idx = mapState.draftStopIds.findIndex(x => String(x) === sid);
+            const active = selected && Number(mapState.routeEditCursor) === idx;
+            const safeId = sid.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            if (selected) {
+                return `<button type="button" class="map-route-choose-btn ${active ? 'selected' : ''}" data-stop-id="${escapeHtml(sid)}" onclick="selectRouteEditCursor('${safeId}')">📍 ${active ? 'Выбрано для продолжения' : 'Выбрать'}</button>`;
+            }
+            return `<button type="button" class="map-route-choose-btn" data-stop-id="${escapeHtml(sid)}" onclick="mapSelectStop('${safeId}')">📍 Выбрать</button>`;
+        }
+
+        function selectRouteEditCursor(id) {
+            const sid = String(id);
+            const idx = mapState.draftStopIds.findIndex(x => String(x) === sid);
+            if (idx < 0) return;
+            mapState.routeEditCursor = idx;
+            const stop = getMapStops().find(s => String(s.id) === sid);
+            renderMapDraftInfo();
+            refreshRouteChooseButtons();
+            mapSetStatus(stop
+                ? `📍 Выбрана «${stop.name}». Новые остановки будут добавляться после неё.`
+                : `📍 Выбрана остановка №${idx + 1}. Новые остановки будут добавляться после неё.`);
+        }
+
+        function refreshRouteChooseButtons() {
+            document.querySelectorAll('.map-route-choose-btn[data-stop-id]').forEach(btn => {
+                const sid = String(btn.dataset.stopId || '');
+                const idx = mapState.draftStopIds.findIndex(x => String(x) === sid);
+                const selected = idx >= 0;
+                const active = selected && Number(mapState.routeEditCursor) === idx;
+                btn.classList.toggle('selected', active);
+                btn.textContent = `📍 ${active ? 'Выбрано для продолжения' : 'Выбрать'}`;
+            });
+        }
+
         function mapSelectStop(id) {
             const stop = getMapStops().find(s => String(s.id) === String(id));
             if (!stop) return;
@@ -1484,6 +1520,7 @@
                     ? `📍 Выбрана остановка «${stop.name}». Новые остановки добавятся после неё. Нажми «Построить по дорогам».`
                     : `📍 Выбрана остановка №${existingIndex + 1}: ${stop.name}`);
                 renderMapDraftInfo();
+                refreshRouteChooseButtons();
                 return;
             }
 
@@ -1508,6 +1545,7 @@
 
             mapState.routeEditCursor = insertIndex;
             renderMapDraftInfo();
+            refreshRouteChooseButtons();
             mapSetStatus(`➕ Остановка добавлена №${insertIndex + 1}: ${stop.name}. Следующую можно выбрать — маршрут удалять не нужно.`);
         }
 
@@ -1541,7 +1579,7 @@
                 });
             }
             if(!el)return;
-            el.innerHTML=cps.length?cps.map((x,i)=>`<div class="map-stop-item" style="display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;"><span class="map-stop-num">${i+1}</span><span><b>🎯 Точка ${i+1}</b><br><small>${Number(x.point.lat).toFixed(5)}, ${Number(x.point.lon).toFixed(5)}</small></span><button type="button" class="btn-secondary" style="padding:4px 7px;font-size:11px;" onclick="removeControlPoint('${String(x.point.id).replaceAll("\'", "\\\'")}')">🗑️ Удалить</button></div>`).join(''):'<div class="map-help">Контрольных точек пока нет. На карте они отмечаются чёрными кружками с номерами.</div>';
+            el.innerHTML=cps.length?cps.map((x,i)=>`<div class="map-stop-item" style="display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;"><span class="map-stop-num">${i+1}</span><span><b>🎯 Контрольная точка ${i+1}</b><br><small>${Number(x.point.lat).toFixed(5)}, ${Number(x.point.lon).toFixed(5)}</small></span><button type="button" class="btn-secondary" style="padding:4px 7px;font-size:11px;" onclick="removeControlPoint('${String(x.point.id).replaceAll("\'", "\\\'")}')">🗑️ Удалить</button></div>`).join(''):'<div class="map-help">Контрольных точек пока нет. На карте они отмечаются чёрными кружками с номерами.</div>';
         }
         function removeControlPoint(id){
             const before=mapState.draftPath.length;
@@ -1580,7 +1618,7 @@
             }
             el.innerHTML = `
                 <b>Точек маршрута: ${names.length}</b>
-                ${names.length ? `<div style="margin-top:5px;">${names.map((n, i) => `${n} <button class="btn-secondary" style="padding:1px 5px;font-size:9px;" onclick="removeDraftStop(${i})">×</button>`).join('<br>')}</div>` : ''}
+                ${names.length ? `<div style="margin-top:5px;">${nodes.map((node, i) => { const stop = node.kind==='control' ? null : stops.find(x=>String(x.id)===String(node.stopId)); if(node.kind==='control') return `${i+1}. 🎯 Контрольная точка ${mapState.draftPath.slice(0,i+1).filter(x=>x.kind==='control').length}`; const sid=String(stop?.id||''); const stopIndex=mapState.draftStopIds.findIndex(x=>String(x)===sid); const active=Number(mapState.routeEditCursor)===stopIndex; const safe=sid.replaceAll("'", "\\'"); return `${i+1}. ${escapeHtml(stop?.name||'Остановка')} <button type="button" class="map-route-choose-btn mini ${active?'selected':''}" data-stop-id="${escapeHtml(sid)}" onclick="selectRouteEditCursor('${safe}')">📍 ${active?'Выбрано':'Выбрать'}</button> <button class="btn-secondary" style="padding:1px 5px;font-size:9px;" onclick="removeDraftStop(${stopIndex})">×</button>`; }).join('<br>')}</div>` : ''}
             `;
         }
 
