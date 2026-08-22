@@ -1193,6 +1193,95 @@
             }
         }
 
+        // Удаление пользовательской остановки.
+        // OSM-остановки не удаляем из общей базы: их можно убрать только очисткой региона.
+        function deleteCustomMapStop(id) {
+            const sid = String(id);
+            const stops = getMapStops();
+            const stop = stops.find(s => String(s.id) === sid);
+            if (!stop) return;
+            if (stop.source !== 'custom') {
+                alert('Эта остановка загружена из OSM. Удали её через очистку выбранного региона.');
+                return;
+            }
+
+            if (!confirm(`Удалить остановку «${stop.name}»?`)) return;
+
+            saveMapStops(stops.filter(s => String(s.id) !== sid));
+
+            // Убираем остановку из всех пользовательских маршрутов.
+            // Если после удаления в маршруте осталось меньше двух остановок,
+            // его геометрия сбрасывается и маршрут можно построить заново.
+            let changed = false;
+            (gameState.routes || []).forEach(route => {
+                const before = JSON.stringify({
+                    stopIds: route.stopIds,
+                    terminalStopIds: route.terminalStopIds,
+                    turnbackStopIds: route.turnbackStopIds,
+                    reverseStopIds: route.reverseStopIds,
+                    pathNodes: route.pathNodes,
+                    stops: route.stops
+                });
+
+                const filterIds = arr => Array.isArray(arr)
+                    ? arr.filter(x => String(x) !== sid)
+                    : arr;
+
+                route.stopIds = filterIds(route.stopIds);
+                route.terminalStopIds = filterIds(route.terminalStopIds);
+                route.turnbackStopIds = filterIds(route.turnbackStopIds);
+                route.reverseStopIds = filterIds(route.reverseStopIds);
+                if (Array.isArray(route.pathNodes)) {
+                    route.pathNodes = route.pathNodes.filter(x =>
+                        x.kind !== 'stop' || String(x.stopId) !== sid
+                    );
+                }
+                if (Array.isArray(route.stops)) {
+                    const removedIndex = route.stopIds.length < (Array.isArray(route.stopIds) ? route.stopIds.length + 1 : 0);
+                    route.stops = route.stopIds.map(stopId => {
+                        const found = getMapStops().find(st => String(st.id) === String(stopId));
+                        return found ? found.name : null;
+                    }).filter(Boolean);
+                }
+
+                const routeStopCount = Array.isArray(route.stopIds) ? route.stopIds.length : 0;
+                if (routeStopCount < 2) {
+                    route.geometry = null;
+                    route.outboundGeometry = null;
+                    route.returnGeometry = null;
+                    route.calculatedDistance = null;
+                    route.calculatedDuration = null;
+                    route.distance = 0;
+                }
+
+                const after = JSON.stringify({
+                    stopIds: route.stopIds,
+                    terminalStopIds: route.terminalStopIds,
+                    turnbackStopIds: route.turnbackStopIds,
+                    reverseStopIds: route.reverseStopIds,
+                    pathNodes: route.pathNodes,
+                    stops: route.stops
+                });
+                if (before !== after) changed = true;
+            });
+
+            if (mapState.draftStopIds.some(x => String(x) === sid)) {
+                mapState.draftStopIds = mapState.draftStopIds.filter(x => String(x) !== sid);
+                mapState.draftPath = mapState.draftPath.filter(x =>
+                    x.kind !== 'stop' || String(x.stopId) !== sid
+                );
+            }
+
+            if (changed) saveGameState();
+            renderMapDraftInfo();
+            renderControlPoints();
+            renderMapStops();
+            renderMapRouteLayers();
+            renderMapRouteList();
+            renderRoutes();
+            mapSetStatus(`Остановка «${stop.name}» удалена.`);
+        }
+
         function onMapClick(e) {
             if (mapState.mode === 'control') {
                 const cp = {id:'cp-'+Date.now()+'-'+Math.random().toString(36).slice(2,7), lat:e.latlng.lat, lon:e.latlng.lng, name:'Контрольная точка'};
@@ -1313,14 +1402,31 @@
                 return;
             }
 
-            // На очень большом масштабе показываем реальные точки, но только в видимой области.
-            const limit = zoom >= 17 ? 1800 : 1100;
-            const draw = visible.slice(0, limit);
+            // Во время построения маршрута нельзя создавать тысячи DOM/SVG-объектов:
+            // после каждого клика это заметно тормозит телефон. Показываем только разумное
+            // число ближайших к центру карты остановок; при приближении можно увидеть остальные.
+            const limit = mapState.mode === 'route'
+                ? (zoom >= 17 ? 650 : 450)
+                : (zoom >= 17 ? 1800 : 1100);
+            let draw = visible;
+            if (mapState.mode === 'route' && visible.length > limit) {
+                const center = mapState.map.getCenter();
+                draw = visible.slice().sort((a,b) => {
+                    const da = Math.pow(Number(a.lat)-center.lat,2) + Math.pow(Number(a.lon)-center.lng,2);
+                    const db = Math.pow(Number(b.lat)-center.lat,2) + Math.pow(Number(b.lon)-center.lng,2);
+                    return da-db;
+                }).slice(0, limit);
+            } else {
+                draw = visible.slice(0, limit);
+            }
             for (const stop of draw) {
                 const color = stop.stopType === 'turnback' ? '#f39c12' : (stop.source === 'custom' ? '#8e44ad' : '#1769aa');
                 const marker = L.circleMarker([stop.lat, stop.lon], {radius:11, weight:4, color:'#fff', fillColor:color, fillOpacity:.95, bubblingMouseEvents:false, className:'map-stop-hit'}).addTo(mapState.map);
                 const stopKind = stop.stopType === 'turnback' ? '🔄 Пункт разворота · не конечная' : '🚏 Остановочный пункт';
-                marker.bindPopup(`<b>${escapeHtml(stop.name)}</b><br>${stopKind}<br><small>${Number(stop.lat).toFixed(6)}, ${Number(stop.lon).toFixed(6)}</small><br><button class="map-select-stop-btn" onclick="mapSelectStop('${String(stop.id).replace(/'/g,"\'")}')">➕ Выбрать для маршрута</button>`);
+                const deleteButton = stop.source === 'custom'
+                    ? `<br><button class="btn-secondary" style="margin-top:5px;width:100%;" onclick="deleteCustomMapStop('${String(stop.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">🗑️ Удалить остановку</button>`
+                    : '';
+                marker.bindPopup(`<b>${escapeHtml(stop.name)}</b><br>${stopKind}<br><small>${Number(stop.lat).toFixed(6)}, ${Number(stop.lon).toFixed(6)}</small><br><button class="map-select-stop-btn" onclick="mapSelectStop('${String(stop.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">➕ Выбрать для маршрута</button>${deleteButton}`);
                 marker.on('click',()=>{
                     if(mapState.mode==='route') {
                         mapSelectStop(stop.id);
@@ -1343,9 +1449,10 @@
             const stops = getMapStops().slice(0, 150);
 
             el.innerHTML = stops.length ? stops.map((s, i) => `
-                <div class="map-stop-item" onclick="focusMapStop('${String(s.id).replace(/'/g, "\\'")}')">
+                <div class="map-stop-item" style="display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;" onclick="focusMapStop('${String(s.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">
                     <span class="map-stop-num">${i + 1}</span>
                     <span>${escapeHtml(s.name)}${s.source === 'custom' ? (s.stopType === 'turnback' ? ' 🔄' : ' 📍') : ''}</span>
+                    ${s.source === 'custom' ? `<button type="button" class="btn-secondary" style="padding:4px 7px;font-size:11px;" onclick="event.stopPropagation();deleteCustomMapStop('${String(s.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">🗑️</button>` : ''}
                 </div>
             `).join('') : `<div class="map-help" style="padding:8px;">Остановки не найдены. Нажми «Загрузить остановки OSM» или создай свою.</div>`;
         }
@@ -1773,13 +1880,22 @@ out body;
                 return;
             }
 
-            mapSetStatus('Строю маршрут по дорожной сети…');
+            mapSetStatus('Строю маршрут по дорожной сети… Сайт можно продолжать использовать.');
+
+            // Отдаём браузеру кадр перед сетевым запросом, чтобы карта/кнопки не
+            // ощущались зависшими на телефоне.
+            await new Promise(resolve => requestAnimationFrame(resolve));
 
             const coordinates = points.map(s => `${s.lon},${s.lat}`).join(';');
-            const url = `https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson&steps=false`;
+            // simplified заметно уменьшает размер GeoJSON и синхронную запись localStorage,
+            // при этом для игровой симуляции точности более чем достаточно.
+            const url = `https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=simplified&geometries=geojson&steps=false`;
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
 
             try {
-                const response = await fetch(url);
+                const response = await fetch(url, {signal: controller.signal});
                 if (!response.ok) throw new Error('HTTP ' + response.status);
                 const data = await response.json();
 
@@ -1826,8 +1942,8 @@ out body;
                 const depot = DEPOTS[route.routeType === 'trolleybus' ? 'trolleybus' : 'bus'];
                 const first = points[0], last = points[points.length-1];
                 try {
-                    const outUrl = `https://router.project-osrm.org/route/v1/driving/${depot.lon},${depot.lat};${first.lon},${first.lat}?overview=full&geometries=geojson`;
-                    const retUrl = `https://router.project-osrm.org/route/v1/driving/${last.lon},${last.lat};${depot.lon},${depot.lat}?overview=full&geometries=geojson`;
+                    const outUrl = `https://router.project-osrm.org/route/v1/driving/${depot.lon},${depot.lat};${first.lon},${first.lat}?overview=simplified&geometries=geojson`;
+                    const retUrl = `https://router.project-osrm.org/route/v1/driving/${last.lon},${last.lat};${depot.lon},${depot.lat}?overview=simplified&geometries=geojson`;
                     const [outR, retR] = await Promise.all([fetch(outUrl), fetch(retUrl)]);
                     if (outR.ok) { const od=await outR.json(); route.outboundGeometry=od.routes?.[0]?.geometry||null; route.outboundDuration=Number(od.routes?.[0]?.duration||0); }
                     if (retR.ok) { const rd=await retR.json(); route.returnGeometry=rd.routes?.[0]?.geometry||null; route.returnDuration=Number(rd.routes?.[0]?.duration||0); }
@@ -1850,8 +1966,14 @@ out body;
                 mapSetStatus(`Готово: ${(result.distance / 1000).toFixed(2)} км · ${formatDuration(result.duration)}`);
             } catch (err) {
                 console.error(err);
-                mapSetStatus('Не удалось построить маршрут.');
-                alert('Маршрут не построился. Проверь порядок остановок и попробуй снова.');
+                mapSetStatus(err?.name === 'AbortError'
+                    ? 'Построение заняло слишком много времени. Приблизь карту/выбери меньше остановок и повтори.'
+                    : 'Не удалось построить маршрут.');
+                alert(err?.name === 'AbortError'
+                    ? 'Сервер маршрутизации не ответил за 30 секунд. Маршрут и сайт не заблокированы — попробуй ещё раз.'
+                    : 'Маршрут не построился. Проверь порядок остановок и попробуй снова.');
+            } finally {
+                clearTimeout(timeoutId);
             }
         }
 
