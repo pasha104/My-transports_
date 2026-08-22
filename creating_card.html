@@ -110,30 +110,41 @@ function routeBy(id){return state.routes.find(r=>String(r.id)===String(id))}
 function reverseRoute(r){if(!r)return null;if(r.pairedRouteId){const p=routeBy(r.pairedRouteId);if(p&&p.geometry&&p.routeType===r.routeType)return p}const same=state.routes.filter(x=>String(x.id)!==String(r.id)&&x.geometry&&x.routeType===r.routeType&&String(x.start||'').trim()===String(r.end||'').trim()&&String(x.end||'').trim()===String(r.start||'').trim());return same.sort((a,b)=>{const aa=a.pairedRouteId&&String(a.pairedRouteId)===String(r.id)?0:1,bb=b.pairedRouteId&&String(b.pairedRouteId)===String(r.id)?0:1;return aa-bb})[0]||null}
 function durationFor(r,startId){
   if(!r)return 1;
-  const ids=Array.isArray(r.terminalStopIds)&&r.terminalStopIds.length? r.terminalStopIds : (Array.isArray(r.stopIds)?r.stopIds:[]);
+  const ids=Array.isArray(r.terminalStopIds)&&r.terminalStopIds.length?r.terminalStopIds:(Array.isArray(r.stopIds)?r.stopIds:[]);
   const first=ids[0];
   const forward=!startId||String(startId)===String(first);
-  const direct=forward?Number(r.outboundDuration||0):Number(r.returnDuration||0);
-  const router=Number(r.calculatedDuration||r.durationSeconds||r.travelDurationSeconds||0);
-  const explicitMin=Number(r.durationMinutes||r.travelDurationMinutes||r.travelTimeMinutes||0);
   const dist=Number(r.calculatedDistance||r.distance*1000||0);
-  // Время берём из самого маршрута. Старые короткие значения не должны
-  // перебивать реально рассчитанную длительность длинного маршрута.
-  const candidates=[];
-  if(Number.isFinite(direct)&&direct>=60)candidates.push(direct/60);
-  if(Number.isFinite(router)&&router>=60)candidates.push(router/60);
-  if(Number.isFinite(explicitMin)&&explicitMin>0)candidates.push(explicitMin);
-  if(candidates.length)return Math.max(1,Math.round(Math.max(...candidates)));
-  // Если у маршрута сохранена только длина — вычисляем время из типа маршрута,
-  // но не подставляем искусственные 10/15 минут.
+
+  // Источник времени для карточки — само сохранённое время маршрута.
+  // Не используем старые durationMinutes/travelTimeMinutes, если они могли
+  // содержать старое значение 10 минут.
+  const rawCandidates=forward
+    ? [r.calculatedDuration,r.durationSeconds,r.travelDurationSeconds,r.routeDurationSeconds,r.osrmDuration,r.routingDuration]
+    : [r.returnDurationSeconds,r.returnCalculatedDuration,r.calculatedReturnDuration,r.calculatedDuration,r.durationSeconds,r.travelDurationSeconds,r.routeDurationSeconds,r.osrmDuration,r.routingDuration];
+  const seconds=rawCandidates.map(Number).find(v=>Number.isFinite(v)&&v>=60);
+
+  if(Number.isFinite(seconds)){
+    // Если сохранённое время явно невозможно для расстояния, не берём его.
+    if(!Number.isFinite(dist)||dist<=0||dist/(seconds/3600)<=120){
+      return Math.max(1,Math.ceil(seconds/60));
+    }
+  }
+
+  // Если маршрут имеет только расстояние, рассчитываем реалистичное время
+  // из типа маршрута. Это запасной вариант, а не фиксированные 10 минут.
   if(Number.isFinite(dist)&&dist>0){
-    const type=String(r.routeServiceType||r.serviceType||'').toLowerCase();
-    const name=String((r.name||'')+' '+(r.note||'')).toLowerCase();
+    const type=String(r.routeServiceType||r.serviceType||r.routeClass||r.busRouteClass||'').toLowerCase();
+    const name=String((r.name||'')+' '+(r.note||'')+' '+(r.routeType||'')).toLowerCase();
     let speed=35;
-    if(type.includes('intercity')||name.includes('межгород')||name.includes('междугород'))speed=70;
-    else if(type.includes('suburban')||name.includes('пригород'))speed=55;
+    if(type.includes('intercity')||name.includes('межгород')||name.includes('междугород')||name.includes('intercity')) speed=70;
+    else if(type.includes('suburban')||name.includes('пригород')||name.includes('suburban')) speed=55;
     return Math.max(1,Math.ceil((dist/(speed/3.6))/60));
   }
+
+  // Только для старых маршрутов без расстояния и расчётного времени.
+  // Если есть явное время маршрута, используем его последним резервом.
+  const explicitMin=Number(forward?r.durationMinutes||r.travelDurationMinutes||r.travelTimeMinutes:r.returnDurationMinutes||r.returnTravelTimeMinutes);
+  if(Number.isFinite(explicitMin)&&explicitMin>0) return Math.max(1,Math.round(explicitMin));
   return 1;
 }
 function transferFor(r,startId){return durationFor(r,startId)}
