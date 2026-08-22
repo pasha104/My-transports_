@@ -5,7 +5,7 @@
   'use strict';
   if (window.__BUSPHOTO_INTERACTIVE_LOADER_V78__) return;
   window.__BUSPHOTO_INTERACTIVE_LOADER_V78__ = true;
-  const VERSION='20260822-v78';
+  const VERSION='20260822-v79';
   const sections=[
     ['menu','interactive-menu.html','interactive-menu-host'],
     ['map','interactive-map.html','interactive-section-host-map'],
@@ -41,16 +41,46 @@
     loading.set(name,promise);
     try{return await promise;} finally{loading.delete(name);}
   }
+  function refreshSectionData(section){
+    try{
+      // The fragments are inserted after the main JS has already rendered.
+      // Refresh only the requested section; never rebuild the whole page.
+      if(section==='finance'){
+        const el=document.getElementById('financeBalance');
+        const owned=document.getElementById('financeOwned');
+        const last=document.getElementById('financeLastPayout');
+        if(typeof gameState!=='undefined'){
+          if(el) el.textContent=typeof money==='function'?money(gameState.balance):`${Math.round(Number(gameState.balance||0)).toLocaleString('ru-RU')} р.`;
+          if(owned) owned.textContent=Array.isArray(gameState.owned)?gameState.owned.length:0;
+          if(last) last.textContent=gameState.lastPayoutDate||'ещё не было';
+        }
+      } else if(section==='garage'){
+        if(typeof renderInteractive==='function') renderInteractive();
+      } else if(section==='history'){
+        if(typeof renderInteractive==='function') renderInteractive();
+      } else if(section==='routes'){
+        if(typeof renderRoutes==='function') renderRoutes();
+      } else if(section==='dispatch'||section==='stats'||section==='maintenance'){
+        if(typeof renderV43Panels==='function') renderV43Panels();
+      }
+    }catch(e){ console.warn('[BUSPHOTO] section refresh failed',section,e); }
+  }
   window.openInteractiveSection=async function(section,btn){
     try{
       if(typeof window.showGameSection==='function'){
-        await loadOne(section,{timeout:7000});
-        window.showGameSection(section,btn); return;
+        await loadOne(section,{timeout:8000});
+        window.showGameSection(section,btn);
+        refreshSectionData(section);
+        return;
       }
       window.__BUSPHOTO_PENDING_SECTION__={section,btn};
-      await loadOne(section,{timeout:7000});
-      if(typeof window.showGameSection==='function'){const p=window.__BUSPHOTO_PENDING_SECTION__; window.__BUSPHOTO_PENDING_SECTION__=null; window.showGameSection(p?.section||section,p?.btn||btn);}
-    }catch(e){console.error('[BUSPHOTO] section open error',section,e); status('Раздел загружается дольше обычного. Можно продолжать работу.',true);}
+      await loadOne(section,{timeout:8000});
+      if(typeof window.showGameSection==='function'){
+        const p=window.__BUSPHOTO_PENDING_SECTION__; window.__BUSPHOTO_PENDING_SECTION__=null;
+        window.showGameSection(p?.section||section,p?.btn||btn);
+        refreshSectionData(p?.section||section);
+      }
+    }catch(e){console.error('[BUSPHOTO] section open error',section,e); status('Раздел не удалось загрузить. Попробуй открыть его ещё раз.',true);}
   };
   window.BUSPHOTOEnsureInteractiveSection=loadOne;
   async function loadMain(){
@@ -61,18 +91,47 @@
   }
   async function start(){
     status('Запуск интерактива…');
-    // Only the menu and shop are on the critical path because the main JS expects
-    // their purchase controls. Everything else is lazy/background.
-    try{await loadOne('menu',{timeout:6000});}catch(e){console.error(e); status('Не удалось загрузить меню. Проверь соединение.',true); return;}
-    try{await loadOne('shop',{timeout:6000});}catch(e){console.warn('[BUSPHOTO] shop deferred',e);}
-    try{await loadMain();
-      const st=document.getElementById('interactiveLoadingStatus'); if(st)st.style.display='none';
-      const p=window.__BUSPHOTO_PENDING_SECTION__; if(p&&typeof window.showGameSection==='function'){window.__BUSPHOTO_PENDING_SECTION__=null; window.showGameSection(p.section,p.btn);}
-    }catch(e){console.error(e); status('Не удалось запустить интерактивный модуль.',true); return;}
+    // Only the menu is critical. The main JS is loaded immediately; the shop is
+    // fetched in the background and then explicitly starts the game state.
+    try{await loadOne('menu',{timeout:8000});}
+    catch(e){console.error(e); status('Не удалось загрузить меню. Проверь соединение.',true); return;}
+    try{await loadMain();}
+    catch(e){console.error(e); status('Не удалось запустить интерактивный модуль.',true); return;}
+
+    const initGame=()=>{
+      try{
+        if(typeof window.__BUSPHOTO_INIT_INTERACTIVE_GAME__==='function' && !window.__BUSPHOTO_GAME_INITIALIZED__){
+          window.__BUSPHOTO_GAME_INITIALIZED__=true;
+          window.__BUSPHOTO_INIT_INTERACTIVE_GAME__();
+        }
+      }catch(e){console.error('[BUSPHOTO] game init failed',e);}
+    };
+
+    // Shop is not allowed to block the page. Once its controls arrive, initialize
+    // the game against the real shared localStorage state.
+    loadOne('shop',{timeout:8000}).then(initGame).catch(e=>{
+      console.warn('[BUSPHOTO] shop deferred',e);
+      // The rest of the UI is still usable; retry once after a short delay.
+      setTimeout(()=>loadOne('shop',{timeout:8000}).then(initGame).catch(()=>{}),1500);
+    });
+
+    const st=document.getElementById('interactiveLoadingStatus'); if(st)st.style.display='none';
+    const p=window.__BUSPHOTO_PENDING_SECTION__;
+    if(p&&typeof window.showGameSection==='function'){
+      window.__BUSPHOTO_PENDING_SECTION__=null;
+      window.showGameSection(p.section,p.btn);
+    }
+
     // Background loading never blocks the main screen.
     const rest=['garage','finance','history','routes','map','rules','dispatch','stats','maintenance'];
     let i=0;
-    const next=()=>{if(i>=rest.length)return; const n=rest[i++]; loadOne(n,{timeout:7000}).catch(e=>console.warn('[BUSPHOTO] background section',n,e)); if('requestIdleCallback' in window) requestIdleCallback(next,{timeout:1500}); else setTimeout(next,80);};
+    const next=()=>{
+      if(i>=rest.length)return;
+      const n=rest[i++];
+      loadOne(n,{timeout:8000}).catch(e=>console.warn('[BUSPHOTO] background section',n,e));
+      if('requestIdleCallback' in window) requestIdleCallback(next,{timeout:1500});
+      else setTimeout(next,80);
+    };
     next();
   }
   function boot(){if(window.__BUSPHOTO_INTERACTIVE_STARTED_V78__)return; window.__BUSPHOTO_INTERACTIVE_STARTED_V78__=true; start();}

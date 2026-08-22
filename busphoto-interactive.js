@@ -1189,21 +1189,56 @@ function rebuildMapStopsIndex(stops) {
         function ensureLeafletLoaded() {
             if (window.L) return Promise.resolve(window.L);
             if (leafletLoadPromise) return leafletLoadPromise;
+            const sources = [
+                'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js',
+                'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+            ];
+            const cssSources = [
+                'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css',
+                'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+            ];
             leafletLoadPromise = new Promise((resolve, reject) => {
-                const css = document.createElement('link');
-                css.rel = 'stylesheet';
-                css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-                document.head.appendChild(css);
-                const script = document.createElement('script');
-                script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-                script.async = true;
-                script.onload = () => resolve(window.L);
-                script.onerror = () => { leafletLoadPromise = null; reject(new Error('Leaflet load failed')); };
-                document.head.appendChild(script);
+                let index = 0;
+                const addCss = () => {
+                    if (!document.querySelector('link[data-busphoto-leaflet]')) {
+                        const css = document.createElement('link');
+                        css.rel = 'stylesheet';
+                        css.href = cssSources[0];
+                        css.dataset.busphotoLeaflet = '1';
+                        document.head.appendChild(css);
+                    }
+                };
+                const tryNext = () => {
+                    if (window.L) return resolve(window.L);
+                    if (index >= sources.length) {
+                        leafletLoadPromise = null;
+                        return reject(new Error('Leaflet load failed'));
+                    }
+                    const src = sources[index++];
+                    const script = document.createElement('script');
+                    script.src = src;
+                    script.async = true;
+                    let timer = setTimeout(() => {
+                        script.remove();
+                        tryNext();
+                    }, 7000);
+                    script.onload = () => {
+                        clearTimeout(timer);
+                        if (window.L) resolve(window.L);
+                        else tryNext();
+                    };
+                    script.onerror = () => {
+                        clearTimeout(timer);
+                        script.remove();
+                        tryNext();
+                    };
+                    document.head.appendChild(script);
+                };
+                addCss();
+                tryNext();
             });
             return leafletLoadPromise;
         }
-
         function mapSetStatus(text) {
             const el = document.getElementById('mapStatus');
             if (el) el.textContent = text;
@@ -3426,8 +3461,9 @@ out body;
             const badge = document.getElementById('gameClockBadge');
             if (badge) {
                 const now = new Date();
-                badge.textContent = now.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) +
-                    (now.getHours() >= 12 ? ' • начисление сегодня выполнено/ожидается' : ' • следующее начисление в 12:00');
+                const gc = typeof getGameClock === 'function' ? getGameClock(now.getTime()) : {hour:now.getHours(),minute:now.getMinutes()};
+                badge.textContent = `${String(gc.hour).padStart(2,'0')}:${String(gc.minute).padStart(2,'0')}` +
+                    (gc.hour >= 12 ? ' • начисление сегодня выполнено/ожидается' : ' • следующее начисление в 12:00');
             }
         }
 
@@ -3944,9 +3980,9 @@ out body;
             document.getElementById('ownedCount').textContent = gameState.owned.length;
 
             const now = new Date();
-            const badge = document.getElementById('gameClockBadge');
-            badge.textContent = now.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) +
-                (now.getHours() >= 12 ? ' • начисление сегодня выполнено/ожидается' : ' • следующее начисление в 12:00');
+            const gc = typeof getGameClock === 'function' ? getGameClock(now.getTime()) : {hour:now.getHours(),minute:now.getMinutes()};
+            badge.textContent = `${String(gc.hour).padStart(2,'0')}:${String(gc.minute).padStart(2,'0')}` +
+                (gc.hour >= 12 ? ' • начисление сегодня выполнено/ожидается' : ' • следующее начисление в 12:00');
 
             updateGameModelSelect();
             initStopRegionSelect();
@@ -4055,6 +4091,8 @@ out body;
                 }, 5000);
             }
         }
+
+        window.__BUSPHOTO_INIT_INTERACTIVE_GAME__ = initInteractiveGame;
 
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) stopMapBusAnimation();
