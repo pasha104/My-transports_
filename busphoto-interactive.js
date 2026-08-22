@@ -140,6 +140,7 @@
             mode: 'select',
             selectedRouteId: null,
             routeEditCursor: null,
+            routeEditPathCursor: null,
             draftStopIds: [],
             draftPath: [],
             creatingNewRoute: false,
@@ -1155,7 +1156,7 @@
                 mapSetStatus('Режим сборки: нажимай остановки по порядку — каждая точка добавляется сразу.');
                 return;
             }
-            if (mode === 'control') { renderMapStops(); renderControlPoints(); mapSetStatus('Контрольные точки: кликай по карте в нужном порядке.'); return; }
+            if (mode === 'control') { renderMapStops(); renderControlPoints(); mapSetStatus('Контрольные точки: ставь их после выбранной остановки — следующая остановка пойдёт уже через них.'); return; }
             if (mode === 'vehicles') {
                 mapState.stopMarkers.forEach(m => m.remove());
                 mapState.stopMarkers.clear();
@@ -1286,9 +1287,19 @@
         function onMapClick(e) {
             if (mapState.mode === 'control') {
                 const cp = {id:'cp-'+Date.now()+'-'+Math.random().toString(36).slice(2,7), lat:e.latlng.lat, lon:e.latlng.lng, name:'Контрольная точка'};
-                mapState.draftPath.push({kind:'control', point:cp});
+
+                // Контрольная точка должна вставляться именно в текущую позицию
+                // редактирования, а не всегда в конец маршрута. Это позволяет
+                // сделать: остановка → контрольная точка → следующая остановка.
+                let insertAt = mapState.draftPath.length;
+                if (Number.isInteger(mapState.routeEditPathCursor) && mapState.routeEditPathCursor >= 0) {
+                    insertAt = Math.min(mapState.routeEditPathCursor + 1, mapState.draftPath.length);
+                }
+                mapState.draftPath.splice(insertAt, 0, {kind:'control', point:cp});
+                mapState.routeEditPathCursor = insertAt;
+
                 renderMapDraftInfo();
-                mapSetStatus(`Добавлена контрольная точка №${mapState.draftPath.filter(x=>x.kind==='control').length}.`);
+                mapSetStatus(`🎯 Контрольная точка ${mapState.draftPath.slice(0, insertAt + 1).filter(x=>x.kind==='control').length} добавлена. Следующая остановка будет строиться уже через неё.`);
                 renderControlPoints();
                 return;
             }
@@ -1483,12 +1494,19 @@
             const idx = mapState.draftStopIds.findIndex(x => String(x) === sid);
             if (idx < 0) return;
             mapState.routeEditCursor = idx;
+
+            // Курсор редактирования хранится в самом pathNodes, поэтому после
+            // выбранной остановки могут идти контрольные точки. Следующая
+            // остановка будет вставлена уже ПОСЛЕ этих точек, а не перед ними.
+            const pathIndex = mapState.draftPath.findIndex(x => x.kind === 'stop' && String(x.stopId) === sid);
+            if (pathIndex >= 0) mapState.routeEditPathCursor = pathIndex;
+
             const stop = getMapStops().find(s => String(s.id) === sid);
             renderMapDraftInfo();
             refreshRouteChooseButtons();
             mapSetStatus(stop
-                ? `📍 Выбрана «${stop.name}». Новые остановки будут добавляться после неё.`
-                : `📍 Выбрана остановка №${idx + 1}. Новые остановки будут добавляться после неё.`);
+                ? `📍 Выбрана «${stop.name}». Теперь можно поставить 🎯 путевую точку — следующая остановка пойдёт после неё.`
+                : `📍 Выбрана остановка №${idx + 1}. Путевые точки и следующие остановки пойдут после неё.`);
         }
 
         function refreshRouteChooseButtons() {
@@ -1511,42 +1529,46 @@
             const sid = String(stop.id);
             const existingIndex = mapState.draftStopIds.findIndex(x => String(x) === sid);
 
-            // Редактор маршрута: повторный клик по уже выбранной остановке НЕ удаляет её.
-            // Он делает её точкой продолжения. Следующие остановки будут добавляться после неё.
+            // Уже выбранная остановка становится новой точкой редактирования.
             if (existingIndex >= 0) {
                 mapState.routeEditCursor = existingIndex;
+                const pathIndex = mapState.draftPath.findIndex(x => x.kind === 'stop' && String(x.stopId) === sid);
+                if (pathIndex >= 0) mapState.routeEditPathCursor = pathIndex;
                 const route = gameState.routes.find(r => String(r.id) === String(mapState.selectedRouteId));
                 mapSetStatus(route
-                    ? `📍 Выбрана остановка «${stop.name}». Новые остановки добавятся после неё. Нажми «Построить по дорогам».`
+                    ? `📍 Выбрана остановка «${stop.name}». Можно поставить 🎯 путевую точку, затем выбрать следующую остановку.`
                     : `📍 Выбрана остановка №${existingIndex + 1}: ${stop.name}`);
                 renderMapDraftInfo();
                 refreshRouteChooseButtons();
                 return;
             }
 
-            // Для нового маршрута добавляем точку в конец.
-            // Для существующего — сразу после выбранной пользователем точки.
+            // Добавляем новую остановку строго после текущего path-курсора.
+            // Поэтому цепочка может выглядеть так: Остановка 5 → КП1 → КП2 → Остановка 6.
             let insertIndex = mapState.draftStopIds.length;
             if (Number.isInteger(mapState.routeEditCursor) && mapState.routeEditCursor >= 0) {
                 insertIndex = Math.min(mapState.routeEditCursor + 1, mapState.draftStopIds.length);
             }
-
             mapState.draftStopIds.splice(insertIndex, 0, stop.id);
 
-            // В pathNodes контрольные точки сохраняем, а остановку вставляем рядом с выбранной точкой.
             let pathInsert = mapState.draftPath.length;
-            const stopPositions = [];
-            mapState.draftPath.forEach((node, i) => {
-                if (node.kind === 'stop') stopPositions.push({i, id:String(node.stopId)});
-            });
-            if (insertIndex < stopPositions.length) pathInsert = stopPositions[insertIndex].i;
-            else if (stopPositions.length) pathInsert = stopPositions[stopPositions.length - 1].i + 1;
+            if (Number.isInteger(mapState.routeEditPathCursor) && mapState.routeEditPathCursor >= 0) {
+                pathInsert = Math.min(mapState.routeEditPathCursor + 1, mapState.draftPath.length);
+            } else {
+                const stopPositions = [];
+                mapState.draftPath.forEach((node, i) => {
+                    if (node.kind === 'stop') stopPositions.push({i, id:String(node.stopId)});
+                });
+                if (insertIndex < stopPositions.length) pathInsert = stopPositions[insertIndex].i;
+                else if (stopPositions.length) pathInsert = stopPositions[stopPositions.length - 1].i + 1;
+            }
             mapState.draftPath.splice(pathInsert, 0, {kind:'stop', stopId:stop.id});
 
             mapState.routeEditCursor = insertIndex;
+            mapState.routeEditPathCursor = pathInsert;
             renderMapDraftInfo();
             refreshRouteChooseButtons();
-            mapSetStatus(`➕ Остановка добавлена №${insertIndex + 1}: ${stop.name}. Следующую можно выбрать — маршрут удалять не нужно.`);
+            mapSetStatus(`➕ Остановка добавлена №${insertIndex + 1}: ${stop.name}. Следующую 🎯 путевую точку можно поставить прямо сейчас.`);
         }
 
         function removeDraftStop(index) {
@@ -1554,6 +1576,11 @@
             mapState.draftStopIds.splice(index,1);
             const pos=mapState.draftPath.findIndex(x=>x.kind==='stop' && String(x.stopId)===String(id));
             if(pos>=0) mapState.draftPath.splice(pos,1);
+            if (Number.isInteger(mapState.routeEditPathCursor)) {
+                if (mapState.routeEditPathCursor > pos) mapState.routeEditPathCursor--;
+                else if (mapState.routeEditPathCursor === pos) mapState.routeEditPathCursor = Math.max(0, pos - 1);
+                if (!mapState.draftPath.length) mapState.routeEditPathCursor = null;
+            }
             if (Number.isInteger(mapState.routeEditCursor)) {
                 if (mapState.routeEditCursor > index) mapState.routeEditCursor--;
                 else if (mapState.routeEditCursor === index) mapState.routeEditCursor = Math.max(0, index - 1);
@@ -1591,6 +1618,11 @@
         }
         function clearControlPoints(){
             mapState.draftPath=mapState.draftPath.filter(x=>x.kind!=='control');
+            if (Number.isInteger(mapState.routeEditCursor)) {
+                const sid = mapState.draftStopIds[mapState.routeEditCursor];
+                const p = mapState.draftPath.findIndex(x => x.kind === 'stop' && String(x.stopId) === String(sid));
+                mapState.routeEditPathCursor = p >= 0 ? p : (mapState.draftPath.length ? mapState.draftPath.length - 1 : null);
+            }
             renderMapDraftInfo();
             renderControlPoints();
             mapSetStatus('Контрольные точки очищены');
@@ -1600,6 +1632,9 @@
             mapState.draftStopIds = [];
             mapState.draftPath = [];
             mapState.routeEditCursor = null;
+            mapState.routeEditPathCursor = null;
+            mapState.routeEditCursor = null;
+            mapState.routeEditPathCursor = null;
             renderMapDraftInfo(); renderControlPoints();
             mapSetStatus('Точки маршрута очищены');
         }
@@ -1902,6 +1937,7 @@ out body;
             mapState.selectedRouteId = routeId || null;
             mapState.creatingNewRoute = false;
             mapState.routeEditCursor = null;
+            mapState.routeEditPathCursor = null;
             clearRouteDraft();
             if (routeId) {
                 const route = gameState.routes.find(r => String(r.id) === String(routeId));
@@ -1914,6 +1950,7 @@ out body;
                         : mapState.draftStopIds.map(id => ({kind:'stop',stopId:id}));
                     // По умолчанию новые остановки добавляются в конец существующего маршрута.
                     mapState.routeEditCursor = Math.max(0, mapState.draftStopIds.length - 1);
+                    mapState.routeEditPathCursor = mapState.draftPath.length ? mapState.draftPath.length - 1 : null;
                     renderMapDraftInfo(); renderControlPoints();
                     mapSetStatus(`✏️ Маршрут №${route.number} загружен. Нажми на любую уже выбранную остановку, чтобы продолжить маршрут от неё.`);
                 }
