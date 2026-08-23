@@ -102,12 +102,17 @@
     catch(e){console.error(e); status('Не удалось запустить интерактивный модуль.',true); return;}
 
     const initGame=()=>{
+      if(typeof window.__BUSPHOTO_INIT_INTERACTIVE_GAME__!=='function' || window.__BUSPHOTO_GAME_INITIALIZED__) return;
       try{
-        if(typeof window.__BUSPHOTO_INIT_INTERACTIVE_GAME__==='function' && !window.__BUSPHOTO_GAME_INITIALIZED__){
-          window.__BUSPHOTO_GAME_INITIALIZED__=true;
-          window.__BUSPHOTO_INIT_INTERACTIVE_GAME__();
-        }
-      }catch(e){console.error('[BUSPHOTO] game init failed',e);}
+        window.__BUSPHOTO_INIT_INTERACTIVE_GAME__();
+        window.__BUSPHOTO_GAME_INITIALIZED__=true;
+        console.info('[BUSPHOTO] game initialized');
+      }catch(e){
+        console.error('[BUSPHOTO] game init failed',e);
+        window.__BUSPHOTO_GAME_INITIALIZED__=false;
+        // Инициализация не должна блокировать загрузку карты/разделов.
+        setTimeout(initGame,1200);
+      }
     };
 
     // Карту не загружаем целиком при старте: её HTML и 10k+ остановок не должны

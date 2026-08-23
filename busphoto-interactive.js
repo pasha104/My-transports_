@@ -2138,19 +2138,25 @@ function rebuildMapStopsIndex(stops) {
         }
 
         function regionAreaQuery(region) {
-            // В OSM административные районы часто хранятся как relation, а не
-            // как готовая area. map_to_area делает из relation рабочую область и
-            // поэтому не даёт ошибку «0 остановок» для районов Беларуси.
-            const relParts = region.areaNames.map(name => `rel["boundary"="administrative"]["name"="${name}"]; rel["boundary"="administrative"]["name:ru"="${name}"];`).join('\n');
-            return `[out:json][timeout:60];\n(\n${relParts}\n)->.regionRelations;\n.regionRelations map_to_area -> .regionAreas;\n(\n  node(area.regionAreas)["highway"="bus_stop"];\n  node(area.regionAreas)["public_transport"="platform"];\n  node(area.regionAreas)["public_transport"="stop_position"];\n);\nout tags qt;`;
+            // Надёжный вариант: ищем административную relation по имени и
+            // превращаем её в area. Используется как резерв, если Nominatim
+            // не дал прямой OSM ID.
+            const relParts = region.areaNames.map(name =>
+                `rel["boundary"="administrative"]["name"="${name}"]; rel["boundary"="administrative"]["name:ru"="${name}"]; rel["boundary"="administrative"]["name:be"="${name}"];`
+            ).join('\n');
+            return `[out:json][timeout:35];\n(\n${relParts}\n)->.regionRelations;\n.regionRelations map_to_area -> .regionAreas;\n(\n  node(area.regionAreas)["highway"="bus_stop"];\n  node(area.regionAreas)["public_transport"="platform"];\n  node(area.regionAreas)["public_transport"="stop_position"];\n);\nout tags qt;`;
+        }
+
+        function regionAreaByOsmIdQuery(osmType, osmId) {
+            const n = Number(osmId);
+            if (!Number.isFinite(n)) throw new Error('Некорректный OSM ID региона');
+            // Для relation area-id = 3600000000 + relation id.
+            const areaId = osmType === 'relation' ? (3600000000 + n) : n;
+            return `[out:json][timeout:35];\n(\n  node(area:${areaId})["highway"="bus_stop"];\n  node(area:${areaId})["public_transport"="platform"];\n  node(area:${areaId})["public_transport"="stop_position"];\n);\nout tags qt;`;
         }
 
         function regionBBoxQuery(b) {
-            return `[out:json][timeout:45];(
-  node["highway"="bus_stop"](${b.south},${b.west},${b.north},${b.east});
-  node["public_transport"="platform"](${b.south},${b.west},${b.north},${b.east});
-  node["public_transport"="stop_position"](${b.south},${b.west},${b.north},${b.east});
-);out tags qt;`;
+            return `[out:json][timeout:30];(\n  node["highway"="bus_stop"](${b.south},${b.west},${b.north},${b.east});\n  node["public_transport"="platform"](${b.south},${b.west},${b.north},${b.east});\n  node["public_transport"="stop_position"](${b.south},${b.west},${b.north},${b.east});\n);out tags qt;`;
         }
 
         function saveRegionBboxCache() {
@@ -2159,19 +2165,46 @@ function rebuildMapStopsIndex(stops) {
 
         async function geocodeRegionBBox(region) {
             if (stopRegionBboxCache[region.id]) return stopRegionBboxCache[region.id];
-            const q = region.id === 'by-minsk-city' ? 'Минск, Беларусь' : `${region.name}, Беларусь`;
-            const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=by&accept-language=ru&q=' + encodeURIComponent(q);
-            const response = await fetch(url, {cache:'default', headers:{'Accept':'application/json'}});
+            const isRussia = String(region.oblast || '').startsWith('Россия');
+            const country = isRussia ? 'Россия' : 'Беларусь';
+            let q;
+            if (region.id === 'by-minsk-city') q = 'Минск, Беларусь';
+            else if (region.oblast && !region.oblast.startsWith('Минск') && !region.oblast.startsWith('Россия')) q = `${region.name}, ${region.oblast}, ${country}`;
+            else q = `${region.name}, ${country}`;
+            const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&countrycodes=' + (isRussia ? 'ru' : 'by') + '&accept-language=ru&q=' + encodeURIComponent(q);
+            const response = await fetch(url, {cache:'default', headers:{'Accept':'application/json','Accept-Language':'ru'}});
             if (!response.ok) throw new Error('Nominatim HTTP ' + response.status);
             const data = await response.json();
-            const item = Array.isArray(data) ? data[0] : null;
+            const candidates = Array.isArray(data) ? data : [];
+            // Сначала предпочитаем administrative relation, затем любой результат
+            // с адекватным bbox. Это важно для районов, у которых имя совпадает с городом.
+            const item = candidates.find(x => x && x.osm_type === 'relation' && Array.isArray(x.boundingbox)) || candidates.find(x => Array.isArray(x.boundingbox));
             if (!item || !Array.isArray(item.boundingbox) || item.boundingbox.length !== 4) throw new Error('Регион не найден через Nominatim');
             const bb = item.boundingbox.map(Number);
             if (bb.some(v => !Number.isFinite(v))) throw new Error('Некорректные границы региона');
-            const box = {south:bb[0], north:bb[1], west:bb[2], east:bb[3]};
+            const box = {south:bb[0], north:bb[1], west:bb[2], east:bb[3], osmType:item.osm_type || null, osmId:item.osm_id || null, displayName:item.display_name || ''};
             stopRegionBboxCache[region.id] = box;
             saveRegionBboxCache();
             return box;
+        }
+
+        function splitRegionBBox(b, maxTiles = 16) {
+            const latSpan = Math.max(0.01, b.north - b.south);
+            const lonSpan = Math.max(0.01, b.east - b.west);
+            const total = Math.max(latSpan, lonSpan);
+            // Не отправляем весь Минск/район одним огромным запросом.
+            // Цель — небольшие bbox, которые Overpass стабильно отдаёт с телефона.
+            const parts = total > 1.2 ? 5 : total > 0.7 ? 4 : total > 0.35 ? 3 : total > 0.16 ? 2 : 1;
+            const out = [];
+            for (let yi=0; yi<parts; yi++) for (let xi=0; xi<parts; xi++) {
+                out.push({
+                    south:b.south + latSpan*yi/parts,
+                    north:b.south + latSpan*(yi+1)/parts,
+                    west:b.west + lonSpan*xi/parts,
+                    east:b.west + lonSpan*(xi+1)/parts
+                });
+            }
+            return out.slice(0, maxTiles);
         }
 
         function normalizeIncomingStops(data, region) {
@@ -2196,61 +2229,89 @@ function rebuildMapStopsIndex(stops) {
             }
 
             mapSetStatus(`Загружаю остановки: ${region.name}…`);
-            const endpoints = ['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+            const endpoints = ['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.private.coffee/api/interpreter'];
             let lastError = null;
+            let incomingAll = [];
 
             async function tryQuery(body, kind) {
                 for (const endpoint of endpoints) {
-                    try {
-                        const response = await fetch(endpoint, {
-                            method:'POST',
-                            headers:{'Content-Type':'text/plain;charset=UTF-8','Accept':'application/json'},
-                            body,
-                            cache:'default'
-                        });
-                        if (!response.ok) throw new Error('HTTP '+response.status);
-                        const data = await response.json();
-                        const incoming = normalizeIncomingStops(data, region);
-                        if (!incoming.length) {
+                    // На мобильных браузерах POST к Overpass иногда падает на
+                    // сетевом preflight/соединении. Поэтому для каждого сервера
+                    // пробуем POST, а затем обычный GET — без CORS-preflight.
+                    const attempts = [
+                        {method:'POST', url:endpoint, options:{headers:{'Content-Type':'text/plain;charset=UTF-8','Accept':'application/json'}, body, cache:'default'}},
+                        {method:'GET', url:endpoint+'?data='+encodeURIComponent(body), options:{headers:{'Accept':'application/json'}, cache:'default'}}
+                    ];
+                    for (const attempt of attempts) {
+                        const controller = new AbortController();
+                        const timer = setTimeout(() => controller.abort(), 18000);
+                        try {
+                            const response = await fetch(attempt.url, Object.assign({}, attempt.options, {method:attempt.method, signal:controller.signal}));
+                            if (!response.ok) throw new Error(`${kind}: HTTP ${response.status}`);
+                            const data = await response.json();
+                            const incoming = normalizeIncomingStops(data, region);
+                            if (incoming.length) return incoming;
                             lastError = new Error(`${kind}: OSM вернул 0 остановок`);
-                            continue;
+                        } catch (err) {
+                            console.warn('OSM region endpoint failed', kind, attempt.method, endpoint, err);
+                            lastError = err;
+                        } finally {
+                            clearTimeout(timer);
                         }
-                        const existing = getMapStops();
-                        const kept = existing.filter(s => s.source !== 'osm' || s.regionId !== region.id);
-                        const cleaned = dedupeMapStops(kept.concat(incoming));
-                        saveMapStops(cleaned);
-                        stopRegionCache[region.id] = {count:incoming.length, loadedAt:new Date().toISOString(), name:region.name};
-                        persistStopRegionCache();
-                        initStopRegionSelect();
-                        renderMapStops();
-                        renderMapStopList();
-                        mapSetStatus(`Готово: ${region.name} · ${incoming.length.toLocaleString('ru-RU')} остановок, сохранено ${cleaned.length.toLocaleString('ru-RU')} остановок.`);
-                        return true;
-                    } catch (err) {
-                        console.warn('OSM region endpoint failed', kind, endpoint, err);
-                        lastError = err;
                     }
                 }
-                return false;
+                return null;
             }
 
-            // 1. Самый дешёвый вариант: найти административную область напрямую.
-            // Если он работает, никаких дополнительных запросов к Nominatim нет.
-            if (await tryQuery(regionAreaQuery(region), 'area')) return;
 
-            // 2. Надёжный резерв: один раз получаем bbox региона через Nominatim,
-            // сохраняем его локально и уже по bbox ищем только остановки.
-            try {
-                const bbox = await geocodeRegionBBox(region);
-                if (await tryQuery(regionBBoxQuery(bbox), 'bbox')) return;
-            } catch (e) {
-                console.warn('[BUSPHOTO] bbox fallback unavailable', e);
-                lastError = e;
+            // 1) Сначала получаем точную OSM relation через Nominatim. Это надёжнее,
+            // чем угадывать русское/белорусское имя relation в Overpass.
+            let geo = null;
+            try { geo = await geocodeRegionBBox(region); } catch (e) { lastError = e; }
+
+            if (geo?.osmType && geo?.osmId) {
+                const byArea = await tryQuery(regionAreaByOsmIdQuery(geo.osmType, geo.osmId), 'OSM area');
+                if (byArea?.length) incomingAll = byArea;
+            }
+
+            // 2) Если area недоступна/пустая, делим bbox на небольшие части.
+            // Это значительно снижает вероятность таймаута Overpass на больших районах.
+            if (!incomingAll.length && geo) {
+                const tiles = splitRegionBBox(geo);
+                const results = [];
+                // Не отправляем много запросов одновременно: максимум 2, чтобы не нагружать OSM.
+                for (let i=0; i<tiles.length; i+=2) {
+                    const batch = tiles.slice(i, i+2);
+                    const batchResults = await Promise.all(batch.map(tile => tryQuery(regionBBoxQuery(tile), 'bbox')));
+                    batchResults.forEach(r => { if (r?.length) results.push(...r); });
+                }
+                incomingAll = dedupeMapStops(results);
+            }
+
+            // 3) Последний резерв — старый поиск relation по имени. Он нужен для редких
+            // случаев, когда геокодер не вернул OSM ID, но relation в Overpass есть.
+            if (!incomingAll.length) {
+                const byName = await tryQuery(regionAreaQuery(region), 'area-name');
+                if (byName?.length) incomingAll = byName;
+            }
+
+            if (incomingAll.length) {
+                const existing = getMapStops();
+                const kept = existing.filter(s => s.source !== 'osm' || s.regionId !== region.id);
+                const cleaned = dedupeMapStops(kept.concat(incomingAll));
+                saveMapStops(cleaned);
+                stopRegionCache[region.id] = {count:incomingAll.length, loadedAt:new Date().toISOString(), name:region.name};
+                persistStopRegionCache();
+                initStopRegionSelect();
+                renderMapStops();
+                renderMapStopList();
+                mapSetStatus(`Готово: ${region.name} · ${incomingAll.length.toLocaleString('ru-RU')} остановок, сохранено ${cleaned.length.toLocaleString('ru-RU')} остановок.`);
+                return;
             }
 
             console.error(lastError);
             mapSetStatus(`Не удалось загрузить ${region.name}.`);
-            alert(`Не удалось загрузить остановки региона «${region.name}». Попробуй ещё раз позже. Регион не помечен как загруженный и «0 остановок» не сохраняется.`);
+            alert(`Не удалось загрузить остановки региона «${region.name}». OSM/Overpass сейчас не ответил. Данные не помечены как «0 остановок», поэтому можно безопасно повторить попытку.`);
         }
 
         function clearSelectedStopRegion() {
@@ -4088,7 +4149,8 @@ out body;
 
             const now = new Date();
             const gc = typeof getGameClock === 'function' ? getGameClock(now.getTime()) : {hour:now.getHours(),minute:now.getMinutes()};
-            badge.textContent = `${String(gc.hour).padStart(2,'0')}:${String(gc.minute).padStart(2,'0')}` +
+            const badge = document.getElementById('gameClockBadge');
+            if (badge) badge.textContent = `${String(gc.hour).padStart(2,'0')}:${String(gc.minute).padStart(2,'0')}` +
                 (gc.hour >= 12 ? ' • начисление сегодня выполнено/ожидается' : ' • следующее начисление в 12:00');
 
             updateGameModelSelect();
