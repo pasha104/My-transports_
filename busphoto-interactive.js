@@ -1198,47 +1198,35 @@ function rebuildMapStopsIndex(stops) {
                 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
             ];
             leafletLoadPromise = new Promise((resolve, reject) => {
-                let index = 0;
-                const addCss = () => {
-                    if (!document.querySelector('link[data-busphoto-leaflet]')) {
-                        const css = document.createElement('link');
-                        css.rel = 'stylesheet';
-                        css.href = cssSources[0];
-                        css.dataset.busphotoLeaflet = '1';
-                        document.head.appendChild(css);
-                    }
+                let settled = false, failed = 0;
+                const finish = (ok, value) => {
+                    if (settled) return;
+                    if (ok) { settled = true; resolve(value); }
+                    else if (++failed >= sources.length) { settled = true; leafletLoadPromise = null; reject(new Error('Leaflet load failed')); }
                 };
-                const tryNext = () => {
-                    if (window.L) return resolve(window.L);
-                    if (index >= sources.length) {
-                        leafletLoadPromise = null;
-                        return reject(new Error('Leaflet load failed'));
-                    }
-                    const src = sources[index++];
+                // CSS: подключаем сразу два CDN, но ждём только JS для старта карты.
+                cssSources.forEach((href, i) => {
+                    if (document.querySelector(`link[data-busphoto-leaflet=\"${i}\"]`)) return;
+                    const css = document.createElement('link');
+                    css.rel = 'stylesheet'; css.href = href;
+                    css.dataset.busphotoLeaflet = String(i);
+                    document.head.appendChild(css);
+                });
+                sources.forEach((src) => {
                     const script = document.createElement('script');
-                    script.src = src;
-                    script.async = true;
-                    let timer = setTimeout(() => {
-                        script.remove();
-                        tryNext();
-                    }, 7000);
+                    script.src = src; script.async = true;
+                    const timer = setTimeout(() => { script.remove(); finish(false); }, 3500);
                     script.onload = () => {
                         clearTimeout(timer);
-                        if (window.L) resolve(window.L);
-                        else tryNext();
+                        if (window.L) finish(true, window.L); else finish(false);
                     };
-                    script.onerror = () => {
-                        clearTimeout(timer);
-                        script.remove();
-                        tryNext();
-                    };
+                    script.onerror = () => { clearTimeout(timer); script.remove(); finish(false); };
                     document.head.appendChild(script);
-                };
-                addCss();
-                tryNext();
+                });
             });
             return leafletLoadPromise;
         }
+        window.ensureLeafletLoaded = ensureLeafletLoaded;
         function mapSetStatus(text) {
             const el = document.getElementById('mapStatus');
             if (el) el.textContent = text;
@@ -1274,23 +1262,18 @@ function rebuildMapStopsIndex(stops) {
             });
             mapState.initialized = true;
 
-            // Автоматически чистим старые дубли, которые могли сохраниться до обновления версии.
+            // Не разбираем/дедуплицируем тысячи остановок в критическом пути.
+            // getMapStops() уже один раз читает localStorage и строит пространственный
+            // индекс; повторная полная обработка при каждом открытии карты не нужна.
             const storedStops = getMapStops();
-            const normalizedStops = dedupeMapStops(storedStops);
-            if (normalizedStops.length !== storedStops.length) saveMapStops(normalizedStops);
-            renderMapStops();
-            renderMapStopList();
-            renderMapRouteLayers();
+            mapSetStatus('Карта готова');
             renderMapRouteControls();
             initStopRegionSelect();
 
-            // Не скачиваем весь Минск при первом открытии карты. Сначала карта
-            // появляется мгновенно, затем в фоне подгружаются только видимые
-            // квадраты остановок. Полную область по-прежнему можно загрузить
-            // вручную через селектор региона.
-            scheduleQuickStopLoad();
-
-            setTimeout(() => mapState.map.invalidateSize({pan:false}), 100);
+            // Остановки и список будут отрисованы renderMapIfReady() после первого
+            // кадра. Если кэша остановок нет, догружаем только видимые квадраты.
+            if (!storedStops.length) setTimeout(scheduleQuickStopLoad, 250);
+            setTimeout(() => mapState.map && mapState.map.invalidateSize({pan:false}), 120);
             startMapBusAnimation();
         }
 
@@ -3426,13 +3409,21 @@ out body;
             if (!document.getElementById('routeMap')) return;
             await initRouteMap();
             if (!mapState.map) return;
+            // Критический путь: только карта и лёгкие элементы.
             renderMapRouteControls();
             renderMapTrackerSelect();
             renderMapStops();
-            renderMapRouteLayers();
             renderMapDraftInfo();
             renderMapBusList();
             startMapBusAnimation();
+            // Тяжёлые слои/список остановок после первого кадра.
+            const idle = () => {
+                if (!mapState.map) return;
+                renderMapRouteLayers();
+                renderMapStopList();
+            };
+            if ('requestIdleCallback' in window) requestIdleCallback(idle, {timeout: 1200});
+            else setTimeout(idle, 120);
         }
 
         function showGameSection(section, btn) {

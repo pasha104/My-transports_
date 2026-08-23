@@ -110,6 +110,15 @@
       }catch(e){console.error('[BUSPHOTO] game init failed',e);}
     };
 
+    // Карта — приоритетный раздел: начинаем загружать её сразу после основного JS,
+    // чтобы при нажатии кнопки не ждать очередь из гаража/финансов/истории.
+    loadOne('map',{timeout:5000}).catch(e=>console.warn('[BUSPHOTO] map preload',e));
+    // Leaflet тоже подготавливаем в фоне. Это не блокирует интерфейс, но при
+    // первом открытии карты библиотека уже будет в памяти, если сеть позволяет.
+    if (typeof window.ensureLeafletLoaded === 'function') {
+      Promise.resolve().then(()=>window.ensureLeafletLoaded()).catch(()=>{});
+    }
+
     // Shop is not allowed to block the page. Once its controls arrive, initialize
     // the game against the real shared localStorage state.
     loadOne('shop',{timeout:8000}).then(initGame).catch(e=>{
@@ -126,7 +135,7 @@
     }
 
     // Background loading never blocks the main screen.
-    const rest=['garage','finance','history','routes','map','rules','dispatch','stats','maintenance'];
+    const rest=['garage','finance','history','routes','rules','dispatch','stats','maintenance'];
     let i=0;
     const next=()=>{
       if(i>=rest.length)return;
