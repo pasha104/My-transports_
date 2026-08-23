@@ -110,11 +110,8 @@
       }catch(e){console.error('[BUSPHOTO] game init failed',e);}
     };
 
-    // Карта — приоритетный раздел: начинаем загружать её сразу после основного JS,
-    // чтобы при нажатии кнопки не ждать очередь из гаража/финансов/истории.
-    loadOne('map',{timeout:5000}).catch(e=>console.warn('[BUSPHOTO] map preload',e));
-    // Leaflet тоже подготавливаем в фоне. Это не блокирует интерфейс, но при
-    // первом открытии карты библиотека уже будет в памяти, если сеть позволяет.
+    // Карту не загружаем целиком при старте: её HTML и 10k+ остановок не должны
+    // нагружать главный экран. Подготавливаем только Leaflet в фоне.
     if (typeof window.ensureLeafletLoaded === 'function') {
       Promise.resolve().then(()=>window.ensureLeafletLoaded()).catch(()=>{});
     }
