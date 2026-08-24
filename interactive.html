@@ -2,12 +2,12 @@
 
 <html lang="ru">
 <head>
-<link href="busphoto-common.css?v=20260822-v77" rel="stylesheet"/>
-<link href="busphoto-interactive.css?v=20260822-v77" rel="stylesheet"/>
+<link href="busphoto-common.css?v=20260823-v81" rel="stylesheet"/>
+<link href="busphoto-interactive.css?v=20260823-v81" rel="stylesheet"/>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>BUSPHOTO — Интерактивный транспортный бизнес</title>
-<script defer="" src="busphoto-common.js?v=20260822-v77"></script>
+<script defer="" src="busphoto-common.js?v=20260823-v81"></script>
 
 <style id="v43-features">
 #dispatcherPanel,#vehicleStatsPanel,#maintenancePanel{display:flex;flex-direction:column;gap:8px}
@@ -16,7 +16,7 @@
 }
 @media(max-width:600px){#dispatcherPanel .interactive-log-row,#vehicleStatsPanel .interactive-log-row,#maintenancePanel .interactive-log-row{flex-direction:column;align-items:stretch}}
 </style>
-<script defer="True" src="interactive-loader.js?v=20260822-v79"></script></head>
+<script defer="True" src="interactive-loader.js?v=20260823-v81"></script></head>
 <body class="light-theme">
 <header>
 <div>
@@ -58,9 +58,9 @@
 <div id="interactive-section-host-routes"></div>
 <div id="interactive-section-host-map"></div>
 <div id="interactive-rules-host"></div>
-<div id="interactive-section-host-dispatch"></div>
-<div id="interactive-section-host-stats"></div>
-<div id="interactive-section-host-maintenance"></div>
+<div id="interactive-section-host-dispatch"><div class="game-section" id="game-section-dispatch"><div class="interactive-card"><h3>🚦 Диспетчерская</h3><div id="dispatcherPanel"></div></div></div></div>
+<div id="interactive-section-host-stats"><div class="game-section" id="game-section-stats"><div class="interactive-card"><h3>📊 Статистика ТС</h3><div id="vehicleStatsPanel"></div></div></div></div>
+<div id="interactive-section-host-maintenance"><div class="game-section" id="game-section-maintenance"><div class="interactive-card"><h3>🔧 Состояние ТС и обслуживание</h3><div id="maintenancePanel"></div></div></div></div>
 </div></div>
 </body>
 </html>

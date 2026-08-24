@@ -5,7 +5,7 @@
   'use strict';
   if (window.__BUSPHOTO_INTERACTIVE_LOADER_V78__) return;
   window.__BUSPHOTO_INTERACTIVE_LOADER_V78__ = true;
-  const VERSION='20260822-v79';
+  const VERSION='20260823-v82';
   const sections=[
     ['menu','interactive-menu.html','interactive-menu-host'],
     ['map','interactive-map.html','interactive-section-host-map'],
@@ -22,9 +22,13 @@
   const byName=Object.fromEntries(sections.map(x=>[x[0],x]));
   const loaded=new Set(), loading=new Map();
   function status(text,error){const el=document.getElementById('interactiveLoadingStatus'); if(!el)return; el.textContent=text; el.style.display=''; el.style.borderColor=error?'#d32f2f':'';}
-  function fetchWithTimeout(url,ms){
+  async function fetchWithTimeout(url,ms){
     const c=new AbortController(); const t=setTimeout(()=>c.abort(),ms);
-    return fetch(url,{cache:'default',credentials:'same-origin',signal:c.signal}).finally(()=>clearTimeout(t));
+    try {
+      return await fetch(url,{cache:'default',credentials:'same-origin',signal:c.signal});
+    } finally {
+      clearTimeout(t);
+    }
   }
   async function loadOne(name,opts={}){
     const item=byName[name]; if(!item)return false;
@@ -33,6 +37,12 @@
     const promise=(async()=>{
       const host=document.getElementById(hostId);
       if(!host)throw new Error('Host not found: '+hostId);
+      // Некоторые лёгкие разделы встроены в interactive.html, чтобы они были
+      // доступны даже при медленном соединении. Не скачиваем их повторно.
+      if(host.querySelector('#game-section-'+name)){
+        loaded.add(name);
+        return true;
+      }
       host.replaceChildren();
       const r=await fetchWithTimeout(file+'?v='+VERSION,opts.timeout||8000);
       if(!r.ok)throw new Error(file+' HTTP '+r.status);
@@ -108,10 +118,10 @@
         window.__BUSPHOTO_GAME_INITIALIZED__=true;
         console.info('[BUSPHOTO] game initialized');
       }catch(e){
-        console.error('[BUSPHOTO] game init failed',e);
+        // Не запускаем бесконечный цикл повторов: он только создавал лавину ошибок.
         window.__BUSPHOTO_GAME_INITIALIZED__=false;
-        // Инициализация не должна блокировать загрузку карты/разделов.
-        setTimeout(initGame,1200);
+        console.error('[BUSPHOTO] game init failed', e?.stack || e);
+        status('Интерактив запущен частично. Открой раздел ещё раз.',true);
       }
     };
 
@@ -123,11 +133,12 @@
 
     // Shop is not allowed to block the page. Once its controls arrive, initialize
     // the game against the real shared localStorage state.
-    loadOne('shop',{timeout:8000}).then(initGame).catch(e=>{
-      console.warn('[BUSPHOTO] shop deferred',e);
-      // The rest of the UI is still usable; retry once after a short delay.
-      setTimeout(()=>loadOne('shop',{timeout:8000}).then(initGame).catch(()=>{}),1500);
-    });
+    // Инициализируем игру сразу. Все функции теперь терпимы к отсутствующим
+    // фрагментам DOM, поэтому магазин/гараж/карта больше не могут заблокировать init.
+    initGame();
+    loadOne('shop',{timeout:8000}).then(()=>{
+      if(!window.__BUSPHOTO_GAME_INITIALIZED__) initGame();
+    }).catch(e=>console.warn('[BUSPHOTO] shop deferred',e));
 
     const st=document.getElementById('interactiveLoadingStatus'); if(st)st.style.display='none';
     const p=window.__BUSPHOTO_PENDING_SECTION__;
@@ -137,7 +148,7 @@
     }
 
     // Background loading never blocks the main screen.
-    const rest=['garage','finance','history','routes','rules','dispatch','stats','maintenance'];
+    const rest=['garage','finance','history','routes','rules'];
     let i=0;
     const next=()=>{
       if(i>=rest.length)return;
