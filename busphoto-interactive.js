@@ -386,6 +386,7 @@ function rebuildMapStopsIndex(stops) {
             gameState.routes = gameState.routes.filter(r => r.routeType !== 'tram');
             gameState.owned = gameState.owned.filter(v => v.category !== 'tram');
             gameState.owned.forEach(v => {
+                if (!Number.isFinite(Number(v.payoutDistanceMeters)) || Number(v.payoutDistanceMeters) < 0) v.payoutDistanceMeters = 0;
                 if (!v.depot) v.depot = DEPOTS[v.category] ? DEPOTS[v.category].id : 'ap5';
                 // Номер зависит от типа ТС: троллейбусу нужен только бортовой номер,
                 // автобусу/электробусу — только госномер. Старые лишние поля удаляем.
@@ -974,7 +975,7 @@ function rebuildMapStopsIndex(stops) {
             saveGameState();
             document.getElementById('mapNewRouteNumber').value=''; document.getElementById('mapNewRouteName').value='';
             renderInteractive(); renderMapRouteControls(); renderMapRouteLayers();
-            mapSetStatus(`Создан ${routeTypeLabel(type)} №${number}. Строю линию…`);
+            mapSetStatus(`✅ Создан ${routeTypeLabel(type)} №${number}. Строю линию…`);
             // Сразу строим дорожную геометрию для маршрута, созданного из карты.
             // Раньше такой маршрут сохранялся без distance/geometry, из-за чего в списке
             // появлялось «нет расчёта», хотя остановки уже были выбраны.
@@ -982,16 +983,16 @@ function rebuildMapStopsIndex(stops) {
                 await buildSelectedRoute();
             } catch (e) {
                 console.warn('Автоматическая постройка маршрута не удалась', e);
-            } finally {
-                // После создания маршрута черновик очищаем.
-                // Иначе при создании второго направления (например, №23 обратно)
-                // уже выбранные остановки первого направления считались бы выбранными
-                // и повторно нажать на них было невозможно.
-                mapState.draftStopIds = [];
-                mapState.draftPath = [];
-                renderMapDraftInfo(); renderControlPoints();
-                renderMapStops();
+                saveGameState();
+                renderInteractive(); renderMapRouteControls(); renderMapRouteLayers();
+                mapSetStatus(`⚠️ Маршрут №${number} создан, но дорожная линия пока не построена. Нажми «Построить по дорогам» ещё раз.`);
             }
+            // После создания маршрута черновик очищаем только ПОСЛЕ того, как объект
+            // уже сохранён. Ошибка OSRM не должна отменять создание маршрута.
+            mapState.draftStopIds = [];
+            mapState.draftPath = [];
+            renderMapDraftInfo(); renderControlPoints();
+            renderMapStops();
         }
 
         // Карточка ТС — основной источник расписания, если она создана для машины.
@@ -1821,8 +1822,8 @@ function rebuildMapStopsIndex(stops) {
                 else rest.push(stop);
             }
 
-            const maxMarkers = zoom >= 17 ? 320 : zoom >= 15 ? 240 : 150;
-            const cellPx = zoom >= 17 ? 30 : zoom >= 15 ? 34 : 42;
+            const maxMarkers = zoom >= 17 ? 220 : zoom >= 15 ? 160 : 110;
+            const cellPx = zoom >= 17 ? 42 : zoom >= 15 ? 50 : 60;
             const cells = new Map();
             const center = mapState.map.getCenter();
 
@@ -1894,7 +1895,7 @@ function rebuildMapStopsIndex(stops) {
             // Это намного дешевле, чем создавать 450+ DOM-маркеров после каждого клика.
             let draw = mapState.mode === 'route'
                 ? getRouteRenderStops(visible, zoom)
-                : visible.slice(0, zoom >= 17 ? 1800 : 1100);
+                : visible.slice(0, zoom >= 17 ? 700 : 450);
 
             const needed = new Map(draw.map(stop => [String(stop.id), stop]));
 
@@ -1908,17 +1909,29 @@ function rebuildMapStopsIndex(stops) {
 
             for (const stop of draw) {
                 const sid = String(stop.id);
-                if (mapState.stopMarkers.has(sid)) continue;
+                const existing = mapState.stopMarkers.get(sid);
+                if (existing) {
+                    const selectedNow = mapState.draftStopIds.some(id => String(id) === sid);
+                    existing.setStyle({
+                        radius: selectedNow ? 8 : 5,
+                        color: selectedNow ? '#ffd54a' : '#fff',
+                        weight: selectedNow ? 3 : 1.5
+                    });
+                    if (selectedNow && existing.bringToFront) existing.bringToFront();
+                    continue;
+                }
                 const color = stop.stopType === 'turnback' ? '#f39c12' : (stop.source === 'custom' ? '#8e44ad' : '#1769aa');
                 const selected = mapState.draftStopIds.some(id => String(id) === sid);
-                const size = selected ? 34 : 28;
-                const icon = L.divIcon({
-                    className:'route-stop-dom-icon',
-                    html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${selected ? 4 : 3}px solid ${selected ? '#ffd54a' : '#fff'};box-shadow:0 2px 6px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;box-sizing:border-box;"></div>`,
-                    iconSize:[size,size],
-                    iconAnchor:[size/2,size/2]
-                });
-                const marker=L.marker([stop.lat,stop.lon],{icon,keyboard:false,zIndexOffset:selected?1000:700}).addTo(mapState.map);
+                const marker = L.circleMarker([Number(stop.lat), Number(stop.lon)], {
+                    radius: selected ? 8 : 5,
+                    color: selected ? '#ffd54a' : '#fff',
+                    weight: selected ? 3 : 1.5,
+                    fillColor: color,
+                    fillOpacity: 0.92,
+                    bubblingMouseEvents: false,
+                    interactive: true
+                }).addTo(mapState.map);
+                if (selected) marker.bringToFront();
                 const stopKind=stop.stopType==='turnback'?'🔄 Пункт разворота · не конечная':'🚏 Остановочный пункт';
                 const deleteButton=stop.source==='custom'
                     ? `<br><button class="btn-secondary" style="margin-top:5px;width:100%;" onclick="deleteCustomMapStop('${sid.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">🗑️ Удалить остановку</button>`:'';
@@ -3118,19 +3131,27 @@ out body;
                             vehicle.health = 100;
                             vehicle.maintenanceDue = false;
                         }
-                        total+=100;
-                        // v43: статистика и состояние ТС обновляются при каждом прибытии.
+                        // Выплата теперь зависит от реально пройденного расстояния.
+                        // 5 км = 10 р. Остаток расстояния переносится на следующее прибытие.
+                        // Например: 4 км -> 0 р. и 4 км в остатке; затем ещё 1 км -> 10 р.
+                        const routeMeters = Math.max(0, Number(a.route.calculatedDistance || 0) || routeGeometryDistanceMeters(a.route) || (Number(a.route.distance || 0) * 1000));
+                        vehicle.payoutDistanceMeters = Math.max(0, Number(vehicle.payoutDistanceMeters || 0)) + routeMeters;
+                        const payoutBlocks = Math.floor(vehicle.payoutDistanceMeters / 5000);
+                        const arrivalPayout = payoutBlocks * 10;
+                        vehicle.payoutDistanceMeters = vehicle.payoutDistanceMeters % 5000;
+                        total += arrivalPayout;
+                        // Статистика и состояние ТС обновляются при каждом прибытии.
                         vehicle.stats = vehicle.stats || {trips:0, arrivals:0, distanceKm:0, workMinutes:0, earned:0};
                         vehicle.stats.trips = Number(vehicle.stats.trips||0) + 1;
                         vehicle.stats.arrivals = Number(vehicle.stats.arrivals||0) + 1;
-                        vehicle.stats.distanceKm = Number(vehicle.stats.distanceKm||0) + Number(a.route.calculatedDistance||0)/1000;
-                        vehicle.stats.earned = Number(vehicle.stats.earned||0) + 100;
+                        vehicle.stats.distanceKm = Number(vehicle.stats.distanceKm||0) + routeMeters/1000;
+                        vehicle.stats.earned = Number(vehicle.stats.earned||0) + arrivalPayout;
                         vehicle.health = Math.max(0, Number(vehicle.health ?? 100) - 0.10);
                         if (vehicle.health <= 20 && !vehicle.maintenanceDue) vehicle.maintenanceDue = true;
                         const t=new Date(a.ts).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
-                        const detail=`🕐 ${t} · ТС ${vehicle.model||'—'} · маршрут №${a.route.number||'—'} · прибытие на конечную · +100 р.`;
+                        const detail=`🕐 ${t} · ТС ${vehicle.model||'—'} · маршрут №${a.route.number||'—'} · прибытие на конечную · ${arrivalPayout>0?`+${arrivalPayout} р.`:'без выплаты'} · пройдено ${(routeMeters/1000).toFixed(2)} км · до следующей выплаты ${((5000-vehicle.payoutDistanceMeters)%5000/1000 || 0).toFixed(2)} км`;
                         gameState.log=gameState.log||[];
-                        gameState.log.unshift({date:localDateKey(new Date(a.ts)),time:t,type:'route-arrival',routeNumber:a.route.number||'—',arrivalTime:t,vehicleModel:vehicle.model||'—',total:100,details:[detail]});
+                        gameState.log.unshift({date:localDateKey(new Date(a.ts)),time:t,type:'route-arrival',routeNumber:a.route.number||'—',arrivalTime:t,vehicleModel:vehicle.model||'—',total:arrivalPayout,distanceKm:routeMeters/1000,payoutDistanceRemainderKm:vehicle.payoutDistanceMeters/1000,details:[detail]});
                     });
                     changed=true;
                 }
