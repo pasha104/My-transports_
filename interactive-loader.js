@@ -5,7 +5,7 @@
   'use strict';
   if (window.__BUSPHOTO_INTERACTIVE_LOADER_V78__) return;
   window.__BUSPHOTO_INTERACTIVE_LOADER_V78__ = true;
-  const VERSION='20260823-v82';
+  const VERSION='20260827-v103';
   const sections=[
     ['menu','interactive-menu.html','interactive-menu-host'],
     ['map','interactive-map.html','interactive-section-host-map'],
