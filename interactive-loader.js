@@ -1,9 +1,9 @@
-/* BUSPHOTO non-blocking modular loader v78 */
+/* BUSPHOTO non-blocking modular loader v79 */
 (function(){
 'use strict';
 if(window.__BUSPHOTO_INTERACTIVE_LOADER_V78__)return;
 window.__BUSPHOTO_INTERACTIVE_LOADER_V78__=true;
-const VERSION='20260828-v106';
+const VERSION='20260829-v107';
 const sections=[['menu','interactive-menu.html','interactive-menu-host'],['map','interactive-map.html','interactive-section-host-map'],['shop','interactive-shop.html','interactive-section-host-shop'],['garage','interactive-garage.html','interactive-section-host-garage'],['finance','interactive-finance.html','interactive-section-host-finance'],['history','interactive-history.html','interactive-section-host-history'],['routes','interactive-routes.html','interactive-section-host-routes'],['dispatch','interactive-dispatch.html','interactive-section-host-dispatch'],['stats','interactive-stats.html','interactive-section-host-stats'],['maintenance','interactive-maintenance.html','interactive-section-host-maintenance'],['sync','interactive-sync.html','interactive-section-host-sync'],['rules','interactive-rules.html','interactive-rules-host']];
 const byName=Object.fromEntries(sections.map(x=>[x[0],x])),loaded=new Set(),loading=new Map();
 function status(t,e){const x=document.getElementById('interactiveLoadingStatus');if(x){x.textContent=t;x.style.display='';x.style.borderColor=e?'#d32f2f':'';}}
