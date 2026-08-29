@@ -8,7 +8,7 @@
 <title>BUSPHOTO — Интерактивный транспортный бизнес</title>
 <script defer src="busphoto-common.js?v=20260823-v81"></script>
 <style id="v43-features">#dispatcherPanel,#vehicleStatsPanel,#maintenancePanel{display:flex;flex-direction:column;gap:8px}#dispatcherPanel .interactive-log-row,#vehicleStatsPanel .interactive-log-row,#maintenancePanel .interactive-log-row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:11px;border:1px solid var(--bp-border);border-radius:10px;background:var(--bp-panel)}@media(max-width:600px){#dispatcherPanel .interactive-log-row,#vehicleStatsPanel .interactive-log-row,#maintenancePanel .interactive-log-row{flex-direction:column;align-items:stretch}}</style>
-<script defer src="interactive-loader.js?v=20260828-v106"></script>
+<script defer src="interactive-loader.js?v=20260829-v107"></script>
 </head>
 <body class="light-theme">
 <header><div><span class="logo-box">BUSPHOTO</span><span id="header-subtitle" style="font-size:15px;font-weight:bold;margin-left:8px;">База данных ПС</span></div><div class="header-controls"><select aria-label="Язык" class="theme-toggle-btn language-select" id="headerLangSelect" onchange="changeLanguage(this.value)"><option value="ru">Русский (Русский)</option><option value="be">Беларуская (Белорусский)</option><option value="uk">Українська (Украинский)</option><option value="en">English (Английский)</option><option value="de">Deutsch (Немецкий)</option><option value="zh">中文 (Китайский)</option></select><button class="theme-toggle-btn" onclick="toggleTheme()">🌓 Сменить тему</button><div style="font-size:11px;color:#c8e6c9;"><span id="txt-in-base">ТС в базе</span>: <b id="dbCount">0</b></div></div></header>
