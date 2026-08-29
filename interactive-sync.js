@@ -3,8 +3,9 @@
   'use strict';
   if(window.__BUSPHOTO_SYNC_MODULE__) return;
   window.__BUSPHOTO_SYNC_MODULE__=true;
-  const SUPABASE_URL='https://ubhfigqpsepnpokrbdyo.supabase.co';
-  const SUPABASE_KEY='sb_publishable_yN8W8pvQq8hWsYMO8z1Rzw_6zKQ-8D1';
+  // This is YOUR Supabase project, not the friend's project.
+  const SUPABASE_URL='https://llfljfsdkacrdpddmyuy.supabase.co';
+  const SUPABASE_KEY='sb_publishable_nmxU0hY96F_GuY9jgMvmOw_RcX9Pz_C';
   const TABLE='busphoto_cloud_state';
   const ROW_ID='main';
   const SYNC_KEYS=['busphoto_interactive_game','busphoto_service_cards_v1','minsk_custom_osm_stops_v1','busphoto_stop_regions_loaded_v1','busphoto_stop_region_bbox_v1','busphoto_tracked_vehicle_v1','busphoto_single_route_shifts_v35','busphoto_departure_cards_v36','busphoto_maintenance_v43'];
