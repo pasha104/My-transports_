@@ -14,7 +14,8 @@ if (window.caches) {
 }
 </script>
 <title>BUSPHOTO — База данных и поиск</title>
-<script src="busphoto-common.js?v=20260822-v77" defer></script>
+<script src="busphoto-common.js?v=20260830-main-sync" defer></script>
+<script src="main-sync.js?v=20260830-main-sync" defer></script>
 </head>
 <body class="light-theme">
 <header>
@@ -48,6 +49,7 @@ if (window.caches) {
 <button class="btn-primary" onclick="openAddModal()">➕ Добавить ТС</button>
 </div>
 </div>
+<section id="mainSyncRoot" class="filter-panel" style="margin-bottom:10px;"><div style="font-weight:800;font-size:15px;margin-bottom:6px;">☁️ Синхронизация основной БД</div><div id="mainSyncAuth"><button class="btn-primary" type="button" id="mainSyncGoogle">🇬 Google — Войти и синхронизировать</button><div style="display:grid;gap:6px;margin-top:7px;max-width:420px;"><input id="mainSyncEmail" type="email" placeholder="Email" autocomplete="email"><input id="mainSyncPassword" type="password" placeholder="Пароль" autocomplete="current-password"><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-secondary" type="button" id="mainSyncLogin">Войти</button><button class="btn-secondary" type="button" id="mainSyncSignup">Создать аккаунт</button></div></div></div><div id="mainSyncPanel" style="display:none"><div id="mainSyncUser" style="font-size:12px;font-weight:700;margin-bottom:7px"></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-primary" type="button" id="mainSyncSave">☁️ Сохранить БД</button><button class="btn-secondary" type="button" id="mainSyncLoad">⬇️ Загрузить БД</button><button class="btn-secondary" type="button" id="mainSyncLogout">Выйти</button></div><label style="display:flex;align-items:center;gap:7px;margin-top:8px;font-size:12px"><input id="mainSyncAuto" type="checkbox"> 🔄 Автосинхронизация после изменений БД</label></div><div id="mainSyncInfo" style="font-size:12px;margin-top:7px"></div><div id="mainSyncStatus" class="interactive-badge" style="margin-top:7px">Синхронизация не запущена.</div></section>
 <div class="filter-panel">
 <input id="searchInput" onkeyup="filterDB()" placeholder="Фильтр по модели, номеру..." type="text"/>
 <select id="parkSelect" onchange="filterDB()">
@@ -99,7 +101,7 @@ if (window.caches) {
 <label><span id="lbl-country">Страна</span>: <input id="searchCountry" style="width:100%; padding:5px; background:var(--bp-input-bg); color:var(--bp-text); border:1px solid var(--bp-border);" type="text" value="Беларусь"/></label>
 <label><span id="lbl-city">Город</span>: <input id="searchCity" style="width:100%; padding:5px; background:var(--bp-input-bg); color:var(--bp-text); border:1px solid var(--bp-border);" type="text" value="Минск"/></label>
 <label><span id="lbl-model">Модель</span>: <input id="searchModelQuery" placeholder="например, МАЗ-203" style="width:100%; padding:5px; background:var(--bp-input-bg); color:var(--bp-text); border:1px solid var(--bp-border);" type="text"/></label>
-<label><span id="lbl-num">Гос. или бортовой номер</span>: <input id="searchNumQuery" placeholder="например, 23145" style="width:100%; padding:5px; background:var(--bp-input-bg); color:var(--bp-text); border:1px solid var(--bp-border);" type="text"/></label>
+<label><span id="lbl-num">Гос. или бортовой номер</span>: <input id="searchNumQuery" placeholder="например, 23145" style="width:100%; padding:5px; background:var(--bp-input-bg); color:var(--bp-input-bg); border:1px solid var(--bp-border);" type="text"/></label>
 <button id="btn-find" onclick="executeGlobalSearch()" style="background:#28a745; color:#fff; border:none; padding:8px; cursor:pointer; font-weight:bold;">Найти в базе</button>
 </div>
 </div></div><div class="modal-overlay" id="photoUploadModal">
