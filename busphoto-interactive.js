@@ -1,1 +1,1 @@
-/* ===== Интерактив: транспортный бизнес ===== */
+/* BUSPHOTO interactive core restored as a single deferred script for reliable mobile startup. */
