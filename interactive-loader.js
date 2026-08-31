@@ -1,10 +1,10 @@
-/* BUSPHOTO interactive bootstrap v111 — loads the real game split into part1/part2. */
+/* BUSPHOTO interactive bootstrap — stable core loader */
 (function(){
 'use strict';
-if(window.__BUSPHOTO_INTERACTIVE_BOOT_V111__) return;
-window.__BUSPHOTO_INTERACTIVE_BOOT_V111__=true;
-const VERSION='20260831-v111';
-const GAME_PARTS=['part1.txt','part2.txt'];
+if(window.__BUSPHOTO_INTERACTIVE_LOADER_STABLE__) return;
+window.__BUSPHOTO_INTERACTIVE_LOADER_STABLE__=true;
+const VERSION='20260831-stable1';
+const CORE_URL='https://raw.githubusercontent.com/pasha104/My-transports_/bcea47e8609b1d06603cc891c71b3f066adcc371/busphoto-interactive.js';
 const sections=[
  ['menu','interactive-menu.html','interactive-menu-host'],
  ['shop','interactive-shop.html','interactive-section-host-shop'],
@@ -23,34 +23,18 @@ function status(text,error){
  if(!text){el.style.display='none';return;}
  el.textContent=text;el.style.display='';el.style.borderColor=error?'#d32f2f':'';
 }
-async function fetchText(url,timeout=9000){
+async function fetchText(url,timeout=8000){
  const controller=new AbortController();
  const timer=setTimeout(()=>controller.abort(),timeout);
  try{
-  const r=await fetch(url,{cache:'default',credentials:'same-origin',signal:controller.signal});
+  const r=await fetch(url,{cache:'no-store',credentials:'omit',signal:controller.signal});
   if(!r.ok) throw new Error(url+' HTTP '+r.status);
   return await r.text();
  }finally{clearTimeout(timer)}
 }
-function injectGlobalScript(code,name){
- return new Promise((resolve,reject)=>{
-  try{
-   const s=document.createElement('script');
-   s.dataset.busphotoGamePart=name;
-   s.text=code+'\n//# sourceURL='+name;
-   document.head.appendChild(s);
-   resolve();
-  }catch(e){reject(e)}
- });
-}
-async function loadGameCore(){
- if(window.__BUSPHOTO_GAME_CORE_LOADED__) return;
- const texts=await Promise.all(GAME_PARTS.map(f=>fetchText(f+'?v='+VERSION,10000)));
- for(let i=0;i<texts.length;i++) await injectGlobalScript(texts[i],GAME_PARTS[i]);
- window.__BUSPHOTO_GAME_CORE_LOADED__=true;
-}
 async function loadSection(name){
- const info=byName[name];if(!info)return false;
+ const info=byName[name];
+ if(!info)return false;
  if(loaded.has(name))return true;
  if(loading.has(name))return loading.get(name);
  const [,file,hostId]=info;
@@ -58,7 +42,7 @@ async function loadSection(name){
   const host=document.getElementById(hostId);
   if(!host) throw new Error('Host not found: '+hostId);
   if(host.querySelector('#game-section-'+name)){loaded.add(name);return true;}
-  const html=await fetchText(file+'?v='+VERSION,8000);
+  const html=await fetchText(file+'?v='+VERSION);
   host.innerHTML=html;
   loaded.add(name);
   return true;
@@ -75,32 +59,39 @@ window.openInteractiveSection=async function(name,button){
     if(name==='garage'&&typeof renderGarageSection==='function')renderGarageSection();
     if(name==='history'&&typeof renderHistorySection==='function')renderHistorySection();
     if(name==='routes'&&typeof renderRoutes==='function')renderRoutes();
+    if((name==='dispatch'||name==='stats'||name==='maintenance')&&typeof renderV43Panels==='function')renderV43Panels();
    }catch(e){console.warn('[BUSPHOTO] section refresh',e)}
   }
- }catch(e){console.error('[BUSPHOTO] section open',e);status('Раздел не удалось загрузить. Открой его ещё раз.',true)}
+ }catch(e){
+  console.error('[BUSPHOTO] section open',name,e);
+  status('Раздел не удалось загрузить. Открой его ещё раз.',true);
+ }
 };
 window.BUSPHOTOEnsureInteractiveSection=loadSection;
-async function loadOptionalScripts(){
- for(const file of ['passenger-payout.js','card-map-preview.js']){
-  if(document.querySelector('script[data-busphoto-optional="'+file+'"]'))continue;
+function loadScript(src,id){
+ return new Promise((resolve,reject)=>{
+  if(id&&document.getElementById(id)){resolve();return;}
   const s=document.createElement('script');
-  s.dataset.busphotoOptional=file;
-  s.src=file+'?v='+VERSION;
-  s.async=true;
+  if(id)s.id=id;
+  s.src=src;
+  s.async=false;
+  s.onload=resolve;
+  s.onerror=()=>reject(new Error('Не удалось загрузить '+src));
   document.head.appendChild(s);
- }
+ });
 }
 async function start(){
  status('');
  try{
   await loadSection('menu');
-  await loadGameCore();
+  await loadScript(CORE_URL+'?v='+VERSION,'busphotoStableCore');
   if(typeof window.__BUSPHOTO_INIT_INTERACTIVE_GAME__==='function' && !window.__BUSPHOTO_GAME_INITIALIZED__){
    window.__BUSPHOTO_INIT_INTERACTIVE_GAME__();
    window.__BUSPHOTO_GAME_INITIALIZED__=true;
   }
-  loadOptionalScripts();
   if(typeof window.ensureLeafletLoaded==='function') Promise.resolve().then(()=>window.ensureLeafletLoaded()).catch(()=>{});
+  loadScript('passenger-payout.js?v='+VERSION,'busphotoPassengerPayoutScript').catch(()=>{});
+  loadScript('card-map-preview.js?v='+VERSION,'busphotoCardMapPreviewScript').catch(()=>{});
   loadSection('shop').catch(e=>console.warn('[BUSPHOTO] shop',e));
  }catch(e){
   console.error('[BUSPHOTO] bootstrap failed',e?.stack||e);
@@ -108,8 +99,8 @@ async function start(){
  }
 }
 function boot(){
- if(window.__BUSPHOTO_INTERACTIVE_STARTED_V111__)return;
- window.__BUSPHOTO_INTERACTIVE_STARTED_V111__=true;
+ if(window.__BUSPHOTO_INTERACTIVE_STARTED_STABLE__)return;
+ window.__BUSPHOTO_INTERACTIVE_STARTED_STABLE__=true;
  start();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
