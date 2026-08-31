@@ -5,6 +5,11 @@
 <link href="busphoto-interactive.css?v=20260831-stable1" rel="stylesheet"/>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script>
+/* Remove an old service-worker/cache so the repaired interactive is actually loaded on mobile. */
+if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister())).catch(() => {});
+if (window.caches) caches.keys().then(keys => keys.forEach(key => caches.delete(key))).catch(() => {});
+</script>
 <title>BUSPHOTO — Интерактивный транспортный бизнес</title>
 <script defer src="busphoto-common.js?v=20260831-stable1"></script>
 <style id="v43-features">
