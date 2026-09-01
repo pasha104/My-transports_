@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<link href="busphoto-common.css?v=20260901-stable2" rel="stylesheet"/>
-<link href="busphoto-interactive.css?v=20260901-stable2" rel="stylesheet"/>
+<link href="busphoto-common.css?v=20260901-stable3" rel="stylesheet"/>
+<link href="busphoto-interactive.css?v=20260901-stable3" rel="stylesheet"/>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <script>
@@ -11,7 +11,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().the
 if (window.caches) caches.keys().then(keys => keys.forEach(key => caches.delete(key))).catch(() => {});
 </script>
 <title>BUSPHOTO — Интерактивный транспортный бизнес</title>
-<script defer src="busphoto-common.js?v=20260901-stable2"></script>
+<script defer src="busphoto-common.js?v=20260901-stable3"></script>
 <style id="v43-features">
 #dispatcherPanel,#vehicleStatsPanel,#maintenancePanel{display:flex;flex-direction:column;gap:8px}
 #dispatcherPanel .interactive-log-row,#vehicleStatsPanel .interactive-log-row,#maintenancePanel .interactive-log-row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:11px;border:1px solid var(--bp-border);border-radius:10px;background:var(--bp-panel)}
@@ -20,7 +20,7 @@ if (window.caches) caches.keys().then(keys => keys.forEach(key => caches.delete(
 nav a.nav-btn{color:#fff!important;text-decoration:none!important}
 nav a.nav-btn:visited,nav a.nav-btn:hover,nav a.nav-btn:active{color:#fff!important;text-decoration:none!important}
 </style>
-<script defer src="interactive-loader.js?v=20260901-stable2"></script>
+<script defer src="interactive-loader.js?v=20260901-stable3"></script>
 </head>
 <body class="light-theme">
 <header><div><span class="logo-box">BUSPHOTO</span><span id="header-subtitle" style="font-size:15px; font-weight:bold; margin-left:8px;">База данных ПС</span></div><div class="header-controls"><select aria-label="Язык" class="theme-toggle-btn language-select" id="headerLangSelect" onchange="changeLanguage(this.value)"><option value="ru">Русский (Русский)</option><option value="be">Беларуская (Белорусский)</option><option value="uk">Українська (Украинский)</option><option value="en">English (Английский)</option><option value="de">Deutsch (Немецкий)</option><option value="zh">中文 (Китайский)</option></select><button class="theme-toggle-btn" onclick="toggleTheme()">🌓 Сменить тему</button><div style="font-size:11px; color:#c8e6c9;"><span id="txt-in-base">ТС в базе</span>: <b id="dbCount">0</b></div></div></header>
