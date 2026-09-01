@@ -1,54 +1,46 @@
-/* BUSPHOTO — компактная история по времени */
+/* BUSPHOTO — компактная история по времени v2 */
 (function(){
 'use strict';
-if(window.__BUSPHOTO_COMPACT_HISTORY__)return;
-window.__BUSPHOTO_COMPACT_HISTORY__=true;
+if(window.__BUSPHOTO_COMPACT_HISTORY_V2__)return;
+window.__BUSPHOTO_COMPACT_HISTORY_V2__=true;
 const KEY='busphoto_interactive_game';
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function timeOf(x){return String(x?.arrivalTime||x?.time||'').trim();}
 function dateOf(x){return String(x?.date||'').trim()||'—';}
-function stamp(x){
- const d=dateOf(x),t=timeOf(x);
- const m=/^(\d{1,2})[:.](\d{2})/.exec(t);
- return `${d} ${m?String(m[1]).padStart(2,'0')+':'+m[2]:t}`;
-}
-function sortLog(a,b){return stamp(b).localeCompare(stamp(a),'ru',{numeric:true});}
+function minuteStamp(x){const t=timeOf(x),m=/^(\d{1,2})[:.](\d{2})/.exec(t);return m?`${String(m[1]).padStart(2,'0')}:${m[2]}`:t||'—';}
+function keyOf(x){return `${dateOf(x)}|${minuteStamp(x)}`;}
 function vehicleLine(x){
- const model=x.vehicleModel||x.model||x.vehicle||'—';
+ const model=x.vehicleModel||x.model||x.vehicle||'ТС',number=x.vehicleNumber||x.number||'—';
  const route=x.routeNumber?` · маршрут №${esc(x.routeNumber)}`:'';
  const p=x.passengerCount!=null?` · 👥 ${esc(x.passengerCount)}${x.passengerCapacity?'/'+esc(x.passengerCapacity):''}`:'';
- const total=Number(x.total||x.amount||0);
- const payout=total?`<b class="interactive-positive">+${Math.round(total).toLocaleString('ru-RU')} р.</b>`:'';
  const dist=x.distancePayout!=null?` · расстояние +${Math.round(Number(x.distancePayout)||0)} р.`:'';
  const pass=x.passengerPayout!=null?` · пассажиры +${Math.round(Number(x.passengerPayout)||0)} р.`:'';
- return `<div class="history-time-item"><span>🚍 <b>${esc(model)}</b>${route}${p}${dist}${pass}</span><span>${payout}</span></div>`;
+ const total=Number(x.total||x.amount||0);
+ return `<div class="history-time-item"><span>🚍 <b>${esc(model)}</b> (${esc(number)})${route}${p}${dist}${pass}</span><b class="interactive-positive">+${Math.round(total).toLocaleString('ru-RU')} р.</b></div>`;
 }
 function compactHistory(){
  const host=document.getElementById('historyLog');if(!host)return;
  let state={};try{state=JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(e){}
- const log=Array.isArray(state.log)?state.log.slice().sort(sortLog):[];
+ const log=Array.isArray(state.log)?state.log.slice():[];
  if(!log.length){host.innerHTML='<div class="interactive-muted">Операций пока нет.</div>';return;}
  const groups=new Map();
- for(const x of log){const key=`${dateOf(x)}|${timeOf(x)||'—'}`;if(!groups.has(key))groups.set(key,{date:dateOf(x),time:timeOf(x)||'—',items:[]});groups.get(key).items.push(x)}
- let html='';
- for(const g of groups.values()){
-   const arrivals=g.items.filter(x=>x.type==='route-arrival');
-   const others=g.items.filter(x=>x.type!=='route-arrival');
-   html+=`<div class="history-time-group"><div class="history-time-head">📅 ${esc(g.date)} <strong>🕐 ${esc(g.time)}</strong></div>`;
-   if(arrivals.length)html+=arrivals.map(vehicleLine).join('');
-   for(const x of others){
-     const text=x.details?.[0]||x.message||x.text||x.type||'Операция';
-     const amount=x.amount!=null?Number(x.amount):x.total!=null?Number(x.total):0;
-     html+=`<div class="history-time-item"><span>ℹ️ ${esc(String(text).replace(/<[^>]*>/g,''))}</span>${amount?`<b class="interactive-positive">${amount>0?'+':''}${Math.round(amount).toLocaleString('ru-RU')} р.</b>`:''}</div>`;
+ for(const item of log){
+   if(item.type==='route-arrival-batch'&&Array.isArray(item.arrivals)){
+     const key=keyOf(item);if(!groups.has(key))groups.set(key,{date:dateOf(item),time:minuteStamp(item),arrivals:[],others:[]});groups.get(key).arrivals.push(...item.arrivals);
+   }else if(item.type==='route-arrival'){
+     const key=keyOf(item);if(!groups.has(key))groups.set(key,{date:dateOf(item),time:minuteStamp(item),arrivals:[],others:[]});groups.get(key).arrivals.push(item);
+   }else{
+     const key=keyOf(item);if(!groups.has(key))groups.set(key,{date:dateOf(item),time:minuteStamp(item),arrivals:[],others:[]});groups.get(key).others.push(item);
    }
-   html+='</div>';
  }
- host.innerHTML=html;
+ const arr=[...groups.values()].sort((a,b)=>`${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`,'ru',{numeric:true}));
+ host.innerHTML=arr.map(g=>{
+   const total=g.arrivals.reduce((s,x)=>s+Number(x.total||0),0)+g.others.reduce((s,x)=>s+Number(x.total||x.amount||0),0);
+   const rows=g.arrivals.map(vehicleLine).join('');
+   const others=g.others.map(x=>{const text=x.details?.[0]||x.message||x.text||x.type||'Операция';const amount=Number(x.total??x.amount??0);return `<div class="history-time-item"><span>ℹ️ ${esc(String(text).replace(/<[^>]*>/g,''))}</span>${amount?`<b class="interactive-positive">${amount>0?'+':''}${Math.round(amount).toLocaleString('ru-RU')} р.</b>`:''}</div>`;}).join('');
+   return `<div class="history-time-group"><div class="history-time-head">📅 ${esc(g.date)} <strong>🕐 ${esc(g.time)}</strong><b class="interactive-positive">+${Math.round(total).toLocaleString('ru-RU')} р.</b></div>${rows}${others}</div>`;
+ }).join('');
 }
-function install(){
- if(typeof window.renderHistorySection!=='function')return false;
- if(window.renderHistorySection.__compactV1)return true;
- const fn=compactHistory;fn.__compactV1=true;window.renderHistorySection=fn;compactHistory();return true;
-}
+function install(){window.renderHistorySection=compactHistory;compactHistory();return true;}
 let tries=0;const timer=setInterval(()=>{tries++;if(install()||tries>100)clearInterval(timer)},100);
 })();
