@@ -3,7 +3,7 @@
 'use strict';
 if(window.__BUSPHOTO_INTERACTIVE_LOADER_STABLE__) return;
 window.__BUSPHOTO_INTERACTIVE_LOADER_STABLE__=true;
-const VERSION='20260901-stable2';
+const VERSION='20260901-stable3';
 const CORE_URL='https://raw.githubusercontent.com/pasha104/My-transports_/bcea47e8609b1d06603cc891c71b3f066adcc371/busphoto-interactive.js';
 const sections=[
  ['menu','interactive-menu.html','interactive-menu-host'],
