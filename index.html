@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<link rel="stylesheet" href="busphoto-common.css?v=20260822-v77">
+<link rel="stylesheet" href="busphoto-common.css?v=20260901-stable3">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>
@@ -9,12 +9,11 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().the
 if (window.caches) caches.keys().then(keys => keys.forEach(key => caches.delete(key))).catch(() => {});
 </script>
 <title>BUSPHOTO — База данных и поиск</title>
-<script src="busphoto-common.js?v=20260830-main-sync" defer></script>
-<script src="main-sync.js?v=20260830-main-sync" defer></script>
+<script src="busphoto-common.js?v=20260901-stable3" defer></script>
 </head>
 <body class="light-theme">
 <header><div><span class="logo-box">BUSPHOTO</span><span id="header-subtitle" style="font-size:15px;font-weight:bold;margin-left:8px;">База данных ПС</span></div><div class="header-controls"><select aria-label="Язык" class="theme-toggle-btn language-select" id="headerLangSelect" onchange="changeLanguage(this.value)"><option value="ru">Русский (Русский)</option><option value="be">Беларуская (Белорусский)</option><option value="uk">Українська (Украинский)</option><option value="en">English (Английский)</option><option value="de">Deutsch (Немецкий)</option><option value="zh">中文 (Китайский)</option></select><button class="theme-toggle-btn" onclick="toggleDeviceMode()" title="Переключить интерфейс между режимом ПК и мобильным">📱/💻 <span id="deviceModeLabel">Авто</span></button><button class="theme-toggle-btn" onclick="toggleTheme()">🌓 Сменить тему</button><div style="font-size:11px;color:#c8e6c9;"><span id="txt-in-base">ТС в базе</span>: <b id="dbCount">0</b></div></div></header>
-<nav><a class="nav-btn active" href="index.html" style="display:block;color:#e2f0d9;padding:9px 12px;font-size:11px;font-weight:bold;border-bottom:3px solid transparent;flex-shrink:0;">📋 База данных + поиск</a><a class="nav-btn" href="models.html" style="display:block;color:#e2f0d9;padding:9px 12px;font-size:11px;font-weight:bold;border-bottom:3px solid transparent;flex-shrink:0;">🚍 Список моделей</a><a class="nav-btn" href="interactive.html" style="display:block;color:#e2f0d9;padding:9px 12px;font-size:11px;font-weight:bold;border-bottom:3px solid transparent;flex-shrink:0;">🎮 Интерактив</a><a class="nav-btn" href="sync.html" style="display:block;color:#e2f0d9;padding:9px 12px;font-size:11px;font-weight:bold;border-bottom:3px solid transparent;flex-shrink:0;">☁️ Синхронизация</a></nav>
+<nav><a class="nav-btn active" href="index.html" style="display:block;color:#e2f0d9;padding:9px 12px;font-size:11px;font-weight:bold;border-bottom:3px solid transparent;flex-shrink:0;">📋 База данных + поиск</a><a class="nav-btn" href="models.html" style="display:block;color:#e2f0d9;padding:9px 12px;font-size:11px;font-weight:bold;border-bottom:3px solid transparent;flex-shrink:0;">🚍 Список моделей</a><a class="nav-btn" href="interactive.html" style="display:block;color:#e2f0d9;padding:9px 12px;font-size:11px;font-weight:bold;border-bottom:3px solid transparent;flex-shrink:0;">🎮 Интерактив</a></nav>
 <div class="main-wrapper"><div class="tab-content active" id="database">
 <div class="page-header"><span id="page-title-db">Минск — Подвижной состав</span><div class="action-buttons"><button class="btn-secondary" onclick="openEditSelectionModal()" style="background:#1e3f66;border-color:#1e3f66;">✏️ Править ТС</button><button class="btn-secondary" onclick="openDeleteModal()" style="background:#8b0000;border-color:#8b0000;">🗑 Удалить ТС</button><button class="btn-secondary" onclick="openPhotoUploadModal()" style="background:#1e3f66;border-color:#1e3f66;">📷 Загрузить фото</button><button class="btn-secondary" onclick="exportDatabase()">💾 Экспорт БД</button><button class="btn-secondary" onclick="document.getElementById('importFile').click()">📂 Импорт БД</button><input accept=".json" id="importFile" onchange="importDatabase(event)" style="display:none" type="file"/><button class="btn-primary" onclick="openAddModal()">➕ Добавить ТС</button></div></div>
 <div class="filter-panel"><input id="searchInput" onkeyup="filterDB()" placeholder="Фильтр по модели, номеру..." type="text"/><select id="parkSelect" onchange="filterDB()"><option id="opt-all-parks" value="">Все предприятия</option><option value="ТП 2">Транспортный парк №2 (ТП 2)</option><option value="АП 1">Автобусный парк №1 (АП 1)</option></select></div>
