@@ -18,6 +18,7 @@
 <button class="map-filter-btn" id="gameRouteFilterTrolleybus" onclick="setGameRouteTypeFilter('trolleybus')">🚎 Троллейбусы</button>
 </div>
 <div style="margin:8px 0;"><input id="routeSearchInput" type="search" placeholder="Поиск маршрута по номеру или названию..." style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--bp-border);border-radius:8px;background:var(--bp-input-bg);color:var(--bp-text);"></div>
+<input id="gameRouteSearch" type="search" placeholder="🔎 Поиск маршрута по номеру, названию или конечным..." oninput="renderRoutes()" style="width:100%;box-sizing:border-box;padding:9px 10px;margin:0 0 8px;border:1px solid var(--bp-border);border-radius:8px;background:var(--bp-input-bg);color:var(--bp-text);">
 <div id="routesList"></div>
 </div>
 </div>
