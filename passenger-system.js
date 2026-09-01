@@ -15,8 +15,14 @@
 
   function money(v){ return Math.round(Number(v||0)).toLocaleString('ru-RU') + ' р.'; }
   function capacity(vehicle){
-    const c = Number(CAPACITY?.[vehicle?.category]?.[vehicle?.model] || 0);
-    return Math.max(1, c || 50);
+    const models=CAPACITY?.[vehicle?.category] || {};
+    const raw=String(vehicle?.model||'').trim();
+    const normalized=raw.replace(/^МАЗ\s+/i,'МАЗ-');
+    let best=0;
+    for(const key of Object.keys(models)){
+      if(normalized===key || normalized.startsWith(key)) best=Math.max(best,Number(models[key]||0));
+    }
+    return Math.max(1, best || 50);
   }
   function loadPercent(){
     const r=Math.random();
