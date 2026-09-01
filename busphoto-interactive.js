@@ -3089,6 +3089,24 @@ out body;
             return {point:pathPointFromGeometry(pair.inboundGeometry,1),phase:`стоянка на конечной №${pair.inbound.number}`,activeRoute:pair.inbound};
         }
 
+        const GAME_PASSENGER_CAPACITY = {
+            "МАЗ-101":123,"МАЗ-103":103,"МАЗ-104":110,"МАЗ-105":190,"МАЗ-107":150,"МАЗ-152":145,"МАЗ-203":105,"МАЗ-205":185,"МАЗ-206":72,"МАЗ-215":183,"МАЗ-216":169,"МАЗ-226":72,"МАЗ-231":80,"МАЗ-232":45,"МАЗ-241":36,"МАЗ-251":44,"МАЗ-256":43,"МАЗ-257":48,"МАЗ-303":110,
+            "МАЗ-103Т":108,"МАЗ-203Т":103,"МАЗ-303Т":75,"АКСМ-101":114,"БКМ-201":109,"БКМ-213":168,"БКМ-321":115,"БКМ-333":170,"БКМ-420":115,"БКМ-433":153,
+            "МАЗ-303Е":72,"МАЗ-305Е":150,"БКМ-Е321":83,"БКМ-Е433":153
+        };
+        function getPassengerCapacity(vehicle){
+            const model=String(vehicle?.model||vehicle?.modelPrefix||'').trim();
+            if(GAME_PASSENGER_CAPACITY[model]) return GAME_PASSENGER_CAPACITY[model];
+            const key=Object.keys(GAME_PASSENGER_CAPACITY).find(k=>model===k || model.startsWith(k+' ') || model.startsWith(k+'.'));
+            return key ? GAME_PASSENGER_CAPACITY[key] : 0;
+        }
+        function getRandomPassengerLoad(capacity){
+            if(!capacity) return 0;
+            const ranges=[[0.15,0.40],[0.40,0.75],[0.70,0.95],[0.95,1.00]];
+            const [min,max]=ranges[Math.floor(Math.random()*ranges.length)];
+            return Math.min(capacity,Math.round(capacity*(min+Math.random()*(max-min))));
+        }
+
         function processServiceCardPayouts(now = new Date()) {
             let total=0, changed=false;
             const cards=Array.isArray(gameState.serviceCards)?gameState.serviceCards:[];
@@ -3136,8 +3154,12 @@ out body;
                         const routeMeters = Math.max(0, Number(a.route.calculatedDistance || 0) || routeGeometryDistanceMeters(a.route) || (Number(a.route.distance || 0) * 1000));
                         vehicle.payoutDistanceMeters = Math.max(0, Number(vehicle.payoutDistanceMeters || 0)) + routeMeters;
                         const payoutBlocks = Math.floor(vehicle.payoutDistanceMeters / 5000);
-                        const arrivalPayout = payoutBlocks * 10;
+                        const distancePayout = payoutBlocks * 10;
                         vehicle.payoutDistanceMeters = vehicle.payoutDistanceMeters % 5000;
+                        const passengerCapacity = getPassengerCapacity(vehicle);
+                        const passengerCount = getRandomPassengerLoad(passengerCapacity);
+                        const passengerPayout = passengerCount * 3;
+                        const arrivalPayout = distancePayout + passengerPayout;
                         total += arrivalPayout;
                         // Статистика и состояние ТС обновляются при каждом прибытии.
                         vehicle.stats = vehicle.stats || {trips:0, arrivals:0, distanceKm:0, workMinutes:0, earned:0};
@@ -3145,12 +3167,14 @@ out body;
                         vehicle.stats.arrivals = Number(vehicle.stats.arrivals||0) + 1;
                         vehicle.stats.distanceKm = Number(vehicle.stats.distanceKm||0) + routeMeters/1000;
                         vehicle.stats.earned = Number(vehicle.stats.earned||0) + arrivalPayout;
+                        vehicle.stats.passengers = Number(vehicle.stats.passengers||0) + passengerCount;
+                        vehicle.stats.passengerPayout = Number(vehicle.stats.passengerPayout||0) + passengerPayout;
                         vehicle.health = Math.max(0, Number(vehicle.health ?? 100) - 0.10);
                         if (vehicle.health <= 20 && !vehicle.maintenanceDue) vehicle.maintenanceDue = true;
                         const t=new Date(a.ts).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
-                        const detail=`🕐 ${t} · ТС ${vehicle.model||'—'} · маршрут №${a.route.number||'—'} · прибытие на конечную · ${arrivalPayout>0?`+${arrivalPayout} р.`:'без выплаты'} · пройдено ${(routeMeters/1000).toFixed(2)} км · до следующей выплаты ${((5000-vehicle.payoutDistanceMeters)%5000/1000 || 0).toFixed(2)} км`;
+                        const detail=`🕐 ${t} · ТС ${vehicle.model||'—'} · маршрут №${a.route.number||'—'} · прибытие на конечную · 👥 ${passengerCount}/${passengerCapacity||'—'} пассажиров · расстояние +${distancePayout} р. · пассажиры +${passengerPayout} р. · ${arrivalPayout>0?`итого +${arrivalPayout} р.`:'без выплаты'} · пройдено ${(routeMeters/1000).toFixed(2)} км · до следующей выплаты ${((5000-vehicle.payoutDistanceMeters)%5000/1000 || 0).toFixed(2)} км`;
                         gameState.log=gameState.log||[];
-                        gameState.log.unshift({date:localDateKey(new Date(a.ts)),time:t,type:'route-arrival',routeNumber:a.route.number||'—',arrivalTime:t,vehicleModel:vehicle.model||'—',total:arrivalPayout,distanceKm:routeMeters/1000,payoutDistanceRemainderKm:vehicle.payoutDistanceMeters/1000,details:[detail]});
+                        gameState.log.unshift({date:localDateKey(new Date(a.ts)),time:t,type:'route-arrival',routeNumber:a.route.number||'—',arrivalTime:t,vehicleModel:vehicle.model||'—',total:arrivalPayout,distanceKm:routeMeters/1000,payoutDistanceRemainderKm:vehicle.payoutDistanceMeters/1000,details:[detail],passengers:passengerCount,passengerCapacity:passengerCapacity,distancePayout:distancePayout,passengerPayout:passengerPayout});
                     });
                     changed=true;
                 }
