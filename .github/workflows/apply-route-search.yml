@@ -1,0 +1,38 @@
+name: Apply route search
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch route search
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('interactive-routes.html'); s=p.read_text(encoding='utf-8')
+          if 'id="routeSearchInput"' not in s:
+              s=s.replace('<div id="routesList"></div>', '<div style="margin:8px 0;"><input id="routeSearchInput" type="search" placeholder="Поиск маршрута по номеру или названию..." style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--bp-border);border-radius:8px;background:var(--bp-input-bg);color:var(--bp-text);"></div>\n<div id="routesList"></div>')
+              p.write_text(s,encoding='utf-8')
+          p=Path('creating_card.html'); s=p.read_text(encoding='utf-8')
+          if 'class="route-search"' not in s:
+              s=s.replace('<label class="field">Маршрут<select class="route"></select></label>', '<label class="field">Маршрут<div style="display:flex;flex-direction:column;gap:6px"><input class="route-search" type="search" placeholder="Поиск маршрута по номеру или названию..." style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #aaa;border-radius:8px"><select class="route"></select></div></label>')
+              s=s.replace("d.querySelector('.route').onchange=()=>{fillStops(d);recalc()};", "d.querySelector('.route').onchange=()=>{fillStops(d);recalc()};d.querySelector('.route-search').oninput=()=>fillRoutes(d);",1)
+              old="function fillRoutes(d,selected){const rs=routesFor(vehicle()),s=d.querySelector('.route'),cur=selected||s.value;"
+              new="function fillRoutes(d,selected){const rs=routesFor(vehicle()),s=d.querySelector('.route'),q=(d.querySelector('.route-search')?.value||'').trim().toLowerCase(),cur=selected||s.value;const filtered=rs.filter(r=>!q||[r.number,r.start,r.end].some(x=>String(x??'').toLowerCase().includes(q)));"
+              s=s.replace(old,new).replace("s.innerHTML=rs.length?rs.map(r=>", "s.innerHTML=filtered.length?filtered.map(r=>",1).replace("if(cur&&rs.some(r=>String(r.id)===String(cur)))s.value=cur}", "if(cur&&filtered.some(r=>String(r.id)===String(cur)))s.value=cur}",1)
+              p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit and remove workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add interactive-routes.html creating_card.html .github/workflows/apply-route-search.yml
+          git commit -m 'Добавить поиск маршрутов' || exit 0
+          git rm .github/workflows/apply-route-search.yml || true
+          git commit -m 'Удалить одноразовый workflow' || true
+          git push
