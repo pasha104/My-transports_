@@ -29,5 +29,4 @@ function wrap(){
 }
 window.BUSPHOTOShowCardRoutePreview=show;window.BUSPHOTOClearCardRoutePreview=clear;
 setTimeout(wrap,0);setTimeout(wrap,500);setTimeout(wrap,1500);
-const q=new URLSearchParams(location.search);if(q.get('routeId')){const wait=setInterval(()=>{if(typeof mapState!=='undefined'&&mapState.map){clearInterval(wait);show(q.get('routeId'),q.get('vehicleId'))}},250);setTimeout(()=>clearInterval(wait),15000)}
 })();

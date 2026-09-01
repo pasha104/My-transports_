@@ -259,7 +259,7 @@ function removeVehiclePhoto() {
                     else if (Array.isArray(parsed.database)) imported = parsed.database;
                     if (!imported) throw new Error('JSON должен содержать массив ТС.');
                     vehicleDB = imported.map(v => ({...v}));
-                    localStorage.setItem('busphoto_custom_db', JSON.stringify(vehicleDB));
+                    localStorage.setItem('busphoto_custom_db', JSON.stringify(vehicleDB)); window.dispatchEvent(new Event('busphoto-db-changed'));
                     renderTable();
                     renderModels();
                     alert(`База данных успешно импортирована: ${vehicleDB.length} ТС.`);
@@ -330,7 +330,7 @@ function removeVehiclePhoto() {
                 thPurpose: "Назначение", thFactory: "Заводской №", thVIN: "VIN", thBuild: "Построен",
                 thArrive: "Поступил", thStart: "Начал работу", thOut: "Отставлен", thDecomm: "Списан",
                 thUtil: "Утилизирован", thNote: "Примечание",
-                linear: "Линейный", service: "Служебный", museum: "Музейный", museum: "Музейный",
+                linear: "Линейный", service: "Служебный",
                 txtAct: "Эксплуатируется", txtDecomm: "Списан", txtNotOp: "Не был в эксплуатации",
                 txtNotWrk: "Не эксплуатируется", txtUnk: "Судьба неизвестна", txtMod: "КВР/Модернизация",
                 txtOut: "Выведен из эксплуатации", txtTransCity: "Передан в городе", txtTransOther: "Передан в другой город", txtPlateChange: "Смена госномера",
@@ -552,7 +552,7 @@ function removeVehiclePhoto() {
             let dispGov = v.gov !== '—' && v.gov !== '????' ? v.gov : `Борт. ${v.num}`;
             if (confirm(`Удалить транспортное средство ${v.model} (${dispGov}) из базы?`)) {
                 vehicleDB.splice(index, 1);
-                localStorage.setItem('busphoto_custom_db', JSON.stringify(vehicleDB));
+                localStorage.setItem('busphoto_custom_db', JSON.stringify(vehicleDB)); window.dispatchEvent(new Event('busphoto-db-changed'));
                 renderTable();
                 renderDeleteList(document.getElementById('deleteSearchInput').value);
                 alert('Транспортное средство успешно удалено!');
@@ -676,7 +676,7 @@ function removeVehiclePhoto() {
                 note: document.getElementById('editNote').value
             };
 
-            localStorage.setItem('busphoto_custom_db', JSON.stringify(vehicleDB));
+            localStorage.setItem('busphoto_custom_db', JSON.stringify(vehicleDB)); window.dispatchEvent(new Event('busphoto-db-changed'));
             renderTable();
             closeEditModal();
             alert('Транспортное средство успешно обновлено в базе!');
@@ -892,7 +892,7 @@ function removeVehiclePhoto() {
             };
 
             vehicleDB.unshift(newBus); 
-            localStorage.setItem('busphoto_custom_db', JSON.stringify(vehicleDB));
+            localStorage.setItem('busphoto_custom_db', JSON.stringify(vehicleDB)); window.dispatchEvent(new Event('busphoto-db-changed'));
             
             renderTable();
             const dbCountEl = document.getElementById('dbCount');

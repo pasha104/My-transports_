@@ -1204,8 +1204,6 @@ function rebuildMapStopsIndex(stops) {
 
         function renderRoutes() {
             const list = document.getElementById('routesList');
-            const routeSearchInput = document.getElementById('routeSearchInput');
-            if (routeSearchInput && !routeSearchInput.dataset.bound) { routeSearchInput.dataset.bound='1'; routeSearchInput.addEventListener('input', renderRoutes); }
             const summary = document.getElementById('routeAssignmentSummary');
             if (!list || !summary) return;
             // Не подгружаем список остановок при открытии маршрутов: это тяжёлая операция.
@@ -1241,9 +1239,23 @@ function rebuildMapStopsIndex(stops) {
                 list.innerHTML = `<div class="interactive-muted">Маршрутов пока нет. Открой «Карту» и создай маршрут там.</div>`;
                 return;
             }
+            const oldSearch = document.getElementById('interactiveRouteSearch');
+            if (!oldSearch) {
+                const input = document.createElement('input');
+                input.id = 'interactiveRouteSearch'; input.type = 'search';
+                input.placeholder = 'Поиск маршрута по номеру или названию…';
+                input.style.cssText = 'width:100%;box-sizing:border-box;margin:8px 0;padding:9px;border:1px solid var(--bp-border);border-radius:8px;';
+                input.oninput = () => renderRoutes();
+                list.parentNode.insertBefore(input, list);
+            }
 
-            const routeQuery = (document.getElementById('routeSearchInput')?.value || '').trim().toLowerCase();
-            const visibleRoutes = gameState.routes.filter(route => (mapState.routeTypeFilter === 'all' || route.routeType === mapState.routeTypeFilter) && (!routeQuery || [route.number, route.start, route.end].some(x => String(x ?? '').toLowerCase().includes(routeQuery))));
+            const routeSearch = String(document.getElementById('interactiveRouteSearch')?.value || '').trim().toLowerCase();
+            const visibleRoutes = gameState.routes.filter(route => {
+                if (mapState.routeTypeFilter !== 'all' && route.routeType !== mapState.routeTypeFilter) return false;
+                if (!routeSearch) return true;
+                const hay = [route.number, route.start, route.end, route.name, route.title].filter(Boolean).join(' ').toLowerCase();
+                return hay.includes(routeSearch);
+            });
             list.innerHTML = visibleRoutes.map(route => {
                 const ids = Array.isArray(route.vehicleIds) ? route.vehicleIds : (route.vehicleId ? [route.vehicleId] : []);
                 const assignedVehicles = gameState.owned.filter(v => ids.some(id => String(id) === String(v.id)));
@@ -1915,7 +1927,7 @@ function rebuildMapStopsIndex(stops) {
                 if (existing) {
                     const selectedNow = mapState.draftStopIds.some(id => String(id) === sid);
                     existing.setStyle({
-                        radius: selectedNow ? 8 : 5,
+                        radius: mapState.mode === 'route' ? (selectedNow ? 11 : 8) : (selectedNow ? 8 : 5),
                         color: selectedNow ? '#ffd54a' : '#fff',
                         weight: selectedNow ? 3 : 1.5
                     });
@@ -1925,7 +1937,7 @@ function rebuildMapStopsIndex(stops) {
                 const color = stop.stopType === 'turnback' ? '#f39c12' : (stop.source === 'custom' ? '#8e44ad' : '#1769aa');
                 const selected = mapState.draftStopIds.some(id => String(id) === sid);
                 const marker = L.circleMarker([Number(stop.lat), Number(stop.lon)], {
-                    radius: selected ? 8 : 5,
+                    radius: mapState.mode === 'route' ? (selected ? 11 : 8) : (selected ? 8 : 5),
                     color: selected ? '#ffd54a' : '#fff',
                     weight: selected ? 3 : 1.5,
                     fillColor: color,
@@ -3092,24 +3104,6 @@ out body;
             return {point:pathPointFromGeometry(pair.inboundGeometry,1),phase:`стоянка на конечной №${pair.inbound.number}`,activeRoute:pair.inbound};
         }
 
-        const GAME_PASSENGER_CAPACITY = {
-            "МАЗ-101":123,"МАЗ-103":103,"МАЗ-104":110,"МАЗ-105":190,"МАЗ-107":150,"МАЗ-152":145,"МАЗ-203":105,"МАЗ-205":185,"МАЗ-206":72,"МАЗ-215":183,"МАЗ-216":169,"МАЗ-226":72,"МАЗ-231":80,"МАЗ-232":45,"МАЗ-241":36,"МАЗ-251":44,"МАЗ-256":43,"МАЗ-257":48,"МАЗ-303":110,
-            "МАЗ-103Т":108,"МАЗ-203Т":103,"МАЗ-303Т":75,"АКСМ-101":114,"БКМ-201":109,"БКМ-213":168,"БКМ-321":115,"БКМ-333":170,"БКМ-420":115,"БКМ-433":153,
-            "МАЗ-303Е":72,"МАЗ-305Е":150,"БКМ-Е321":83,"БКМ-Е433":153
-        };
-        function getPassengerCapacity(vehicle){
-            const model=String(vehicle?.model||vehicle?.modelPrefix||'').trim();
-            if(GAME_PASSENGER_CAPACITY[model]) return GAME_PASSENGER_CAPACITY[model];
-            const key=Object.keys(GAME_PASSENGER_CAPACITY).find(k=>model===k || model.startsWith(k+' ') || model.startsWith(k+'.'));
-            return key ? GAME_PASSENGER_CAPACITY[key] : 0;
-        }
-        function getRandomPassengerLoad(capacity){
-            if(!capacity) return 0;
-            const ranges=[[0.15,0.40],[0.40,0.75],[0.70,0.95],[0.95,1.00]];
-            const [min,max]=ranges[Math.floor(Math.random()*ranges.length)];
-            return Math.min(capacity,Math.round(capacity*(min+Math.random()*(max-min))));
-        }
-
         function processServiceCardPayouts(now = new Date()) {
             let total=0, changed=false;
             const cards=Array.isArray(gameState.serviceCards)?gameState.serviceCards:[];
@@ -3159,9 +3153,20 @@ out body;
                         const payoutBlocks = Math.floor(vehicle.payoutDistanceMeters / 5000);
                         const distancePayout = payoutBlocks * 10;
                         vehicle.payoutDistanceMeters = vehicle.payoutDistanceMeters % 5000;
-                        const passengerCapacity = getPassengerCapacity(vehicle);
-                        const passengerCount = getRandomPassengerLoad(passengerCapacity);
-                        const passengerPayout = passengerCount * 3;
+                        const capacityByCategory = {bus: 70, trolleybus: 85, electricbus: 90, minibus: 20};
+                        const modelText = String(vehicle.model || '').toLowerCase();
+                        let capacity = Number(vehicle.capacity || vehicle.passengerCapacity || 0);
+                        if (!capacity) {
+                            capacity = capacityByCategory[vehicle.category] || 70;
+                            if (/103|206|105|203/.test(modelText)) capacity = 72;
+                            if (/215|320|5292/.test(modelText)) capacity = 100;
+                        }
+                        capacity = Math.max(1, Math.round(capacity));
+                        const loadMin = Math.max(0, Math.floor(capacity * 0.15));
+                        const passengers = loadMin + Math.floor(Math.random() * (capacity - loadMin + 1));
+                        vehicle.passengerCapacity = capacity;
+                        vehicle.lastPassengers = passengers;
+                        const passengerPayout = passengers * 3;
                         const arrivalPayout = distancePayout + passengerPayout;
                         total += arrivalPayout;
                         // Статистика и состояние ТС обновляются при каждом прибытии.
@@ -3170,16 +3175,12 @@ out body;
                         vehicle.stats.arrivals = Number(vehicle.stats.arrivals||0) + 1;
                         vehicle.stats.distanceKm = Number(vehicle.stats.distanceKm||0) + routeMeters/1000;
                         vehicle.stats.earned = Number(vehicle.stats.earned||0) + arrivalPayout;
-                        vehicle.stats.passengers = Number(vehicle.stats.passengers||0) + passengerCount;
-                        vehicle.stats.passengerPayout = Number(vehicle.stats.passengerPayout||0) + passengerPayout;
-                        vehicle.stats.passengers = Number(vehicle.stats.passengers||0) + passengerCount;
-                        vehicle.stats.passengerPayout = Number(vehicle.stats.passengerPayout||0) + passengerPayout;
                         vehicle.health = Math.max(0, Number(vehicle.health ?? 100) - 0.10);
                         if (vehicle.health <= 20 && !vehicle.maintenanceDue) vehicle.maintenanceDue = true;
                         const t=new Date(a.ts).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
-                        const detail=`🕐 ${t} · ТС ${vehicle.model||'—'} · маршрут №${a.route.number||'—'} · прибытие на конечную · 👥 ${passengerCount}/${passengerCapacity||'—'} пассажиров · расстояние +${distancePayout} р. · пассажиры +${passengerPayout} р. · ${arrivalPayout>0?`итого +${arrivalPayout} р.`:'без выплаты'} · пройдено ${(routeMeters/1000).toFixed(2)} км · до следующей выплаты ${((5000-vehicle.payoutDistanceMeters)%5000/1000 || 0).toFixed(2)} км`;
+                        const detail=`🕐 ${t} · ТС ${vehicle.model||'—'} · маршрут №${a.route.number||'—'} · прибытие на конечную · ${arrivalPayout>0?`+${arrivalPayout} р.`:'без выплаты'} · 👥 ${passengers}/${capacity} · +${passengerPayout} р. за пассажиров · пройдено ${(routeMeters/1000).toFixed(2)} км · до следующей выплаты ${((5000-vehicle.payoutDistanceMeters)%5000/1000 || 0).toFixed(2)} км`;
                         gameState.log=gameState.log||[];
-                        gameState.log.unshift({date:localDateKey(new Date(a.ts)),time:t,type:'route-arrival',routeNumber:a.route.number||'—',arrivalTime:t,vehicleModel:vehicle.model||'—',total:arrivalPayout,distanceKm:routeMeters/1000,payoutDistanceRemainderKm:vehicle.payoutDistanceMeters/1000,details:[detail],passengers:passengerCount,passengerCapacity:passengerCapacity,distancePayout:distancePayout,passengerPayout:passengerPayout});
+                        gameState.log.unshift({date:localDateKey(new Date(a.ts)),time:t,type:'route-arrival',routeNumber:a.route.number||'—',arrivalTime:t,vehicleModel:vehicle.model||'—',total:arrivalPayout,distanceKm:routeMeters/1000,payoutDistanceRemainderKm:vehicle.payoutDistanceMeters/1000,details:[detail]});
                     });
                     changed=true;
                 }

@@ -1,0 +1,49 @@
+<div class="game-section" id="game-section-sync">
+  <div class="interactive-card">
+    <h3>☁️ Синхронизация через Google</h3>
+    <p id="busSyncIntro" style="color:var(--bp-text-muted);line-height:1.5;">
+      Войди через свой Google-аккаунт. После входа данные игры можно сохранить в облако и восстановить на другом устройстве.
+    </p>
+
+    <div id="busSyncAuth">
+      <div style="display:grid;gap:8px;max-width:520px;">
+        <button class="btn-primary" type="button" id="busSyncGoogle" style="font-size:16px;padding:12px;">
+          🇬 Google — Войти и синхронизировать
+        </button>
+        <details style="margin-top:4px;">
+          <summary style="cursor:pointer;color:var(--bp-text-muted);">Вход по email/паролю (резервный вариант)</summary>
+          <div style="display:grid;gap:8px;margin-top:8px;">
+            <input id="busSyncEmail" type="email" placeholder="Email" autocomplete="email" style="padding:10px;background:var(--bp-input-bg);color:var(--bp-text);border:1px solid var(--bp-border);border-radius:6px;box-sizing:border-box;width:100%;">
+            <input id="busSyncPassword" type="password" placeholder="Пароль" autocomplete="current-password" style="padding:10px;background:var(--bp-input-bg);color:var(--bp-text);border:1px solid var(--bp-border);border-radius:6px;box-sizing:border-box;width:100%;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn-primary" type="button" id="busSyncLogin">Войти</button>
+              <button class="btn-secondary" type="button" id="busSyncSignup">Создать аккаунт</button>
+              <button class="btn-secondary" type="button" id="busSyncResend">📨 Повторить письмо</button>
+            </div>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div id="busSyncPanel" style="display:none;">
+      <div id="busSyncUser" class="interactive-badge" style="margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <button class="btn-primary" type="button" id="busSyncSave">☁️ Сохранить в облако</button>
+        <button class="btn-secondary" type="button" id="busSyncLoad">⬇️ Загрузить из облака</button>
+        <button class="btn-secondary" type="button" id="busSyncLogout">Выйти</button>
+      </div>
+      <label style="display:flex;gap:8px;align-items:center;margin:8px 0;color:var(--bp-text);">
+        <input id="busSyncAuto" type="checkbox"> Автосинхронизация после изменений
+      </label>
+      <div id="busSyncInfo" style="color:var(--bp-text-muted);font-size:12px;line-height:1.5;"></div>
+    </div>
+
+    <div id="busSyncStatus" class="interactive-badge" style="margin-top:10px;">Синхронизация не запущена.</div>
+
+    <div style="margin-top:12px;padding:10px;border:1px solid var(--bp-border);border-radius:8px;color:var(--bp-text-muted);font-size:11px;line-height:1.5;">
+      📱 Используй один и тот же Google-аккаунт на всех устройствах.
+      При первом входе сначала сохрани актуальную игру в облако. На другом устройстве нажми «Загрузить из облака».
+      <br>⚠️ Загрузка из облака заменяет локальный прогресс.
+    </div>
+  </div>
+</div>
