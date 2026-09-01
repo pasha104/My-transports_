@@ -37,13 +37,10 @@
     return {count,capacity:cap,loadPercent:Math.round(count/cap*100)};
   }
 
-  function patchWhenReady(){
-    if(typeof window.processServiceCardPayouts !== 'function'){
-      setTimeout(patchWhenReady,100);
-      return;
-    }
+  function installPatch(){
+    if(typeof window.processServiceCardPayouts !== 'function') return false;
     const original=window.processServiceCardPayouts;
-    if(original.__passengerWrapped) return;
+    if(original.__passengerWrapped) return true;
 
     function wrapped(now){
       const key='busphoto_interactive_game';
@@ -99,7 +96,23 @@
     wrapped.__passengerWrapped=true;
     window.processServiceCardPayouts=wrapped;
     console.info('[BUSPHOTO] passenger earnings enabled');
+    return true;
   }
 
-  patchWhenReady();
+  // The loader creates busphoto-interactive.js dynamically and initializes the game
+  // immediately in its onload continuation. Hook script insertion so the passenger
+  // wrapper is installed before that continuation runs, avoiding a first-load race.
+  const originalAppendChild=document.head.appendChild.bind(document.head);
+  document.head.appendChild=function(node){
+    if(node && node.tagName==='SCRIPT' && String(node.src||'').includes('busphoto-interactive.js')){
+      const originalOnload=node.onload;
+      node.onload=function(ev){
+        installPatch();
+        if(typeof originalOnload==='function') return originalOnload.call(this,ev);
+      };
+    }
+    return originalAppendChild(node);
+  };
+
+  installPatch();
 })();
