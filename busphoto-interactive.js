@@ -1204,6 +1204,8 @@ function rebuildMapStopsIndex(stops) {
 
         function renderRoutes() {
             const list = document.getElementById('routesList');
+            const routeSearchInput = document.getElementById('routeSearchInput');
+            if (routeSearchInput && !routeSearchInput.dataset.bound) { routeSearchInput.dataset.bound='1'; routeSearchInput.addEventListener('input', renderRoutes); }
             const summary = document.getElementById('routeAssignmentSummary');
             if (!list || !summary) return;
             // Не подгружаем список остановок при открытии маршрутов: это тяжёлая операция.
@@ -1240,7 +1242,8 @@ function rebuildMapStopsIndex(stops) {
                 return;
             }
 
-            const visibleRoutes = gameState.routes.filter(route => (mapState.routeTypeFilter === 'all' || route.routeType === mapState.routeTypeFilter));
+            const routeQuery = (document.getElementById('routeSearchInput')?.value || '').trim().toLowerCase();
+            const visibleRoutes = gameState.routes.filter(route => (mapState.routeTypeFilter === 'all' || route.routeType === mapState.routeTypeFilter) && (!routeQuery || [route.number, route.start, route.end].some(x => String(x ?? '').toLowerCase().includes(routeQuery))));
             list.innerHTML = visibleRoutes.map(route => {
                 const ids = Array.isArray(route.vehicleIds) ? route.vehicleIds : (route.vehicleId ? [route.vehicleId] : []);
                 const assignedVehicles = gameState.owned.filter(v => ids.some(id => String(id) === String(v.id)));
