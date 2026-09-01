@@ -3169,6 +3169,8 @@ out body;
                         vehicle.stats.earned = Number(vehicle.stats.earned||0) + arrivalPayout;
                         vehicle.stats.passengers = Number(vehicle.stats.passengers||0) + passengerCount;
                         vehicle.stats.passengerPayout = Number(vehicle.stats.passengerPayout||0) + passengerPayout;
+                        vehicle.stats.passengers = Number(vehicle.stats.passengers||0) + passengerCount;
+                        vehicle.stats.passengerPayout = Number(vehicle.stats.passengerPayout||0) + passengerPayout;
                         vehicle.health = Math.max(0, Number(vehicle.health ?? 100) - 0.10);
                         if (vehicle.health <= 20 && !vehicle.maintenanceDue) vehicle.maintenanceDue = true;
                         const t=new Date(a.ts).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});

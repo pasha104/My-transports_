@@ -330,7 +330,7 @@ function removeVehiclePhoto() {
                 thPurpose: "Назначение", thFactory: "Заводской №", thVIN: "VIN", thBuild: "Построен",
                 thArrive: "Поступил", thStart: "Начал работу", thOut: "Отставлен", thDecomm: "Списан",
                 thUtil: "Утилизирован", thNote: "Примечание",
-                linear: "Линейный", service: "Служебный", museum: "Музейный",
+                linear: "Линейный", service: "Служебный", museum: "Музейный", museum: "Музейный",
                 txtAct: "Эксплуатируется", txtDecomm: "Списан", txtNotOp: "Не был в эксплуатации",
                 txtNotWrk: "Не эксплуатируется", txtUnk: "Судьба неизвестна", txtMod: "КВР/Модернизация",
                 txtOut: "Выведен из эксплуатации", txtTransCity: "Передан в городе", txtTransOther: "Передан в другой город", txtPlateChange: "Смена госномера",
