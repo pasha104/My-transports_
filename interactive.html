@@ -20,8 +20,8 @@ if (window.caches) caches.keys().then(keys => keys.forEach(key => caches.delete(
 nav a.nav-btn{color:#fff!important;text-decoration:none!important}
 nav a.nav-btn:visited,nav a.nav-btn:hover,nav a.nav-btn:active{color:#fff!important;text-decoration:none!important}
 </style>
+<script defer src="passenger-system.js?v=20260901-passengers2"></script>
 <script defer src="interactive-loader.js?v=20260901-stable3"></script>
-<script defer src="passenger-system.js?v=20260901-passengers1"></script>
 </head>
 <body class="light-theme">
 <header><div><span class="logo-box">BUSPHOTO</span><span id="header-subtitle" style="font-size:15px; font-weight:bold; margin-left:8px;">База данных ПС</span></div><div class="header-controls"><select aria-label="Язык" class="theme-toggle-btn language-select" id="headerLangSelect" onchange="changeLanguage(this.value)"><option value="ru">Русский (Русский)</option><option value="be">Беларуская (Белорусский)</option><option value="uk">Українська (Украинский)</option><option value="en">English (Английский)</option><option value="de">Deutsch (Немецкий)</option><option value="zh">中文 (Китайский)</option></select><button class="theme-toggle-btn" onclick="toggleTheme()">🌓 Сменить тему</button><div style="font-size:11px; color:#c8e6c9;"><span id="txt-in-base">ТС в базе</span>: <b id="dbCount">0</b></div></div></header>
