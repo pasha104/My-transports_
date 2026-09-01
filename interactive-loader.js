@@ -1,29 +1,96 @@
-/* BUSPHOTO interactive bootstrap — stable pinned core, no sync */
+/* BUSPHOTO non-blocking modular loader v78 */
 (function(){
-'use strict';
-if(window.__BUSPHOTO_INTERACTIVE_LOADER_STABLE__) return;
-window.__BUSPHOTO_INTERACTIVE_LOADER_STABLE__=true;
-const VERSION='20260901-stable3';
-const CORE_URL='https://raw.githubusercontent.com/pasha104/My-transports_/bcea47e8609b1d06603cc891c71b3f066adcc371/busphoto-interactive.js';
-const sections=[
- ['menu','interactive-menu.html','interactive-menu-host'],
- ['shop','interactive-shop.html','interactive-section-host-shop'],
- ['garage','interactive-garage.html','interactive-section-host-garage'],
- ['finance','interactive-finance.html','interactive-section-host-finance'],
- ['history','interactive-history.html','interactive-section-host-history'],
- ['routes','interactive-routes.html','interactive-section-host-routes'],
- ['map','interactive-map.html','interactive-section-host-map'],
- ['rules','interactive-rules.html','interactive-rules-host']
-];
-const byName=Object.fromEntries(sections.map(x=>[x[0],x]));
-const loaded=new Set(),loading=new Map();
-function status(text,error){const el=document.getElementById('interactiveLoadingStatus');if(!el)return;if(!text){el.style.display='none';return;}el.textContent=text;el.style.display='';el.style.borderColor=error?'#d32f2f':'';}
-async function fetchText(url,timeout=8000){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeout);try{const r=await fetch(url,{cache:'no-store',credentials:'omit',signal:controller.signal});if(!r.ok)throw new Error(url+' HTTP '+r.status);return await r.text();}finally{clearTimeout(timer);}}
-async function loadSection(name){const info=byName[name];if(!info)return false;if(loaded.has(name))return true;if(loading.has(name))return loading.get(name);const [,file,hostId]=info;const p=(async()=>{const host=document.getElementById(hostId);if(!host)throw new Error('Host not found: '+hostId);if(host.querySelector('#game-section-'+name)){loaded.add(name);return true;}host.innerHTML=await fetchText(file+'?v='+VERSION);loaded.add(name);return true;})();loading.set(name,p);try{return await p}finally{loading.delete(name);}}
-function loadScript(src,id){return new Promise((resolve,reject)=>{if(id&&document.getElementById(id)){resolve();return;}const s=document.createElement('script');if(id)s.id=id;s.src=src;s.async=false;s.onload=resolve;s.onerror=()=>reject(new Error('Не удалось загрузить '+src));document.head.appendChild(s);});}
-window.openInteractiveSection=async function(name,button){try{await loadSection(name);if(typeof window.showGameSection==='function'){window.showGameSection(name,button);try{if(name==='garage'&&typeof renderGarageSection==='function')renderGarageSection();if(name==='history'&&typeof renderHistorySection==='function')renderHistorySection();if(name==='routes'&&typeof renderRoutes==='function')renderRoutes();if((name==='dispatch'||name==='stats'||name==='maintenance')&&typeof renderV43Panels==='function')renderV43Panels();}catch(e){console.warn('[BUSPHOTO] section refresh',e);}}else{throw new Error('Игровое ядро ещё не загружено');}}catch(e){console.error('[BUSPHOTO] section open',name,e);status('Раздел не удалось загрузить. Открой его ещё раз.',true);}};
-window.BUSPHOTOEnsureInteractiveSection=loadSection;
-async function start(){status('');try{await loadSection('menu');await loadScript(CORE_URL+'?v='+VERSION,'busphotoStableCore');if(typeof window.__BUSPHOTO_INIT_INTERACTIVE_GAME__==='function'&&!window.__BUSPHOTO_GAME_INITIALIZED__){window.__BUSPHOTO_INIT_INTERACTIVE_GAME__();window.__BUSPHOTO_GAME_INITIALIZED__=true;}loadScript('passenger-payout.js?v='+VERSION,'busphotoPassengerPayoutScript').catch(()=>{});loadScript('card-map-preview.js?v='+VERSION,'busphotoCardMapPreviewScript').catch(()=>{});if(typeof window.ensureLeafletLoaded==='function')Promise.resolve().then(()=>window.ensureLeafletLoaded()).catch(()=>{});loadSection('shop').catch(e=>console.warn('[BUSPHOTO] shop',e));}catch(e){console.error('[BUSPHOTO] bootstrap failed',e?.stack||e);status('Интерактив не удалось запустить. Обнови страницу.',true);}}
-function boot(){if(window.__BUSPHOTO_INTERACTIVE_STARTED_STABLE__)return;window.__BUSPHOTO_INTERACTIVE_STARTED_STABLE__=true;start();}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+  'use strict';
+  if (window.__BUSPHOTO_INTERACTIVE_LOADER_V78__) return;
+  window.__BUSPHOTO_INTERACTIVE_LOADER_V78__ = true;
+  const VERSION='20260828-v106';
+  const sections=[
+    ['menu','interactive-menu.html','interactive-menu-host'],
+    ['map','interactive-map.html','interactive-section-host-map'],
+    ['shop','interactive-shop.html','interactive-section-host-shop'],
+    ['garage','interactive-garage.html','interactive-section-host-garage'],
+    ['finance','interactive-finance.html','interactive-section-host-finance'],
+    ['history','interactive-history.html','interactive-section-host-history'],
+    ['routes','interactive-routes.html','interactive-section-host-routes'],
+    ['dispatch','interactive-dispatch.html','interactive-section-host-dispatch'],
+    ['stats','interactive-stats.html','interactive-section-host-stats'],
+    ['maintenance','interactive-maintenance.html','interactive-section-host-maintenance'],
+    ['rules','interactive-rules.html','interactive-rules-host']
+  ];
+  const byName=Object.fromEntries(sections.map(x=>[x[0],x]));
+  const loaded=new Set(), loading=new Map();
+  function status(text,error){const el=document.getElementById('interactiveLoadingStatus');if(!el)return;el.textContent=text;el.style.display='';el.style.borderColor=error?'#d32f2f':'';}
+  async function fetchWithTimeout(url,ms){
+    const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);
+    try{return await fetch(url,{cache:'default',credentials:'same-origin',signal:c.signal});}
+    finally{clearTimeout(t);}
+  }
+  async function loadOne(name,opts={}){
+    const item=byName[name];if(!item)return false;
+    if(loaded.has(name))return true;if(loading.has(name))return loading.get(name);
+    const [,file,hostId]=item;
+    const promise=(async()=>{
+      const host=document.getElementById(hostId);if(!host)throw new Error('Host not found: '+hostId);
+      if(host.querySelector('#game-section-'+name)){loaded.add(name);return true;}
+      host.replaceChildren();
+      const r=await fetchWithTimeout(file+'?v='+VERSION,opts.timeout||8000);
+      if(!r.ok)throw new Error(file+' HTTP '+r.status);
+      host.innerHTML=await r.text();loaded.add(name);
+      if(name==='garage'&&typeof renderGarageSection==='function')renderGarageSection();
+      if(name==='history'&&typeof renderHistorySection==='function')renderHistorySection();
+      return true;
+    })();
+    loading.set(name,promise);try{return await promise;}finally{loading.delete(name);}
+  }
+  function refreshSectionData(section){
+    try{
+      if(section==='finance'){
+        const el=document.getElementById('financeBalance'),owned=document.getElementById('financeOwned'),last=document.getElementById('financeLastPayout');
+        if(typeof gameState!=='undefined'){
+          if(el)el.textContent=typeof money==='function'?money(gameState.balance):`${Math.round(Number(gameState.balance||0)).toLocaleString('ru-RU')} р.`;
+          if(owned)owned.textContent=Array.isArray(gameState.owned)?gameState.owned.length:0;
+          if(last)last.textContent=gameState.lastPayoutDate||'ещё не было';
+        }
+      }else if(section==='garage'){if(typeof renderGarageSection==='function')renderGarageSection();}
+      else if(section==='history'){if(typeof renderHistorySection==='function')renderHistorySection();}
+      else if(section==='routes'){if(typeof renderRoutes==='function')renderRoutes();}
+      else if(section==='dispatch'||section==='stats'||section==='maintenance'){if(typeof renderV43Panels==='function')renderV43Panels();}
+    }catch(e){console.warn('[BUSPHOTO] section refresh failed',section,e);}
+  }
+  window.openInteractiveSection=async function(section,btn){
+    try{
+      if(typeof window.showGameSection==='function'){await loadOne(section,{timeout:8000});window.showGameSection(section,btn);refreshSectionData(section);return;}
+      window.__BUSPHOTO_PENDING_SECTION__={section,btn};await loadOne(section,{timeout:8000});
+      if(typeof window.showGameSection==='function'){
+        const p=window.__BUSPHOTO_PENDING_SECTION__;window.__BUSPHOTO_PENDING_SECTION__=null;
+        window.showGameSection(p?.section||section,p?.btn||btn);refreshSectionData(p?.section||section);
+      }
+    }catch(e){console.error('[BUSPHOTO] section open error',section,e);status('Раздел не удалось загрузить. Попробуй открыть его ещё раз.',true);}
+  };
+  window.BUSPHOTOEnsureInteractiveSection=loadOne;
+  async function loadMain(){
+    if(document.querySelector('script[data-busphoto-interactive-main]'))return;
+    await new Promise((resolve,reject)=>{const s=document.createElement('script');s.dataset.busphotoInteractiveMain='1';s.src='busphoto-interactive.js?v='+VERSION;s.onload=resolve;s.onerror=()=>reject(new Error('busphoto-interactive.js'));document.head.appendChild(s);});
+  }
+  async function start(){
+    status('Запуск интерактива…');
+    try{await loadOne('menu',{timeout:8000});}catch(e){console.error(e);status('Не удалось загрузить меню. Проверь соединение.',true);return;}
+    try{await loadMain();}catch(e){console.error(e);status('Не удалось запустить интерактивный модуль.',true);return;}
+    const initGame=()=>{if(typeof window.__BUSPHOTO_INIT_INTERACTIVE_GAME__!=='function'||window.__BUSPHOTO_GAME_INITIALIZED__)return;try{window.__BUSPHOTO_INIT_INTERACTIVE_GAME__();window.__BUSPHOTO_GAME_INITIALIZED__=true;}catch(e){window.__BUSPHOTO_GAME_INITIALIZED__=false;console.error('[BUSPHOTO] game init failed',e?.stack||e);status('Интерактив запущен частично. Открой раздел ещё раз.',true);}};
+    if(typeof window.ensureLeafletLoaded==='function')Promise.resolve().then(()=>window.ensureLeafletLoaded()).catch(()=>{});
+    initGame();
+    if(!document.getElementById('busphotoCardMapPreviewScript')){
+      await new Promise(resolve=>{const sc=document.createElement('script');sc.id='busphotoCardMapPreviewScript';sc.src='card-map-preview.js?v='+VERSION;sc.onload=resolve;sc.onerror=resolve;document.head.appendChild(sc);});
+    }
+    const cardQuery=new URLSearchParams(location.search);
+    if(cardQuery.get('open')==='map'&&cardQuery.get('routeId'))loadOne('map',{timeout:10000}).then(()=>{if(typeof window.showGameSection==='function')window.showGameSection('map',null)}).catch(e=>console.warn('[BUSPHOTO] card map open',e));
+    loadOne('shop',{timeout:8000}).then(()=>{if(!window.__BUSPHOTO_GAME_INITIALIZED__)initGame();}).catch(e=>console.warn('[BUSPHOTO] shop deferred',e));
+    const st=document.getElementById('interactiveLoadingStatus');if(st)st.style.display='none';
+    const p=window.__BUSPHOTO_PENDING_SECTION__;if(p&&typeof window.showGameSection==='function'){window.__BUSPHOTO_PENDING_SECTION__=null;window.showGameSection(p.section,p.btn);}
+    const rest=['garage','finance','history','routes','rules'];let i=0;
+    const next=()=>{if(i>=rest.length)return;const n=rest[i++];loadOne(n,{timeout:8000}).catch(e=>console.warn('[BUSPHOTO] background section',n,e));if('requestIdleCallback'in window)requestIdleCallback(next,{timeout:1500});else setTimeout(next,80);};
+    next();
+  }
+  function boot(){if(window.__BUSPHOTO_INTERACTIVE_STARTED_V78__)return;window.__BUSPHOTO_INTERACTIVE_STARTED_V78__=true;start();}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
