@@ -1,0 +1,26 @@
+name: BUSPHOTO card state fix
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p=Path('creating_card.html'); s=p.read_text(encoding='utf-8')
+          s=s.replace("const vehicle=(Array.isArray(window.state?.owned)?state.owned:[]).find", "const vehicle=(typeof state!=='undefined'&&Array.isArray(state.owned)?state.owned:[]).find")
+          s=s.replace("const routes=(Array.isArray(window.state?.routes)?state.routes:[]).filter", "const routes=(typeof state!=='undefined'&&Array.isArray(state.routes)?state.routes:[]).filter")
+          p.write_text(s,encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add creating_card.html .github/workflows/busphoto-card-state-fix.yml
+          git rm .github/workflows/busphoto-card-state-fix.yml
+          git diff --cached --quiet || git commit -m "Fix card route selector state access"
+          git push
