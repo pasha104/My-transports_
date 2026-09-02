@@ -1,4 +1,4 @@
-/* BUSPHOTO — убрать выбор ТС из меню маршрутов */
+/* BUSPHOTO — полностью убрать назначение/выбор ТС из меню маршрутов */
 (function(){
   'use strict';
   function clean(){
@@ -6,19 +6,30 @@
       const root=document.getElementById('routeAssignmentSummary');
       if(!root)return;
       root.querySelectorAll('.route-card').forEach(card=>{
-        [...card.querySelectorAll('div')].forEach(el=>{
+        // Убираем кнопку «ТС на маршруте».
+        card.querySelectorAll('button').forEach(btn=>{
+          const text=(btn.textContent||'').trim();
+          if(/ТС\s+на\s+маршруте/i.test(text))btn.remove();
+        });
+        // Убираем блок выбора ТС и подпись «Выбрано: ... ТС».
+        [...card.querySelectorAll('*')].forEach(el=>{
           const text=(el.textContent||'').trim();
-          if(text.startsWith('🚍 ТС на маршруте —')){
-            const parent=el.parentElement;
-            if(parent) parent.remove();
+          if(/^🚍\s*ТС\s+на\s+маршруте\s*[—-]/i.test(text)){
+            if(el.parentElement)el.parentElement.remove();
           }
         });
+        card.querySelectorAll('.route-assignment').forEach(el=>el.remove());
+        // На всякий случай удаляем оставшиеся чекбоксы выбора ТС.
         card.querySelectorAll('input[type="checkbox"]').forEach(input=>{
           const label=input.closest('label');
-          if(label) label.remove();
-          else input.remove();
+          if(label)label.remove(); else input.remove();
         });
-        card.querySelectorAll('.route-assignment').forEach(el=>el.remove());
+        // Убираем счетчик «Без ТС» / «N ТС на линии».
+        [...card.querySelectorAll('*')].forEach(el=>{
+          if(el.children.length) return;
+          const text=(el.textContent||'').trim();
+          if(/^(?:⏸\s*)?(?:Без\s+ТС|\d+\s+ТС(?:\s+на\s+линии)?)$/i.test(text))el.remove();
+        });
       });
     }catch(e){console.warn('[BUSPHOTO route menu fix]',e);}
   }
