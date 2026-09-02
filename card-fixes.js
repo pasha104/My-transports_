@@ -30,8 +30,6 @@
     return window.state.routes.filter(function(route){return cardRouteCompatible(vehicle,route);});
   };
 
-  // Убираем поиск маршрута из каждого этапа карточки.
-  // Сам выбор маршрута остаётся обычным выпадающим списком.
   function removeRouteSearch(){
     document.querySelectorAll('.stage .routeSearch,.stage input[type="search"]').forEach(function(input){input.remove();});
   }
@@ -44,7 +42,14 @@
         var select=stage.querySelector('.route');if(!select)return;
         var current=select.value;
         var routes=window.routesFor(v);
-        select.innerHTML=routes.length?routes.map(function(r){return '<option value="'+String(r.id).replace(/"/g,'&quot;')+'">№'+String(r.number||'').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];})+' — '+String(r.start||'—').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];})+' → '+String(r.end||'—').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];})+'</option>';}).join(''):'<option value="">Нет подходящих маршрутов</option>';
+        var html=routes.length?routes.map(function(r){
+          var id=String(r.id).replace(/"/g,'&quot;');
+          var number=String(r.number||'').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});
+          var start=String(r.start||'—').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});
+          var end=String(r.end||'—').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});
+          return '<option value="'+id+'">№'+number+' — '+start+' → '+end+'</option>';
+        }).join(''):'<option value="">Нет подходящих маршрутов</option>';
+        if(select.innerHTML!==html)select.innerHTML=html;
         if(routes.some(function(r){return String(r.id)===String(current);}))select.value=current;
       });
       if(typeof window.recalc==='function')window.recalc();
@@ -57,11 +62,24 @@
       location.href='interactive.html?open=map&routeId='+encodeURIComponent(routeId);
     };
   }
+
   removeVehicleFromMapLink();
-  window.addEventListener('load',function(){removeVehicleFromMapLink();setTimeout(refresh,80);});
-  window.addEventListener('storage',function(e){if(e.key==='busphoto_interactive_game')setTimeout(refresh,80);});
-  const observer=new MutationObserver(function(){refresh();});
-  function startObserver(){if(document.body)observer.observe(document.body,{childList:true,subtree:true});}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',startObserver,{once:true});else startObserver();
+  window.addEventListener('load',function(){
+    removeVehicleFromMapLink();
+    setTimeout(refresh,80);
+  });
+  window.addEventListener('storage',function(e){
+    if(e.key==='busphoto_interactive_game')setTimeout(refresh,80);
+  });
+
+  // ВАЖНО: наблюдаем только за появлением самого поля поиска.
+  // Не вызываем refresh() из MutationObserver — иначе изменение select создаёт
+  // новые мутации и страница может уйти в бесконечный цикл.
+  var observer=new MutationObserver(function(){removeRouteSearch();});
+  function startObserver(){
+    if(document.body)observer.observe(document.body,{childList:true,subtree:true});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',startObserver,{once:true});
+  else startObserver();
   setTimeout(refresh,80);
 })();
