@@ -29,23 +29,38 @@
     if(!vehicle||!Array.isArray(state?.routes))return [];
     return state.routes.filter(function(route){return cardRouteCompatible(vehicle,route);});
   };
+
+  // Убираем поиск маршрута из каждого этапа карточки.
+  // Сам выбор маршрута остаётся обычным выпадающим списком.
+  function removeRouteSearch(){
+    document.querySelectorAll('.stage .routeSearch').forEach(function(input){input.remove();});
+  }
+
   function refresh(){
     try{
+      removeRouteSearch();
       var v=typeof window.vehicle==='function'?window.vehicle():null;
       document.querySelectorAll('.stage').forEach(function(stage){
         var select=stage.querySelector('.route');if(!select)return;
         var current=select.value;
         var routes=window.routesFor(v);
-        var q=stage.querySelector('.routeSearch');
-        var term=String(q?.value||'').trim().toLowerCase();
-        var filtered=routes.filter(function(r){return !term||[r.number,r.start,r.end,r.name,r.title].filter(Boolean).join(' ').toLowerCase().includes(term);});
-        select.innerHTML=filtered.length?filtered.map(function(r){return '<option value="'+String(r.id).replace(/"/g,'&quot;')+'">№'+String(r.number||'').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];})+' — '+String(r.start||'—').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];})+' → '+String(r.end||'—').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];})+'</option>';}).join(''):'<option value="">Нет подходящих маршрутов</option>';
-        if(filtered.some(function(r){return String(r.id)===String(current);}))select.value=current;
+        select.innerHTML=routes.length?routes.map(function(r){return '<option value="'+String(r.id).replace(/"/g,'&quot;')+'">№'+String(r.number||'').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];})+' — '+String(r.start||'—').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];})+' → '+String(r.end||'—').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];})+'</option>';}).join(''):'<option value="">Нет подходящих маршрутов</option>';
+        if(routes.some(function(r){return String(r.id)===String(current);}))select.value=current;
       });
       if(typeof window.recalc==='function')window.recalc();
     }catch(e){console.warn('[BUSPHOTO card fixes]',e);}
   }
-  setTimeout(refresh,80);
-  window.addEventListener('load',function(){setTimeout(refresh,80);});
+
+  // При открытии маршрута с карточки больше не передаём vehicleId:
+  // меню карты работает только с выбранным маршрутом.
+  function removeVehicleFromMapLink(){
+    if(typeof window.openCardMap==='function')window.openCardMap=function(routeId){
+      if(!routeId)return;
+      location.href='interactive.html?open=map&routeId='+encodeURIComponent(routeId);
+    };
+  }
+  removeVehicleFromMapLink();
+  window.addEventListener('load',function(){removeVehicleFromMapLink();setTimeout(refresh,80);});
   window.addEventListener('storage',function(e){if(e.key==='busphoto_interactive_game')setTimeout(refresh,80);});
+  setTimeout(refresh,80);
 })();
