@@ -1,0 +1,27 @@
+name: BUSPHOTO syntax check
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check JavaScript syntax
+        run: |
+          node --check busphoto-interactive.js
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          for fn in ['creating_card.html','interactive-routes.html','index.html']:
+            s=Path(fn).read_text(encoding='utf-8')
+            for i,code in enumerate(re.findall(r'<script(?:[^>]*)>(.*?)</script>',s,re.S),1):
+              if not code.strip(): continue
+              f=Path('/tmp/check.js'); f.write_text(code,encoding='utf-8')
+              r=subprocess.run(['node','--check',str(f)],capture_output=True,text=True)
+              if r.returncode:
+                print(f'ERROR {fn} script {i}')
+                print(r.stderr)
+                raise SystemExit(1)
+          print('ALL JS SYNTAX OK')
