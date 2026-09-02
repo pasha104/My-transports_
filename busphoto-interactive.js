@@ -271,8 +271,7 @@ function rebuildMapStopsIndex(stops) {
                 "МАЗ-303Е": { price: 130000, salary: [7500, 12500] },
                 "МАЗ-305Е": { price: 250000, salary: [20000, 25000] },
                 "БКМ-Е321": { price: 60000, salary: [7500, 10000] },
-                "БКМ-Е433": { price: 90000, salary: [12000, 15000] },
-                "БКМ-Е350": { price: 110000, salary: [10000, 14000], capacity: 53, seats: 42, rangeKm: 100, maxSpeedKmh: 90, motorKw: 220 }
+                "БКМ-Е433": { price: 90000, salary: [12000, 15000] }
             }
         };
         let mapState = {
@@ -965,7 +964,7 @@ function rebuildMapStopsIndex(stops) {
             const number = document.getElementById('mapNewRouteNumber')?.value.trim();
             if (!number) return alert('Укажи номер нового маршрута.');
             const type = document.getElementById('mapRouteType')?.value || 'bus';
-            const routeServiceType = (type==='bus'||type==='electrobus') ? ((document.getElementById('mapBusRouteClass')?.value || 'city')==='intercity' ? 'city' : (document.getElementById('mapBusRouteClass')?.value || 'city')) : 'city';
+            const routeServiceType = type==='bus' ? (document.getElementById('mapBusRouteClass')?.value || 'city') : 'city';
             const name = document.getElementById('mapNewRouteName')?.value.trim() || `${stops[0].name} — ${stops[stops.length-1].name}`;
             const classicStops = stops.filter(s => s.stopType !== 'turnback');
             const route = { id:Date.now()+Math.random(), number, name, start:(classicStops[0]||stops[0]).name, end:(classicStops[classicStops.length-1]||stops[stops.length-1]).name, distance:0, stopCount:stops.length, stops:stops.map(s=>s.name), stopIds:ids, terminalStopIds:classicStops.map(s=>s.id), turnbackStopIds:stops.filter(s=>s.stopType==='turnback').map(s=>s.id), turnaroundMinutes:2, color:type==='trolleybus'?'#1565c0':(type==='electrobus'?'#00897b':'#1e88e5'), note:'Создано через карту', routeType:type, routeServiceType, vehicleId:null, vehicleIds:[], geometry:null, outboundGeometry:null, returnGeometry:null, reverseStopIds:ids.slice().reverse(), calculatedDistance:null, calculatedDuration:null, createdAt:localDateKey(), source:'map', controlPoints:mapState.draftPath.filter(x=>x.kind==='control').map(x=>x.point), pathNodes:mapState.draftPath.map(x=>x.kind==='control'?{kind:'control',point:x.point}:{kind:'stop',stopId:x.stopId}) };
@@ -1264,7 +1263,7 @@ function rebuildMapStopsIndex(stops) {
                 return `
                     <div class="route-card">
                         <div class="route-card-title">
-                            <span>🛣️ №${route.number} — ${escapeHtml(route.start || "—")} → ${escapeHtml(route.end || "—")} <span class="route-type-badge">${routeTypeLabel(route.routeType)}${(route.routeType==='bus'||route.routeType==='electrobus')?' · '+escapeHtml(routeServiceLabel(route.routeServiceType)):''}</span></span>
+                            <span>🛣️ №${route.number} — ${escapeHtml(route.start || "—")} → ${escapeHtml(route.end || "—")} <span class="route-type-badge">${routeTypeLabel(route.routeType)}${route.routeType==='bus'?' · '+escapeHtml(routeServiceLabel(route.routeServiceType)):''}</span></span>
                             <span class="route-badge ${assignedVehicles.length ? 'route-running' : 'route-idle'}">
                                 ${assignedVehicles.length ? `${assignedVehicles.map(v=>vehicleCategoryIcon(v.category)).join('')} ${assignedVehicles.length} ТС на линии` : '⏸ Без ТС'}
                             </span>
@@ -2758,7 +2757,7 @@ out body;
             const number=document.getElementById('mapNewRouteNumber')?.value.trim();
             if(!number){ alert('Укажи номер нового маршрута.'); return; }
             const type=document.getElementById('mapRouteType')?.value||'bus';
-            const service=(type==='bus'||type==='electrobus')?((document.getElementById('mapBusRouteClass')?.value||'city')==='intercity'?'city':(document.getElementById('mapBusRouteClass')?.value||'city')):'city';
+            const service=type==='bus'?(document.getElementById('mapBusRouteClass')?.value||'city'):'city';
             const t=mapState.gpxTrack;
             let stopIds=mapState.draftStopIds.slice();
             const stops=getMapStops();
@@ -3330,7 +3329,7 @@ out body;
                         <b>№${escapeHtml(route.number)}</b> — ${escapeHtml(route.start || "—")} → ${escapeHtml(route.end || "—")} <span class="route-type-badge">${routeTypeLabel(route.routeType)}</span>
                     </div>
                     <div class="map-help">
-                        ${routeTypeLabel(route.routeType)}${(route.routeType==='bus'||route.routeType==='electrobus')?' · '+escapeHtml(routeServiceLabel(route.routeServiceType)):''}
+                        ${routeTypeLabel(route.routeType)}${route.routeType==='bus'?' · '+escapeHtml(routeServiceLabel(route.routeServiceType)):''}
                         · ${escapeHtml(route.start || '—')} → ${escapeHtml(route.end || '—')}
                         · ${(Array.isArray(route.vehicleIds) ? route.vehicleIds.length : (route.vehicleId ? 1 : 0))} ТС
                     </div>
@@ -4688,4 +4687,3 @@ out body;
 
   setInterval(()=>{ if(typeof gameState!=='undefined' && Array.isArray(gameState.owned)){gameState.owned.forEach(ensureVehicleStats); if(document.getElementById('game-section-dispatch')?.classList.contains('active'))renderDispatcherV43();}},5000);
 })();
-\n/* BUSPHOTO surgical route/model patch 20260902 */\n(function(){\n  if(window.__BUSPHOTO_ROUTE_MODEL_PATCH_20260902__)return;\n  window.__BUSPHOTO_ROUTE_MODEL_PATCH_20260902__=true;\n  if(typeof gameCatalog!=='undefined'&&gameCatalog.electrobus){gameCatalog.electrobus['БКМ-Е350']={price:110000,salary:[10000,14000],capacity:53,seats:42,rangeKm:100,maxSpeedKmh:90,motorKw:220};}\n  const oldSupports=window.gameModelSupportsType;\n  window.gameModelSupportsType=function(model,type){const cat=document.getElementById('gameCategory')?.value;if(cat==='electrobus')return type==='all'||type==='city'||type==='suburban';if(cat==='trolleybus')return type==='all'||type==='city';return oldSupports?oldSupports(model,type):true;};\n  const oldClass=window.updateBusRouteClassVisibility;\n  window.updateBusRouteClassVisibility=function(){const type=document.getElementById('mapRouteType')?.value||'bus';const el=document.getElementById('mapBusRouteClass');if(!el)return;[...el.options].forEach(o=>o.hidden=(type==='electrobus'&&o.value==='intercity')||(type==='trolleybus'&&o.value!=='city'));el.style.display='block';if(type==='electrobus'&&el.value==='intercity')el.value='city';if(type==='trolleybus')el.value='city';if(oldClass&&type==='bus')try{oldClass()}catch(e){}};\n  const oldLoad=window.loadGameState;if(oldLoad)window.loadGameState=function(){oldLoad();(gameState.routes||[]).forEach(r=>{if(r.routeType==='electrobus'&&r.routeServiceType==='intercity')r.routeServiceType='city';if(r.routeType==='trolleybus'&&r.routeServiceType!=='city')r.routeServiceType='city';});(gameState.owned||[]).forEach(v=>{if(v.category==='electrobus'&&v.model==='БКМ-Е350')v.passengerCapacity=53;});if(typeof saveGameState==='function')saveGameState();};\n  document.addEventListener('change',e=>{if(e.target?.id==='mapRouteType')window.updateBusRouteClassVisibility();},{passive:true});\n})();\n\n(function(){\n  const oldRenderRoutes=window.renderRoutes;if(typeof oldRenderRoutes!=='function')return;\n  window.renderRoutes=function(){oldRenderRoutes();const list=document.getElementById('routesList');if(!list)return;list.querySelectorAll('.route-badge').forEach(e=>e.remove());list.querySelectorAll('button').forEach(b=>{if((b.textContent||'').includes('ТС на маршруте'))b.remove()});list.querySelectorAll('.route-card').forEach(card=>{card.querySelectorAll('div').forEach(div=>{if((div.textContent||'').trim().startsWith('🚍 ТС на маршруте —'))div.remove()});card.querySelectorAll('.route-assignment').forEach(box=>{const del=[...box.querySelectorAll('button')].find(b=>(b.textContent||'').includes('Удалить маршрут'));box.innerHTML='';if(del)box.appendChild(del);});});};\n})();\n
