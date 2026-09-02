@@ -26,14 +26,14 @@
   window.cardRouteCompatible=cardRouteCompatible;
   window.compatible=function(vehicle,route){return cardRouteCompatible(vehicle,route);};
   window.routesFor=function(vehicle){
-    if(!vehicle||!Array.isArray(state?.routes))return [];
-    return state.routes.filter(function(route){return cardRouteCompatible(vehicle,route);});
+    if(!vehicle||!Array.isArray(window.state?.routes))return [];
+    return window.state.routes.filter(function(route){return cardRouteCompatible(vehicle,route);});
   };
 
   // Убираем поиск маршрута из каждого этапа карточки.
   // Сам выбор маршрута остаётся обычным выпадающим списком.
   function removeRouteSearch(){
-    document.querySelectorAll('.stage .routeSearch').forEach(function(input){input.remove();});
+    document.querySelectorAll('.stage .routeSearch,.stage input[type="search"]').forEach(function(input){input.remove();});
   }
 
   function refresh(){
@@ -51,8 +51,6 @@
     }catch(e){console.warn('[BUSPHOTO card fixes]',e);}
   }
 
-  // При открытии маршрута с карточки больше не передаём vehicleId:
-  // меню карты работает только с выбранным маршрутом.
   function removeVehicleFromMapLink(){
     if(typeof window.openCardMap==='function')window.openCardMap=function(routeId){
       if(!routeId)return;
@@ -62,5 +60,8 @@
   removeVehicleFromMapLink();
   window.addEventListener('load',function(){removeVehicleFromMapLink();setTimeout(refresh,80);});
   window.addEventListener('storage',function(e){if(e.key==='busphoto_interactive_game')setTimeout(refresh,80);});
+  const observer=new MutationObserver(function(){refresh();});
+  function startObserver(){if(document.body)observer.observe(document.body,{childList:true,subtree:true});}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',startObserver,{once:true});else startObserver();
   setTimeout(refresh,80);
 })();
