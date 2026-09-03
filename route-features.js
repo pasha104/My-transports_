@@ -64,7 +64,11 @@
   async function ensureSection(){
     const host=document.getElementById('interactive-section-host-routes');if(!host)return;
     if(!host.querySelector('#game-section-routes')){try{const res=await fetch('interactive-routes.html?routefix=2',{cache:'no-store'});if(res.ok)host.innerHTML=await res.text();}catch(e){}}
-    const section=host.querySelector('#game-section-routes');if(section){section.style.display='block';section.hidden=false;}
+    // ВАЖНО: не открываем раздел программно. Его видимостью управляет меню
+    // через showGameSection('routes'). Раньше здесь display:block раскрывал
+    // «Мои маршруты» одновременно с магазином, гаражом и другими разделами.
+    const section=host.querySelector('#game-section-routes');
+    if(section){section.style.removeProperty('display');section.hidden=false;}
     if(typeof window.renderRoutes==='function'){try{window.renderRoutes();}catch(e){}}
     setTimeout(()=>{fallbackRender();addButtons();removeAssignmentUI();},100);
     setTimeout(()=>{addButtons();removeAssignmentUI();},600);
