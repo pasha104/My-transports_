@@ -1,24 +1,14 @@
 <div class="game-section" id="game-section-routes">
-<div class="route-menu-grid">
-<div class="interactive-card">
-<h3>🚌 Распределение автобусов</h3>
-<div class="interactive-muted" style="margin-bottom:8px;">
-                            Маршруты создаются только на карте. Здесь можно назначать купленные ТС на готовую линию.
-                            Назначение не меняет деньги и ЗП.
-                        </div>
-<div id="routeAssignmentSummary"></div>
-</div>
-</div>
-<div class="interactive-card" style="margin-top:12px;">
-<h3>🛣️ Мои маршруты</h3>
-<div class="interactive-muted" style="margin-bottom:8px;">Новый маршрут создавай только через раздел «Карта» → «Сборка маршрута».</div>
-<div class="map-filter-row" style="margin-bottom:8px;">
-<button class="map-filter-btn active" id="gameRouteFilterAll" onclick="setGameRouteTypeFilter('all')">Все</button>
-<button class="map-filter-btn" id="gameRouteFilterBus" onclick="setGameRouteTypeFilter('bus')">🚌 Автобусы</button>
-<button class="map-filter-btn" id="gameRouteFilterElectrobus" onclick="setGameRouteTypeFilter('electrobus')">⚡ Электробусы</button>
-<button class="map-filter-btn" id="gameRouteFilterTrolleybus" onclick="setGameRouteTypeFilter('trolleybus')">🚎 Троллейбус</button>
-</div>
-<input id="gameRouteSearch" type="search" placeholder="🔎 Поиск маршрута по номеру, названию или конечным..." oninput="renderRoutes()" style="width:100%;box-sizing:border-box;padding:9px 10px;margin:0 0 8px;border:1px solid var(--bp-border);border-radius:8px;background:var(--bp-input-bg);color:var(--bp-text);">
-<div id="routesList"></div>
-</div>
+  <div class="interactive-card" style="margin-top:12px;">
+    <h3>🛣️ Мои маршруты</h3>
+    <div class="interactive-muted" style="margin-bottom:8px;">Новый маршрут создавай только через раздел «Карта» → «Сборка маршрута».</div>
+    <div class="map-filter-row" style="margin-bottom:8px;">
+      <button class="map-filter-btn active" id="gameRouteFilterAll" onclick="setGameRouteTypeFilter('all')">Все</button>
+      <button class="map-filter-btn" id="gameRouteFilterBus" onclick="setGameRouteTypeFilter('bus')">🚌 Автобусы</button>
+      <button class="map-filter-btn" id="gameRouteFilterElectrobus" onclick="setGameRouteTypeFilter('electrobus')">⚡ Электробусы</button>
+      <button class="map-filter-btn" id="gameRouteFilterTrolleybus" onclick="setGameRouteTypeFilter('trolleybus')">🚎 Троллейбус</button>
+    </div>
+    <input id="gameRouteSearch" type="search" placeholder="🔎 Поиск маршрута по номеру, названию или конечным..." oninput="renderRoutes()" style="width:100%;box-sizing:border-box;padding:9px 10px;margin:0 0 8px;border:1px solid var(--bp-border);border-radius:8px;background:var(--bp-input-bg);color:var(--bp-text);">
+    <div id="routesList"></div>
+  </div>
 </div>
