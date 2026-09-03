@@ -47,7 +47,7 @@ function enhance(){
   });
   if(d.body)observer.observe(d.body,{childList:true,subtree:true});
   if(!d.getElementById('bpCardFixesScript')){
-    const s=d.createElement('script');s.id='bpCardFixesScript';s.src='card-fixes.js?v=20260903-fixes6';d.head.appendChild(s);
+    const s=d.createElement('script');s.id='bpCardFixesScript';s.src='card-fixes.js?v=20260903-fixes7';d.head.appendChild(s);
   }
 }
 f.addEventListener('load',()=>{enhance();if(new URLSearchParams(location.search).get('cards')==='1')setTimeout(()=>f.contentDocument.getElementById('cardsSection')?.scrollIntoView({behavior:'smooth',block:'start'}),350);});
