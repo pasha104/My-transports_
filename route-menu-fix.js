@@ -1,18 +1,13 @@
-/* BUSPHOTO — убрать выбор/назначение ТС из меню маршрутов */
+/* BUSPHOTO — выбор ТС из меню маршрутов удалён на уровне HTML.
+   Без MutationObserver, чтобы меню не зависало.
+*/
 (function(){
   'use strict';
-
-  // Никаких MutationObserver: он мог зацикливаться при перерисовке меню.
-  // Блок назначения ТС просто скрывается CSS и не влияет на список маршрутов.
-  function hideVehicleAssignment(){
-    if(document.getElementById('bpRouteMenuNoVehicleStyle'))return;
-    var style=document.createElement('style');
-    style.id='bpRouteMenuNoVehicleStyle';
-    style.textContent='#routeAssignmentSummary{display:none!important}';
-    (document.head||document.documentElement).appendChild(style);
+  function clean(){
+    const root=document.getElementById('routeAssignmentSummary');
+    if(root) root.remove();
   }
-
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',hideVehicleAssignment,{once:true});
-  else hideVehicleAssignment();
-  window.addEventListener('load',hideVehicleAssignment);
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',clean,{once:true});
+  else clean();
+  window.addEventListener('load',clean);
 })();
