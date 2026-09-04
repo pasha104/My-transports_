@@ -31,7 +31,6 @@
     const rt=routeType(r), st=serviceType(r);
     if(vc==='trolleybus')return rt==='trolleybus';
     if(vc==='electrobus')return (rt==='electrobus'||rt==='bus')&&(!st||st==='city'||st==='suburban');
-    // Обычный автобус можно поставить на автобусный, троллейбусный и электробусный маршрут.
     return rt==='bus'||rt==='trolleybus'||rt==='electrobus';
   }
   function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -85,6 +84,27 @@
     const s=document.getElementById('vehicle');
     if(s&&!s.dataset.cardFixBound){s.dataset.cardFixBound='1';s.addEventListener('change',()=>{presetApplied=false;setTimeout(refresh,0);});}
     refresh();setTimeout(refresh,250);setTimeout(refresh,800);setTimeout(refresh,1500);
+
+    // При добавлении второго/третьего маршрута исходный код создаёт новый .stage.
+    // Раньше новый select.route появлялся без списка маршрутов. Обновляем только
+    // после изменения блока stages и отключаем observer на время refresh, чтобы
+    // не получить зацикливание MutationObserver.
+    const stages=document.getElementById('stages');
+    if(stages&&!stages.dataset.routeObserverBound){
+      stages.dataset.routeObserverBound='1';
+      let observer=null,scheduled=false;
+      const safeRefresh=()=>{
+        scheduled=false;
+        if(observer)observer.disconnect();
+        try{refresh();}finally{if(observer)observer.observe(stages,{childList:true,subtree:true});}
+      };
+      observer=new MutationObserver(()=>{
+        if(scheduled)return;
+        scheduled=true;
+        setTimeout(safeRefresh,30);
+      });
+      observer.observe(stages,{childList:true,subtree:true});
+    }
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
   window.addEventListener('load',()=>setTimeout(refresh,50));
