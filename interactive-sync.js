@@ -65,6 +65,11 @@
     x.textContent=`Локально: ${l.vehicles} ТС · ${l.routes} маршрутов · ${l.stops} остановок · ${fmt(l.balance)} р.${extra?' · '+extra:''}`;
   }
   function redirectUrl(){
+    // Android WebView's appassets origin cannot receive email-confirmation callbacks.
+    // Send confirmation to the public site, then sign in with the same email/password in the app.
+    if (window.location.hostname === 'appassets.androidplatform.net') {
+      return 'https://pasha104.github.io/My-transports_/interactive.html';
+    }
     return window.location.origin + window.location.pathname;
   }
   async function loadSdk(){
