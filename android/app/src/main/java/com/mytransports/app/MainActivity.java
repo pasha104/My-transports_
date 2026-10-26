@@ -7,19 +7,28 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.content.Intent;
 import android.net.Uri;
 import android.content.ActivityNotFoundException;
 import android.webkit.ValueCallback;
 
+import androidx.webkit.WebViewAssetLoader;
+
 public class MainActivity extends Activity {
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private static final int FILE_CHOOSER_REQUEST = 2017;
+    private WebViewAssetLoader assetLoader;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        assetLoader = new WebViewAssetLoader.Builder()
+                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                .build();
+
         webView = new WebView(this);
         setContentView(webView);
 
@@ -36,12 +45,21 @@ public class MainActivity extends Activity {
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                return assetLoader.shouldInterceptRequest(request.getUrl());
+            }
+
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 String scheme = uri.getScheme() == null ? "" : uri.getScheme();
-                if ("file".equals(scheme) || "about".equals(scheme)) return false;
+                String host = uri.getHost() == null ? "" : uri.getHost();
+
+                if ("https".equals(scheme) && "appassets.androidplatform.net".equals(host)) {
+                    return false;
+                }
+                if ("about".equals(scheme)) return false;
                 if ("https".equals(scheme) || "http".equals(scheme)) {
-                    String host = uri.getHost() == null ? "" : uri.getHost();
                     if (host.equals("localhost") || host.endsWith("github.io")) {
                         return false;
                     }
@@ -70,7 +88,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        webView.loadUrl("file:///android_asset/site/index.html");
+        webView.loadUrl("https://appassets.androidplatform.net/assets/site/index.html");
     }
 
     @Override
