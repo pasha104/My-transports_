@@ -1,0 +1,55 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [android-apk]
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-apk.yml'
+      - '*.html'
+      - '*.js'
+      - '*.css'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Copy website into Android assets
+        shell: bash
+        run: |
+          mkdir -p android/app/src/main/assets/site
+          find . -maxdepth 1 -type f \( -name '*.html' -o -name '*.js' -o -name '*.css' -o -name '*.json' -o -name '*.txt' -o -name '*.svg' -o -name '*.png' -o -name '*.jpg' -o -name '*.webp' \) -print0 | while IFS= read -r -d '' f; do cp "$f" android/app/src/main/assets/site/; done
+          if [ -d images ]; then cp -R images android/app/src/main/assets/site/; fi
+          if [ -d assets ]; then cp -R assets android/app/src/main/assets/site/; fi
+          if [ -d data ]; then cp -R data android/app/src/main/assets/site/; fi
+          test -f android/app/src/main/assets/site/index.html
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build debug APK
+        working-directory: android
+        run: gradle --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: My-transports-Android-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
