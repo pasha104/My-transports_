@@ -6,7 +6,11 @@ let sb=null,user=null,timer=null,channel=null,applying=false; const $=id=>docume
 function status(t,e=false){const x=$('mainSyncStatus');if(x){x.textContent=t;x.style.borderColor=e?'#c62828':'';}}
 function read(){try{return JSON.parse(localStorage.getItem(DB_KEY)||'[]')}catch{return[]}}
 function info(extra=''){const x=$('mainSyncInfo');if(x)x.textContent=`Локальная БД: ${read().length} ТС${extra?' · '+extra:''}`}
-function redirect(){return location.origin+location.pathname+location.hash}
+function redirect(){
+  // The Android asset origin cannot receive email confirmation callbacks.
+  if(location.hostname==='appassets.androidplatform.net') return 'https://pasha104.github.io/My-transports_/index.html';
+  return location.origin+location.pathname+location.hash
+}
 async function sdk(){if(window.supabase?.createClient)return window.supabase;if(window.__BUSPHOTO_MAIN_SDK__)return window.__BUSPHOTO_MAIN_SDK__;return window.__BUSPHOTO_MAIN_SDK__=new Promise((ok,bad)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';s.async=true;s.onload=()=>window.supabase?.createClient?ok(window.supabase):bad(new Error('Supabase SDK не инициализировался'));s.onerror=()=>bad(new Error('Не удалось загрузить Supabase SDK'));document.head.appendChild(s)})}
 function render(){const on=!!user;if($('mainSyncAuth'))$('mainSyncAuth').style.display=on?'none':'';if($('mainSyncPanel'))$('mainSyncPanel').style.display=on?'':'none';if($('mainSyncUser'))$('mainSyncUser').textContent=on?`👤 ${user.email||user.user_metadata?.email||'Google аккаунт'}`:'';if($('mainSyncAuto'))$('mainSyncAuto').checked=localStorage.getItem('busphoto_main_sync_auto_v1')==='1';info()}
 async function loginGoogle(){status('🔐 открываю Google...');const r=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:redirect(),queryParams:{prompt:'select_account'}}});if(r.error)throw r.error}
