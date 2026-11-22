@@ -130,7 +130,7 @@ async function requestRepairRoad(v,start){
  try{
   const d=depotForVehicle(v),url=OSRM+Number(start[1])+','+Number(start[0])+';'+d.lon+','+d.lat+'?overview=full&geometries=geojson&steps=false',r=await fetch(url);
   if(!r.ok)throw new Error('OSRM '+r.status);const data=await r.json(),route=data.routes?.[0];if(!route?.geometry?.coordinates?.length)throw new Error('Маршрут не найден');
-  v.repairRouteGeometry=route.geometry;v.repairRouteStartedAt=Number(v.repairStartedAt||Date.now());v.repairRouteDurationMs=Math.max(60000,Number(route.duration||60)*1000);v.repairRouteDistanceMeters=Number(route.distance||0);v.repairRouteStatus='ready';saveGameState();
+  v.repairRouteGeometry=route.geometry;v.repairRouteStartedAt=Number(v.repairStartedAt||Date.now());v.repairRouteDurationMs=Math.min(Math.max(60000,Number(route.duration||60)*1000),Math.max(60000,Number(v.repairDurationMs||60000)));v.repairRouteDistanceMeters=Number(route.distance||0);v.repairRouteStatus='ready';saveGameState();
  }catch(e){v.repairRouteStatus='unavailable';v.repairRouteError=String(e.message||e);saveGameState();console.warn('[BUSPHOTO] repair route unavailable',e);}
  finally{repairRequests.delete(String(v.id));if(typeof renderV43Panels==='function')renderV43Panels();}
 }
