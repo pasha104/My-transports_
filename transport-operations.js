@@ -102,6 +102,18 @@ if(typeof oldPayout==='function' && !oldPayout.__dispatchGuardV1){
  };
  window.processServiceCardPayouts.__dispatchGuardV1=true;
 }
+const oldCardPoint=window.getCardDrivenPoint;
+if(typeof oldCardPoint==='function')window.getCardDrivenPoint=function(v,card,now){
+ if(v&&Number(v.repairUntil)>Date.now()){
+  const g=v.repairRouteGeometry,d=depotForVehicle(v);
+  if(g?.coordinates?.length>=2){
+   const dur=Math.max(60000,Number(v.repairRouteDurationMs||60000)),p=Math.max(0,Math.min(1,(Date.now()-Number(v.repairRouteStartedAt||Date.now()))/dur));
+   return {point:pathPointFromGeometry(g,p),phase:p>=1?'🏠 в парке '+d.name+' · ожидает ремонта':'🚧 следует в парк '+d.name,activeRoute:getVehicleRoute(v.id)};
+  }
+  return {point:v.repairRouteStartPoint||null,phase:v.repairRouteStatus==='unavailable'?'🚧 маршрут до парка не построен — ТС остановлено':'🚧 строится дорожный маршрут до парка',activeRoute:getVehicleRoute(v.id)};
+ }
+ return oldCardPoint(v,card,now);
+};
 const oldSim=window.getVehicleSimulationPoint;
 if(typeof oldSim==='function')window.getVehicleSimulationPoint=function(v){
  if(!v)return oldSim(v);
@@ -128,7 +140,7 @@ if(typeof oldService==='function')window.serviceVehicleV43=function(id){
  const cs=cards().filter(c=>c&&c.active!==false&&String(c.vehicleId)===String(v.id));
  let sim=null;try{sim=cs.length?getCardDrivenPoint(v,cs,new Date()):getVehicleSimulationPoint(v);}catch(e){}
  const start=sim?.point||null,before=Number(v.repairUntil||0),result=oldService(id);
- if(Number(v.repairUntil)>Date.now()&&Number(v.repairUntil)!==before){v.repairRouteStatus='building';v.repairRouteStartedAt=Number(v.repairStartedAt||Date.now());saveGameState();if(start)requestRepairRoad(v,start);else{const d=depotForVehicle(v);v.repairRouteGeometry={type:'LineString',coordinates:[[d.lon,d.lat],[d.lon,d.lat]]};v.repairRouteStatus='at-depot';saveGameState();}}
+ if(Number(v.repairUntil)>Date.now()&&Number(v.repairUntil)!==before){v.repairRouteStatus='building';v.repairRouteStartedAt=Number(v.repairStartedAt||Date.now());v.repairRouteStartPoint=start;saveGameState();if(start)requestRepairRoad(v,start);else{const d=depotForVehicle(v);v.repairRouteGeometry={type:'LineString',coordinates:[[d.lon,d.lat],[d.lon,d.lat]]};v.repairRouteStatus='at-depot';saveGameState();}}
  return result;
 };
 function installBoard(){
