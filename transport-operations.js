@@ -64,6 +64,44 @@ function renderDispatch(){
   return '<div class="interactive-log-row"><div style="min-width:0"><b>'+vehicleCategoryIcon(v.category||'bus')+' '+esc(v.model||'ТС')+'</b><br><span class="interactive-muted">'+esc(vehicleNumberText(v))+'</span><br><b>'+esc(route?'№'+(route.number||'—')+' · '+(route.start||'—')+' → '+(route.end||'—'):'маршрут не назначен')+'</b><br>'+status+' · '+esc(sim?.phase||'в парке')+'<br><span class="interactive-muted">Рейс: '+trip+' · заезд в парк: '+(active?.abs?.return?hhmm(active.abs.return):'—')+'</span></div><button class="btn-secondary" onclick="focusVehicleV43(\''+esc(v.id)+'\')">🛰️ Следить</button></div>';
  }).join('')||'<div class="interactive-muted">ТС нет.</div>';
 }
+/* Reject overlapping same-vehicle card schedules and deduplicate arrival events. */
+const oldPayout=window.processServiceCardPayouts;
+if(typeof oldPayout==='function' && !oldPayout.__dispatchGuardV1){
+ window.processServiceCardPayouts=function(now){
+  const owner=new Map(),blocked=new Map(),accepted=new Map(),seen=new Set();
+  const sorted=[];
+  cards().filter(c=>c&&c.active!==false).forEach(card=>(card.schedules||[]).forEach((s,i)=>{
+   owner.set(s,String(card.vehicleId));
+   sorted.push({card,s,i,vehicle:gameState.owned.find(v=>String(v.id)===String(card.vehicleId))});
+  }));
+  sorted.sort((a,b)=>String(a.card.createdAt||'').localeCompare(String(b.card.createdAt||''))||a.i-b.i);
+  sorted.forEach(item=>{
+   const v=item.vehicle, s=item.s, route=getScheduleRoute(s);if(!v||!route)return;
+   for(let day=0;day<7;day++){
+    if(!Array.isArray(s.days)||!s.days.includes(day))continue;
+    const base=new Date(2026,0,4+day),abs=getScheduleAbsoluteTimes(s,base,route,v);
+    const key=String(v.id)+'|'+day, list=accepted.get(key)||[];
+    const start=abs.depot.getTime(),end=abs.return.getTime();
+    const overlap=list.some(x=>start<x.end&&end>x.start);
+    if(overlap){const days=blocked.get(s)||new Set();days.add(day);blocked.set(s,days);}
+    else list.push({start,end});
+    accepted.set(key,list);
+   }
+  });
+  const oldGenerated=window.getGeneratedArrivalTimes;
+  if(typeof oldGenerated!=='function')return oldPayout(now);
+  window.getGeneratedArrivalTimes=function(schedule,baseDate){
+   const days=blocked.get(schedule);
+   if(days?.has(baseDate.getDay()))return [];
+   const times=oldGenerated(schedule,baseDate),vehicleId=owner.get(schedule);
+   if(!vehicleId)return times;
+   return times.filter(ts=>{const key=vehicleId+'|'+ts;if(seen.has(key))return false;seen.add(key);return true;});
+  };
+  try{return oldPayout(now);}
+  finally{window.getGeneratedArrivalTimes=oldGenerated;}
+ };
+ window.processServiceCardPayouts.__dispatchGuardV1=true;
+}
 const oldSim=window.getVehicleSimulationPoint;
 if(typeof oldSim==='function')window.getVehicleSimulationPoint=function(v){
  if(!v)return oldSim(v);
